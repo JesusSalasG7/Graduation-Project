@@ -38,7 +38,7 @@ class TmxLevelLoader:
 
     def load_tilemap(self, level: Any, group: ET.Element) -> None:
         tilemap = Tilemap(self.height, self.width, self.tilewidth, self.tileheight)
-        id_texturs = None
+        id_textures = None
 
         for layer in group.findall("layer"):
             tilemap.create_layer()
@@ -51,12 +51,12 @@ class TmxLevelLoader:
                     value = int(line[j])
 
                     if self.level in  settings.TILEMAP: 
-                        for rango, textura in settings.TILEMAP[self.level].items():
-                            if rango[0] <= value <= rango[1]:  # Si el valor está dentro del rango
-                                id_texturs = textura 
+                        for tile_range, texture_id in settings.TILEMAP[self.level].items():
+                            if tile_range[0] <= value <= tile_range[1]:  # Si el valor está dentro del tile_range
+                                id_textures = texture_id 
 
-                    frame_index = value - self.first_ids[id_texturs]
-                    tilemap.set_new_tile(i, j, frame_index, id_texturs)
+                    frame_index = value - self.first_ids[id_textures]
+                    tilemap.set_new_tile(i, j, frame_index, id_textures)
 
         level.tilemap = tilemap
 
@@ -75,11 +75,11 @@ class TmxLevelLoader:
                         continue
 
                     if self.level in  settings.TILEMAP: 
-                        for rango, textura in settings.TILEMAP[self.level].items():
-                            if rango[0] <= value <= rango[1]:  # Si el valor está dentro del rango
-                                id_texturs = textura
+                        for tile_range, texture_id in settings.TILEMAP[self.level].items():
+                            if tile_range[0] <= value <= tile_range[1]:  # Si el valor está dentro del tile_range
+                                id_textures = texture_id
                     
-                    frame_index = value - self.first_ids[id_texturs]
+                    frame_index = value - self.first_ids[id_textures]
 
                     level.add_trap(
                         {
@@ -106,11 +106,11 @@ class TmxLevelLoader:
                         continue
 
                     if self.level in  settings.TILEMAP: 
-                        for rango, textura in settings.TILEMAP[self.level].items():
-                            if rango[0] <= value <= rango[1]:  # Si el valor está dentro del rango
-                                id_texturs = textura
+                        for tile_range, texture_id in settings.TILEMAP[self.level].items():
+                            if tile_range[0] <= value <= tile_range[1]:  # Si el valor está dentro del tile_range
+                                id_textures = texture_id
                     
-                    frame_index = value - self.first_ids[id_texturs]
+                    frame_index = value - self.first_ids[id_textures]
 
                     level.add_item(
                         {
@@ -135,11 +135,11 @@ class TmxLevelLoader:
                     continue
 
                 if self.level in  settings.TILEMAP: 
-                        for rango, textura in settings.TILEMAP[self.level].items():
-                            if rango[0] <= value <= rango[1]:  # Si el valor está dentro del rango
-                                id_texturs = textura
+                        for tile_range, texture_id in settings.TILEMAP[self.level].items():
+                            if tile_range[0] <= value <= tile_range[1]:  # Si el valor está dentro del tile_range
+                                id_textures = texture_id
 
-                frame_index = value - self.first_ids[id_texturs]
+                frame_index = value - self.first_ids[id_textures]
 
                 level.add_creature(
                     {

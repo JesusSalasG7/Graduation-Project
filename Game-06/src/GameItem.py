@@ -16,13 +16,6 @@ class GameItem(GameObject):
         self._on_collide = on_collide
         self._on_consume = on_consume
 
-    def respawn(self, x: Optional[float] = None, y: Optional[float] = None) -> None:
-        if x is not None:
-            self.x = x
-        if y is not None:
-            self.y = y
-        self.active = True
-
     def on_collide(self, another: Any) -> Any:
         if not self.collidable or self._on_collide is None:
             return None
@@ -34,7 +27,4 @@ class GameItem(GameObject):
             return None
         self.active = False
         return self._on_consume( consumer)
-    
-    def activate_item(self) -> Any:
-        self.active = True
 

@@ -1,90 +1,115 @@
 
+import math
+
 import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState
 from gale.text import render_text
-from gale.timer import Timer
 
 import settings
-from src.Puzzle.Tile import Tile
+from src.Puzzle.SortingPuzzle import SortingPuzzle
+
+UNSOLVED_COLOR = (231, 76, 60)  # rojo
+SOLVED_COLOR = (46, 204, 113)  # verde
+KEY_DELAY_SECONDS = 5
 
 
 class PuzzleState(BaseState):
     """
-    "Where's the Key" minigame: a 2x2 swap-and-rotate picture puzzle.
-    Repositioning and rotating the four fragments reveals a hidden picture;
-    solving it grants the player the key needed to face the boss.
+    "Where's the Key" minigame: a picture is cut into
+    settings.BOARD_WIDTH x settings.BOARD_HEIGHT fragments, shown intact
+    (matching the source image) at the start; the player must rearrange
+    the fragments (position + rotation) into the hidden solution to
+    reveal the key and face the boss.
+
+    Game-lifecycle wiring:
+        PlayState (el jugador toca el ítem llave)
+            -> WheresTheKeyState ("Presiona ENTER para comenzar")
+            -> PuzzleState.enter()   <- estás aquí
+
+    Dónde vive el ordenamiento:
+        El algoritmo de ordenamiento NO está en este archivo. Vive en
+        SortingPuzzle.sort() (src/Puzzle/SortingPuzzle.py), que reordena
+        una lista de fragmentos Tile (src/Puzzle/Tile.py) según la
+        casilla de destino de cada uno. PuzzleState solo se encarga del
+        lado pygame: le pide a SortingPuzzle los Tile ya armados
+        (SortingPuzzle.new_tiles()), le pide que los ordene, traduce el
+        orden resultante en posiciones de tablero (__place_tiles) y lo
+        dibuja. Nada de esto necesita cambiar para la tarea del estudiante.
     """
-
-    SELECTED_BORDER_COLOR = (255, 215, 0)
-    BORDER_WIDTH = 3
-
-    # Tile.id (fixed creation order, row-major) -> the (row, col, rotation)
-    # it must reach to reveal the hidden picture. Discovered by trial with
-    # the reference implementation this puzzle was ported from.
-    SOLUTION = {
-        0: (0, 1, 0),
-        1: (1, 0, 0),
-        2: (0, 0, 180),
-        3: (1, 1, 180),
-    }
 
     def enter(self, player) -> None:
         self.player = player
-        self.board = [
-            [None for _ in range(settings.BOARD_WIDTH)]
-            for _ in range(settings.BOARD_HEIGHT)
-        ]
-        self.__generate_board()
+        self.solved = False
+        # Segundos restantes antes de entregar la llave una vez resuelto;
+        # None mientras el puzzle no está resuelto (ver __solve/update).
+        self.key_countdown = None
+
+        # SortingPuzzle.new_tiles() crea cada Tile en su casilla de
+        # origen (imagen intacta, tal cual el asset) junto con la
+        # casilla+rotación de destino que no necesariamente coincide con
+        # ese origen (ver SortingPuzzle.SOLUTION). sort() es quien debe
+        # llevar cada ficha de su origen a su destino.
+        tiles = SortingPuzzle.new_tiles()
+        self.puzzle = SortingPuzzle(tiles)
+        self.__place_tiles()
 
         self.screen_alpha_surface = pygame.Surface(
             (settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT), pygame.SRCALPHA
         )
 
-        # Currently selected tile (first click); swapped with the next tile
-        # clicked, or rotated in place if clicked again.
-        self.highlighted_tile = False
-        self.highlighted_i1 = None
-        self.highlighted_j1 = None
+        # --------------------------------------------------------------
+        # Llamada de validación del desarrollador.
+        #
+        # Se invoca el algoritmo apenas se entra a este estado para
+        # comprobar, de forma visual e inmediata, que el tablero, el
+        # render y el flujo de victoria (entrega de la llave) funcionan
+        # de punta a punta ANTES de dejar SortingPuzzle.sort() vacío para
+        # que el estudiante lo programe.
+        #
+        # Cuando sort() se vacíe, self.puzzle.tiles seguirá desordenado
+        # y la imagen se mostrará incompleta/desordenada hasta que el
+        # estudiante complete el algoritmo correctamente y vuelva a
+        # ejecutar el juego.
+        # --------------------------------------------------------------
+        self.puzzle.sort()
+        self.__place_tiles()
 
-        self.active = True
-        self.solved = False
+        if self.puzzle.is_sorted():
+            self.__solve()
 
-    def __generate_board(self) -> None:
-        value = 0
-        for i in range(settings.BOARD_HEIGHT):
-            for j in range(settings.BOARD_WIDTH):
-                self.board[i][j] = Tile(
-                    x=j * settings.TILE_SIZE,
-                    y=i * settings.TILE_SIZE,
-                    frame=value,
-                    id=value,
-                )
-                value += 1
-
-    def __check_to_win(self) -> bool:
-        for row in self.board:
-            for tile in row:
-                target_row, target_col, target_rotation = self.SOLUTION[tile.id]
-                if (
-                    tile.i != target_row
-                    or tile.j != target_col
-                    or tile.rotation != target_rotation
-                ):
-                    return False
-        return True
+    def __place_tiles(self) -> None:
+        """
+        Traduce el orden actual de self.puzzle.tiles en posiciones de
+        tablero: el tile en el índice `k` de la lista pasa a ocupar la
+        casilla `k` del tablero (fila por fila). Esto es lo único que
+        conecta "el arreglo está ordenado" con "la imagen se ve armada".
+        """
+        for index, tile in enumerate(self.puzzle.tiles):
+            row, col = divmod(index, settings.BOARD_WIDTH)
+            tile.i, tile.j = row, col
+            tile.x = col * settings.TILE_SIZE
+            tile.y = row * settings.TILE_SIZE
 
     def __solve(self) -> None:
         self.solved = True
-        self.active = False
-        Timer.after(2, self.__grant_key)
+        self.key_countdown = KEY_DELAY_SECONDS
 
     def __grant_key(self) -> None:
         self.player.pickup_key = True
         settings.SOUNDS["pickup_coin"].stop()
         settings.SOUNDS["pickup_coin"].play()
         self.state_machine.pop()
+
+    def update(self, dt: float) -> None:
+        if self.key_countdown is None:
+            return
+
+        self.key_countdown -= dt
+        if self.key_countdown <= 0:
+            self.key_countdown = None
+            self.__grant_key()
 
     def render(self, surface: pygame.Surface) -> None:
         pygame.draw.rect(
@@ -94,87 +119,34 @@ class PuzzleState(BaseState):
         )
         surface.blit(self.screen_alpha_surface, (0, 0))
 
-        for row in self.board:
-            for tile in row:
-                tile.render(surface)
+        for tile in self.puzzle.tiles:
+            tile.render(surface)
 
-        if self.highlighted_tile:
-            selected = self.board[self.highlighted_i1][self.highlighted_j1]
-            pygame.draw.rect(
-                surface,
-                self.SELECTED_BORDER_COLOR,
-                selected.get_rect(),
-                self.BORDER_WIDTH,
-            )
+        render_text(
+            surface,
+            "RESUELTO" if self.solved else "NO RESUELTO",
+            settings.FONTS["small"],
+            settings.VIRTUAL_WIDTH // 2,
+            10,
+            SOLVED_COLOR if self.solved else UNSOLVED_COLOR,
+            center=True,
+            shadowed=True,
+        )
 
-        if self.solved:
+        if self.key_countdown is not None:
             render_text(
                 surface,
-                "¡Llave conseguida!",
+                f"Llave en {math.ceil(self.key_countdown)}...",
                 settings.FONTS["small"],
                 settings.VIRTUAL_WIDTH // 2,
-                10,
+                20,
                 (245, 191, 66),
                 center=True,
                 shadowed=True,
             )
 
     def on_input(self, input_id: str, input_data: InputData) -> None:
-        # Left click is bound to the "attack" action; here it means "select
-        # or swap a tile" instead, since this state owns all input while active.
-        if not self.active or input_id != "attack" or not input_data.pressed:
-            return
-
-        pos_x, pos_y = input_data.position
-        pos_x = pos_x * settings.VIRTUAL_WIDTH // settings.WINDOW_WIDTH
-        pos_y = pos_y * settings.VIRTUAL_HEIGHT // settings.WINDOW_HEIGHT
-        i = (pos_y - settings.BOARD_OFFSET_Y) // settings.TILE_SIZE
-        j = (pos_x - settings.BOARD_OFFSET_X) // settings.TILE_SIZE
-
-        if not (0 <= i < settings.BOARD_HEIGHT and 0 <= j < settings.BOARD_WIDTH):
-            return
-
-        i, j = int(i), int(j)
-
-        if not self.highlighted_tile:
-            self.highlighted_tile = True
-            self.highlighted_i1 = i
-            self.highlighted_j1 = j
-            return
-
-        if self.highlighted_i1 == i and self.highlighted_j1 == j:
-            # Second click on the SAME tile: rotate it in place.
-            self.board[i][j].rotate()
-            self.highlighted_tile = False
-            if self.__check_to_win():
-                self.__solve()
-            return
-
-        di = abs(i - self.highlighted_i1)
-        dj = abs(j - self.highlighted_j1)
-        i1, j1 = self.highlighted_i1, self.highlighted_j1
-        self.highlighted_tile = False
-
-        if di <= 1 and dj <= 1 and di != dj:
-            self.__swap(i1, j1, i, j)
-
-    def __swap(self, i1: int, j1: int, i2: int, j2: int) -> None:
-        self.active = False
-        tile1 = self.board[i1][j1]
-        tile2 = self.board[i2][j2]
-
-        def arrive():
-            self.board[i1][j1], self.board[i2][j2] = tile2, tile1
-            tile1.i, tile1.j, tile2.i, tile2.j = i2, j2, i1, j1
-            self.active = True
-            if self.__check_to_win():
-                self.__solve()
-
-        Timer.tween(
-            0.2,
-            [
-                (tile1, {"x": tile2.x, "y": tile2.y}),
-                (tile2, {"x": tile1.x, "y": tile1.y}),
-            ],
-            on_finish=arrive,
-        )
+        # Este puzzle se resuelve por completo mediante código
+        # (SortingPuzzle.sort()); no hay nada que el jugador deba
+        # clickear, arrastrar o rotar.
+        pass

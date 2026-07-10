@@ -1,14 +1,11 @@
 
-import pygame
-
 import settings
-from src.GameObject import GameObject
 from src.states.entities.BaseEntityState import BaseEntityState
 
 class AttackStateBoss(BaseEntityState):
     def enter(self, flipped: bool) -> None:
         self.entity.texture_id = "dead_Attack"
-        self.band = True
+        self.showing_attack_texture = True
 
         self.entity.change_animation("walk")
         self.entity.flipped = flipped
@@ -22,35 +19,16 @@ class AttackStateBoss(BaseEntityState):
             self.entity.flipped = not self.entity.flipped
 
     def check_boundary(self) -> bool:
-        world_width = self.entity.tilemap.width
+        if not self.bounce_off_world_and_walls():
+            return False
 
-        if self.entity.x + self.entity.width >= world_width:
-            self.entity.x = world_width - self.entity.width
-            if self.band:
-                self.entity.texture_id = "dead_Walk"
-                self.entity.change_animation("idle")
-                self.band = False
-            else:
-                self.entity.texture_id = "dead_Attack"
-                self.entity.change_animation("walk")
-                self.band = True
-            return True
-        elif self.entity.x <= 0:
-            self.entity.x = 0
-            return True
+        if self.showing_attack_texture:
+            self.entity.texture_id = "dead_Walk"
+            self.entity.change_animation("idle")
+        else:
+            self.entity.texture_id = "dead_Attack"
+            self.entity.change_animation("walk")
+        self.showing_attack_texture = not self.showing_attack_texture
 
-        if (
-            self.entity.handle_tilemap_collision_on_left()
-            or self.entity.handle_tilemap_collision_on_right()
-        ):
-            if self.band:
-                self.entity.texture_id = "dead_Walk"
-                self.entity.change_animation("idle")
-                self.band = False
-            else:
-                self.entity.texture_id = "dead_Attack"
-                self.entity.change_animation("walk")
-                self.band = True
-
-            return True
+        return True
 

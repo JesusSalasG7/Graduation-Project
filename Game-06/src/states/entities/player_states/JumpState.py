@@ -12,7 +12,7 @@ class JumpState(BaseEntityState):
         settings.SOUNDS["jump"].play()
         
     def update(self, dt: float) -> None:
-        self.entity.vy += settings.GRAVITY * dt
+        self.entity.vy = min(self.entity.vy + settings.GRAVITY * dt, settings.MAX_FALL_SPEED)
         self.entity.handle_tilemap_collision_on_right() or self.entity.handle_tilemap_collision_on_left()
 
         if self.entity.handle_tilemap_collision_on_top():

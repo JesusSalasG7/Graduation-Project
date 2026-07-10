@@ -22,7 +22,7 @@ class Tile:
 
     def render(self, surface: pygame.Surface, rotate: bool) -> None:
         rotated_image = pygame.transform.rotate(
-            settings.TEXTURES["tiles"].subsurface(settings.FRAMES["tiles"][self.frame]),
+            settings.TEXTURES["Puzzle"].subsurface(settings.FRAMES["Puzzle"][self.frame]),
             self.rotation
         )
         surface.blit(

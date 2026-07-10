@@ -4,7 +4,7 @@ from gale.game import Game
 from gale.input_handler import InputData
 from gale.timer import Timer
 import settings
-from src.Tile import Tile
+from src.Puzzle.src.Tile import Tile
 
 
 class Board(Game):

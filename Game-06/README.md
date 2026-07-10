@@ -20,7 +20,9 @@ En un reino lejano, la princesa Celeste ha sido secuestrada por una malvada cria
 
 •	Perderás una vida si:
 Una criatura te daña.
-Caes en los trampas de las mazmorras.
+Caes en las trampas de las mazmorras.
+Te alcanza un chorro de lava.
+El Final Boss te golpea.
 
 •	pierdes todas las vidas si:
 caes en los abismos de la mazmorras
@@ -37,6 +39,9 @@ trampas para evitar que puddas superar la mazmorras.
 3.	Ítems:
 Algunos objetos en las mazmorras son necesarios para avanzar en el juego.
 
+4.	Lava:
+En ciertos tramos del nivel 2, chorros de lava emergen del suelo cada cierto tiempo, suben, se mantienen un instante y vuelven a bajar. Debes cronometrar el salto para no ser golpeado.
+
 # El objetivo
 •	Rescatar a la princesa Celeste:
 Para lograrlo, deberás atravesar todas las mazmorras y enfrentarte al Final Boss.
@@ -45,6 +50,9 @@ Para lograrlo, deberás atravesar todas las mazmorras y enfrentarte al Final Bos
 Este enemigo cuenta con siete vidas.
 Evita sus ataques mientras encuentras oportunidades para contraatacar y derrotarlo.
 Una vez que logres vencerlo, podrás liberar a la princesa y completar el juego.
+
+•	Pantalla final:
+Al derrotar al Final Boss se muestra una pantalla de victoria a pantalla completa con música propia. Desde ahí puedes elegir "Volver a jugar" (regresa al menú de inicio) o "Salir del juego" (cierra el programa).
 
 # Recursos de audio y texturas
 •	Origen de los recursos:
@@ -84,10 +92,7 @@ Instalar las dependencias
 Una vez activado el entorno, instala los paquetes necesarios con:
 pip install -r requirements.txt
 
-Instalar la biblioteca Pillow
-
-Es necesario instalar Pillow, una biblioteca de Python para manejar imágenes:
-pip install pillow
+Esto instala Gale junto con sus dependencias (Pygame, entre otras), que son todo lo que el juego necesita para funcionar.
 
 Ejecutar el juego
 Finalmente, ejecuta el juego con el siguiente comando:

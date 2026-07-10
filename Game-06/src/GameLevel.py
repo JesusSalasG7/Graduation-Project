@@ -7,11 +7,22 @@ import settings
 from src.Creature import Creature
 from src.GameItem import GameItem
 from src.GameObject import GameObject
+from src.LavaShot import LavaShot
 from src.definitions import creatures, items, traps
 
 # Position (in pixels) of the key needed to challenge the boss, roughly at the
 # midpoint of level 2, resting on the long platform that crosses the level.
 BOSS_KEY_POSITION = (544, 144)
+
+# The lava surface tile in tileset3 (tmx gid 60, so frame index 60 - firstgid).
+# Every occurrence of this tile marks a spot a LavaShot can rise out of.
+LAVA_TEXTURE_ID = "tiles3"
+LAVA_FRAME_INDEX = 59
+LAVA_SHOT_SPACING = 4
+
+# Matches Boss.ARENA_MIN_X / PlayState.BOSS_GATE_X: lava shots are excluded
+# from the boss's own floor so they don't add extra chaos to that fight.
+BOSS_ARENA_MIN_X = 1024
 
 
 class GameLevel:
@@ -20,11 +31,13 @@ class GameLevel:
         self.creatures = []
         self.items = []
         self.traps = []
+        self.lava_shots = []
         self.num_level = num_level
         settings.LevelLoader().load(self, settings.TILEMAPS[num_level])
 
         if num_level == 2:
             self._add_boss_key()
+            self._add_lava_shots()
 
     def _add_boss_key(self) -> None:
         x, y = BOSS_KEY_POSITION
@@ -42,6 +55,26 @@ class GameLevel:
                 solidness=GameObject.DEFAULT_SOLIDNESS,
             )
         )
+
+    def _add_lava_shots(self) -> None:
+        lava_columns_by_row = {}
+        for layer in self.tilemap.layers:
+            for tile_row in layer:
+                for tile in tile_row:
+                    if (
+                        tile is not None
+                        and tile.texture_id == LAVA_TEXTURE_ID
+                        and tile.frame_index == LAVA_FRAME_INDEX
+                    ):
+                        lava_columns_by_row.setdefault(tile.i, []).append(tile.j)
+
+        for i, cols in lava_columns_by_row.items():
+            cols = [c for c in cols if c * self.tilemap.tilewidth < BOSS_ARENA_MIN_X]
+            cols.sort()
+            for col in cols[::LAVA_SHOT_SPACING]:
+                x = col * self.tilemap.tilewidth
+                y = i * self.tilemap.tileheight
+                self.lava_shots.append(LavaShot(x, y))
 
     def add_trap(self, trap_data: Dict[str, Any]) -> None:
         trap_name = trap_data.pop("trap_name")
@@ -83,6 +116,9 @@ class GameLevel:
             creature for creature in self.creatures if not creature.is_dead
         ]
 
+        for shot in self.lava_shots:
+            shot.update(dt)
+
     def render(self, surface: pygame.Surface) -> None:
         self.tilemap.render(surface)
         for creature in self.creatures:
@@ -92,4 +128,7 @@ class GameLevel:
                 item.render(surface)
         for trap in self.traps:
             if trap.active:
-                trap.render(surface)        
+                trap.render(surface)
+        for shot in self.lava_shots:
+            if shot.active:
+                shot.render(surface)

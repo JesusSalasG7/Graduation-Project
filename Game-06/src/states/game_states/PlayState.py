@@ -37,7 +37,11 @@ class PlayState(BaseState):
 
         self.player = enter_params.get("player")
         if self.player is None:
-            self.player = Player(0, 400 - 60, self.game_level)
+            # The floor at the level's starting column sits at y=352; spawning
+            # any lower embeds the player a few pixels into solid ground. That
+            # leftover overlap made every horizontal-collision check see the
+            # floor tile beneath as a wall, freezing movement completely.
+            self.player = Player(0, 335, self.game_level)
             self.player.change_state("idle")
 
         self.camera = enter_params.get("camera")
@@ -53,7 +57,7 @@ class PlayState(BaseState):
                 self.boss = Boss(1232,  400 - 110, self.game_level, "dead_Walk")
                 self.boss.change_state("idle")
 
-        self.band = enter_params.get("band",True)
+        self.boss_battle_pending = enter_params.get("boss_battle_pending", True)
 
         Timer.resume()
 
@@ -87,7 +91,7 @@ class PlayState(BaseState):
                 if self.player.collides(creature) and creature.flipped == self.player.flipped:
                     if not self.player.wounded:
                         settings.SOUNDS["wounded"].play()
-                        self.lives-=1    
+                        self.lives-=1
                         self.player.wounded = True
                         Timer.after(3,self.player.recovery)
 
@@ -97,12 +101,12 @@ class PlayState(BaseState):
             elif self.player.collides(creature):
                 if not self.player.wounded:
                     settings.SOUNDS["wounded"].play()
-                    self.lives-=1    
+                    self.lives-=1
                     self.player.wounded = True
                     Timer.after(3,self.player.recovery)
-        
-        if self.lives == 0: 
-            self.player.change_state("dead")            
+
+        if self.lives == 0:
+            self.player.change_state("dead")
 
         for item in self.game_level.items:
             if not item.active or not item.collidable:
@@ -122,13 +126,24 @@ class PlayState(BaseState):
 
         for trap in self.game_level.traps:
             if self.player.collides(trap):
-                
-                if self.lives == 0: 
+
+                if self.lives == 0:
                     self.player.change_state("dead")
 
                 elif not self.player.wounded:
                     settings.SOUNDS["wounded"].play()
-                    self.lives-=1    
+                    self.lives-=1
+                    self.player.wounded = True
+                    Timer.after(3,self.player.recovery)
+
+        for shot in self.game_level.lava_shots:
+            if shot.active and self.player.collides(shot):
+                if self.lives == 0:
+                    self.player.change_state("dead")
+
+                elif not self.player.wounded:
+                    settings.SOUNDS["wounded"].play()
+                    self.lives-=1
                     self.player.wounded = True
                     Timer.after(3,self.player.recovery)
 
@@ -138,11 +153,11 @@ class PlayState(BaseState):
         if (
             (self.player.x > self.BOSS_GATE_X)
             and (self.player.y > 320)
-            and (self.band == True)
+            and self.boss_battle_pending
             and (self.level == 2)
             and self.player.pickup_key
         ):
-            self.band = False
+            self.boss_battle_pending = False
             pygame.mixer.music.stop()
             pygame.mixer.music.unload()
 
@@ -192,8 +207,7 @@ class PlayState(BaseState):
 
     def __pop(self)-> None:
         self.state_machine.pop()
-        self.state_machine.push(game_states.GameOverState(self.state_machine),self.level)
-        self.state_machine.push(game_states.ScenaState(self.state_machine),"End")
+        self.state_machine.push(game_states.FinalState(self.state_machine), level=self.level)
             
     def render(self, surface: pygame.Surface) -> None:
 
@@ -211,14 +225,6 @@ class PlayState(BaseState):
 
             if self.boss is not None:
                 self.boss.render(world_surface)
-                i = 0
-                live_boss_x = 1120
-                while i < self.boss.lives:
-                    world_surface.blit(
-                        settings.TEXTURES["live_boss"], (live_boss_x, 224), settings.FRAMES["live_boss"][5]
-                    )
-                    live_boss_x += 16
-                    i += 1
 
         surface.blit(world_surface, (-self.camera.x, -self.camera.y))
 
@@ -230,6 +236,22 @@ class PlayState(BaseState):
             )
             heart_x -= 11
             i += 1
+
+        # Boss health bar: fixed to the bottom of the screen (HUD space, not
+        # world space) so it stays visible and anchored regardless of camera
+        # position, instead of scrolling with the level. Only shown once the
+        # fight has actually started, not just because the boss exists.
+        if self.boss is not None and self.boss.battle_active:
+            bar_width = (Boss.MAX_LIVES - 1) * 16 + 24
+            live_boss_x = (settings.VIRTUAL_WIDTH - bar_width) // 2
+            live_boss_y = settings.VIRTUAL_HEIGHT - 9 - 6
+            i = 0
+            while i < self.boss.lives:
+                surface.blit(
+                    settings.TEXTURES["live_boss"], (live_boss_x, live_boss_y), settings.FRAMES["live_boss"][5]
+                )
+                live_boss_x += 16
+                i += 1
 
 
     def next_level(self) -> None:

@@ -80,7 +80,7 @@ class Boss(GameEntity):
                 # vulnerable, guaranteeing the player a window to punish it.
                 aggression = 1 - (self.lives / Boss.MAX_LIVES)
                 self.change_state("idle")
-                self.recovery_timer = max(0.45, 1.1 - aggression * 0.7)
+                self.recovery_timer = max(0.6, 1.1 - aggression * 0.5)
             return
 
         if self.recovery_timer > 0:
@@ -95,7 +95,7 @@ class Boss(GameEntity):
         # takes damage, without ever removing the punish window above.
         aggression = 1 - (self.lives / Boss.MAX_LIVES)
         distance = abs(player.x - self.x)
-        attack_range = 70 + aggression * 90
+        attack_range = 70 + aggression * 60
         flipped = player.x > self.x
 
         if distance <= attack_range:

@@ -8,7 +8,6 @@ alejandro.j.mujic4@gmail.com
 This file contains the class SnailWalkState.
 """
 
-from src.GameObject import GameObject
 from src.states.entities.BaseEntityState import BaseEntityState
 
 
@@ -26,18 +25,5 @@ class FlyState(BaseEntityState):
             self.entity.flipped = not self.entity.flipped
 
     def check_boundary(self) -> bool:
-        world_width = self.entity.tilemap.width
-
-        if self.entity.x + self.entity.width >= world_width:
-            self.entity.x = world_width - self.entity.width
-            return True
-        elif self.entity.x <= 0:
-            self.entity.x = 0
-            return True
-
-        if (
-            self.entity.handle_tilemap_collision_on_left()
-            or self.entity.handle_tilemap_collision_on_right()
-        ):
-            return True
+        return self.bounce_off_world_and_walls()
 

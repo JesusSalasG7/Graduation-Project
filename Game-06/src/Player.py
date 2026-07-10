@@ -35,7 +35,6 @@ class Player(GameEntity):
             },
         )
         self.wounded = False
-        self.powerUP = True
         self.pickup_key = False
         self.key_puzzle_pending = False
         self.open_door =False
@@ -50,6 +49,10 @@ class Player(GameEntity):
 
     def change_texture(self, texture_id: str) -> None:
         self.texture_id = texture_id
+
+    def texture_for(self, base_texture_id: str) -> str:
+        """Wounded variants are the base texture id with a '2' suffix."""
+        return f"{base_texture_id}2" if self.wounded else base_texture_id
 
     def attack_zone(self,flipped)  -> None:
         if flipped:

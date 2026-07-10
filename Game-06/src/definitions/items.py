@@ -1,12 +1,7 @@
 
 from typing import Dict, Any
 
-import random
-
-from gale.timer import Timer
-
 import settings
-from src.GameItem import GameItem
 from src.Player import Player
 
 

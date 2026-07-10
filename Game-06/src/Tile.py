@@ -1,7 +1,5 @@
 from typing import Dict
 
-from typing import Dict
-
 from src.GameObject import GameObject
 
 

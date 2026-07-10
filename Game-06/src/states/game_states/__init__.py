@@ -4,7 +4,7 @@ from src.states.game_states.WinerLevelState import WinerLevelState
 from src.states.game_states.PauseState import PauseState
 from src.states.game_states.PlayState import PlayState
 from src.states.game_states.StartState import StartState
-from src.states.game_states.ScenaState import ScenaState
+from src.states.game_states.InstructionsState import InstructionsState
 from src.states.game_states.FinalState import FinalState
 from src.states.game_states.WheresTheKeyState import WheresTheKeyState
 from src.states.game_states.PuzzleState import PuzzleState
@@ -15,7 +15,7 @@ from src.states.game_states.PuzzleState import PuzzleState
     PauseState,
     PlayState,
     StartState,
-    ScenaState,
+    InstructionsState,
     FinalState,
     WheresTheKeyState,
     PuzzleState,

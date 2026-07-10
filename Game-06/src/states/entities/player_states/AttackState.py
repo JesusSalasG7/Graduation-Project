@@ -3,19 +3,14 @@ from gale.input_handler import InputData
 
 import settings
 from src.states.entities.BaseEntityState import BaseEntityState
-from gale.timer import Timer
 
 class AttackState(BaseEntityState):
     def enter(self) -> None:
         self.entity.vx = 0
         self.entity.vy = 0
-        
-        if self.entity.wounded == True:
-            self.entity.texture_id = "Knight_Attack2"
-        else:     
-            self.entity.texture_id = "Knight_Attack" 
 
-        self.entity.change_animation("attack") 
+        self.entity.texture_id = self.entity.texture_for("Knight_Attack")
+        self.entity.change_animation("attack")
         settings.SOUNDS["attack"].stop()
         settings.SOUNDS["attack"].play()
        
