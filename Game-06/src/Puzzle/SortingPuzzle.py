@@ -46,13 +46,8 @@ class SortingPuzzle:
 
     def sort(self) -> None:
         #TODO
-        n = len(self.tiles)
-        ordenado = [None] * n
-        for tile in self.tiles:
-            ordenado[tile.target_index] = tile
-            tile.rotation = tile.target_rotation
-        self.tiles[:] = ordenado
-
+        pass
+    
     @classmethod
     def new_tiles(cls) -> List[Tile]:
         """
