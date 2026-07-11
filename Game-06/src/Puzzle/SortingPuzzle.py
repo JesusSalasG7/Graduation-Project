@@ -45,7 +45,6 @@ class SortingPuzzle:
         return all(tile.is_correct_position() for tile in self.tiles)
 
     def sort(self) -> None:
-        #TODO
         pass
     
     @classmethod

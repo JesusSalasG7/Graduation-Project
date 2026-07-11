@@ -22,7 +22,7 @@ class GameOverState(BaseState, mixins.AnimatedMixin):
         self.animations = {}
         self.current_animation = None
         self.generate_animations(
-            {"dead": {"frames": [0, 1, 2, 3, 4, 5, 6, 7], "interval": 0.13, "loops": 0}}
+            {"dead": {"frames": [0, 1, 2, 3, 4, 5, 6, 7], "interval": 0.13, "loops": 1}}
         )
         self.animations["dead"].on_finish = set_active
         self.active = False

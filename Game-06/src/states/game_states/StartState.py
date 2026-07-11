@@ -101,7 +101,10 @@ class StartState(BaseState, FadeMixin):
         if input_id == "enter" and input_data.pressed:
             settings.SOUNDS["menu_click"].play()
             self._begin_start()
-        elif input_id == "attack" and input_data.pressed:
+        elif input_id == "attack" and input_data.pressed and hasattr(input_data, "position"):
+            # "attack" is also bound to the space bar (see settings.py), whose
+            # KeyboardData has no "position" attribute; only mouse clicks
+            # carry one, so only those can hit a menu button.
             virtual_position = self._to_virtual_position(input_data.position)
             if self.start_button.collidepoint(virtual_position):
                 settings.SOUNDS["menu_click"].play()

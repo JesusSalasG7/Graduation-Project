@@ -21,9 +21,10 @@ class InstructionsState(BaseState):
         )
 
         self.lines = [
-            "A / D o FLECHAS: moverse",
-            "ESPACIO: saltar",
-            "X o CLIC IZQUIERDO: atacar",
+            "FLECHAS IZQ/DER: moverse",
+            "FLECHA ARRIBA: saltar",
+            "ESPACIO o CLIC IZQUIERDO: atacar",
+            "(podes atacar tambien en el aire)",
             "P: pausar el juego",
             "",
             "Rescata a la princesa atravesando",
@@ -48,7 +49,10 @@ class InstructionsState(BaseState):
     def on_input(self, input_id: str, input_data: InputData) -> None:
         if input_id == "enter" and input_data.pressed:
             self._go_back()
-        elif input_id == "attack" and input_data.pressed:
+        elif input_id == "attack" and input_data.pressed and hasattr(input_data, "position"):
+            # "attack" is also bound to the space bar (see settings.py), whose
+            # KeyboardData has no "position" attribute; only mouse clicks
+            # carry one, so only those can hit the back button.
             if self.back_button.collidepoint(self._to_virtual_position(input_data.position)):
                 self._go_back()
 
