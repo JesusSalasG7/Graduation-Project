@@ -20,7 +20,7 @@ class WorldRenderer:
     def __init__(self, world: World) -> None:
         self.world = world
 
-    def render(self, surface: pygame.Surface) -> None:
+    def render(self, surface: pygame.Surface, awaiting_record_name: bool = False) -> None:
         surface.blit(settings.SPRITES["map"], (0, 0))
         self._render_food(surface)
         self._render_snake(surface)
@@ -28,7 +28,7 @@ class WorldRenderer:
         self._render_hud(surface)
 
         if self.world.game_over:
-            self._render_game_over(surface)
+            self._render_game_over(surface, awaiting_record_name)
 
     @staticmethod
     def _cell_topleft(cell: Cell) -> Tuple[int, int]:
@@ -272,15 +272,18 @@ class WorldRenderer:
         )
 
     def _render_hud(self, surface: pygame.Surface) -> None:
+        score_text = f"Manzanas: {self.world.score}"
         render_text(
             surface,
-            f"Manzanas: {self.world.score}",
+            score_text,
             settings.FONTS["hud"],
             8,
             6,
             pygame.Color("white"),
             shadowed=True,
         )
+
+        self._render_record_badge(surface, score_text)
 
         if self.world.mode == "challenge":
             render_text(
@@ -293,7 +296,33 @@ class WorldRenderer:
                 shadowed=True,
             )
 
-    def _render_game_over(self, surface: pygame.Surface) -> None:
+    def _render_record_badge(self, surface: pygame.Surface, score_text: str) -> None:
+        """
+        Draws the pixel-art trophy plus the current best score right after
+        the "Manzanas" counter, so the record is always visible next to the
+        live count -- see World.display_best_score for how that number is
+        picked.
+        """
+        hud_font = settings.FONTS["hud"]
+        score_width, score_height = hud_font.size(score_text)
+
+        trophy = settings.SPRITES["trophy"]
+        gap = 6
+        trophy_x = 8 + score_width + gap
+        trophy_y = 6 + score_height // 2 - trophy.get_height() // 2
+        surface.blit(trophy, (trophy_x, trophy_y))
+
+        render_text(
+            surface,
+            str(self.world.display_best_score),
+            hud_font,
+            trophy_x + trophy.get_width() + 4,
+            6,
+            pygame.Color(255, 193, 7),
+            shadowed=True,
+        )
+
+    def _render_game_over(self, surface: pygame.Surface, awaiting_record_name: bool) -> None:
         center_x = settings.VIRTUAL_WIDTH // 2
         center_y = settings.VIRTUAL_HEIGHT // 2
 
@@ -307,13 +336,18 @@ class WorldRenderer:
             center=True,
             shadowed=True,
         )
-        render_text(
-            surface,
-            "Press ENTER to restart",
-            settings.FONTS["hud"],
-            center_x,
-            center_y + 16,
-            pygame.Color("white"),
-            center=True,
-            shadowed=True,
-        )
+
+        # While PlayState has the new-record name prompt up, ENTER submits
+        # the name rather than restarting -- skip the hint below so it
+        # doesn't contradict what the key is about to do.
+        if not awaiting_record_name:
+            render_text(
+                surface,
+                "Press ENTER to restart",
+                settings.FONTS["hud"],
+                center_x,
+                center_y + 16,
+                pygame.Color("white"),
+                center=True,
+                shadowed=True,
+            )

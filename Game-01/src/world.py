@@ -7,6 +7,7 @@ read-only state exposed here through the renderer.
 import random
 
 import settings
+from src import records
 from src.direction import Direction
 from src.entities.food import FoodField
 from src.entities.snake import Snake
@@ -42,6 +43,11 @@ class World:
         self.game_over = False
         self._move_timer = 0.0
 
+        # Reloaded fresh every round so a record saved at the end of the
+        # previous one (see PlayState's name-entry flow) is picked up
+        # immediately, without requiring the app to restart.
+        self.best_score = records.best_score()
+
         # Tongue flicks are an occasional, self-timed habit rather than
         # something triggered directly by game state: the snake waits a
         # random amount of time, flicks briefly, then picks a new wait.
@@ -70,6 +76,17 @@ class World:
     @property
     def mouth_open(self) -> bool:
         return self._apple_nearby()
+
+    @property
+    def display_best_score(self) -> int:
+        """
+        The number the HUD's trophy should show. While the current run is
+        at or above the saved best, this tracks the live score instead of
+        the (now stale) saved value -- so it climbs in real time whether
+        there was no record yet (best_score == 0) or the run just tied
+        the existing one, and keeps climbing until the run ends.
+        """
+        return max(self.best_score, self.score)
 
     def consume_impact_event(self) -> bool:
         """Whether a collision just happened, cleared once read."""
@@ -197,31 +214,9 @@ class World:
     # ------------------------------------------------------------------
 
     def _apple_passes_filter(self, value: int) -> bool:
-        """
-        Whether `value` (the apple's nutritional value) falls inside the
-        snake's active filter window. Inclusive on both ends: an apple
-        worth exactly filter_min or filter_max is safe to eat.
-        """
-        return self.filter_min <= value <= self.filter_max
+        # TODO: Reto "Filtro Metabolico de Valores" -- ver Reto_Filtro_Metabolico.html
+        pass
 
     def _handle_challenge_apple_eaten(self, apple) -> None:
-        """
-        Called exactly once, the instant the head lands on `apple`'s cell,
-        challenge mode only. An in-range apple feeds the snake (grows it
-        by its value, adds that value to the score, gets replaced); an
-        out-of-range one is treated as poisonous -- same fatal outcome as
-        a wall/self collision, reusing impact_cell/_impact_event so the
-        renderer's existing star-burst/dazed-face treatment applies here
-        too, with no extra rendering work needed.
-        """
-        if self._apple_passes_filter(apple.value):
-            self.snake.grow(apple.value)
-            self.score += apple.value
-            self.food_field.remove(apple)
-            self._spawn_apple()
-            self._eat_event = True
-        else:
-            self.game_over = True
-            self.impact_cell = apple.position
-            self.impact_time = 0.0
-            self._impact_event = True
+        # TODO: Reto "Filtro Metabolico de Valores" -- ver Reto_Filtro_Metabolico.html
+        pass

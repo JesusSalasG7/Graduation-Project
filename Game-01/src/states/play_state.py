@@ -8,10 +8,13 @@ import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState
+from gale.text import render_text
 
 import settings
+from src import records
 from src.audio.ambient import AmbientController
 from src.direction import Direction
+from src.rendering.controls_modal import ControlsModal
 from src.rendering.world_renderer import WorldRenderer
 from src.world import World
 
@@ -21,6 +24,8 @@ _DIRECTION_BY_ACTION = {
     "move_left": Direction.LEFT,
     "move_right": Direction.RIGHT,
 }
+
+_MAX_RECORD_NAME_LENGTH = 12
 
 
 class PlayState(BaseState):
@@ -33,6 +38,21 @@ class PlayState(BaseState):
         self.ambient.start()
         self._start_theme_music()
 
+        # Set the instant a run ends above the saved best (see update()),
+        # so the player can attach their name to it before restarting --
+        # entirely PlayState-side UI flow, not part of World's model.
+        self._entering_record_name = False
+        self._record_name = ""
+
+        # Shown once per match, right as the chosen mode starts (not back
+        # in the menu), so the player sees how to move before the snake
+        # actually starts responding -- dismissed with "restart" (ENTER),
+        # same as everywhere else in the UI.
+        self._showing_controls = True
+        self._controls_modal = ControlsModal(
+            settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2
+        )
+
     def _start_theme_music(self) -> None:
         pygame.mixer.music.load(str(settings.THEME_MUSIC_PATH))
         pygame.mixer.music.set_volume(settings.THEME_MUSIC_VOLUME)
@@ -40,6 +60,15 @@ class PlayState(BaseState):
 
     def on_input(self, input_id: str, input_data: InputData) -> None:
         if not input_data.pressed:
+            return
+
+        if self._showing_controls:
+            if input_id == "restart":
+                self._showing_controls = False
+            return
+
+        if self._entering_record_name:
+            self._handle_record_name_input(input_id, input_data)
             return
 
         direction = _DIRECTION_BY_ACTION.get(input_id)
@@ -53,13 +82,32 @@ class PlayState(BaseState):
             self.world.reset()
             self._start_theme_music()
 
+    def _handle_record_name_input(self, input_id: str, input_data: InputData) -> None:
+        if input_id == "text_backspace":
+            self._record_name = self._record_name[:-1]
+        elif input_id == "text_char" and len(self._record_name) < _MAX_RECORD_NAME_LENGTH:
+            # Names are shown/stored upper-case regardless of the shift
+            # state the player actually typed with.
+            self._record_name += input_data.unicode.upper()
+        elif input_id == "restart":
+            records.add(self._record_name.strip() or "JUGADOR", self.world.score)
+            self._entering_record_name = False
+
     def update(self, dt: float) -> None:
+        if self._showing_controls:
+            self._controls_modal.update(dt)
+            return
+
         self.world.update(dt)
 
         if self.world.consume_impact_event():
             settings.SOUNDS["crash"].play()
             self.ambient.duck()
             pygame.mixer.music.stop()
+
+            if records.qualifies(self.world.score):
+                self._entering_record_name = True
+                self._record_name = ""
 
         if self.world.consume_eat_event():
             settings.SOUNDS["eat"].play()
@@ -69,4 +117,40 @@ class PlayState(BaseState):
         self.ambient.update(dt)
 
     def render(self, surface: pygame.Surface) -> None:
-        self.renderer.render(surface)
+        if self._showing_controls:
+            # Just the map and the modal -- the snake/food/HUD only show
+            # up once the player has dismissed the tutorial and the
+            # actual match begins.
+            surface.blit(settings.SPRITES["map"], (0, 0))
+            self._controls_modal.render(surface)
+            return
+
+        self.renderer.render(surface, awaiting_record_name=self._entering_record_name)
+
+        if self._entering_record_name:
+            self._render_record_name_prompt(surface)
+
+    def _render_record_name_prompt(self, surface: pygame.Surface) -> None:
+        center_x = settings.VIRTUAL_WIDTH // 2
+        center_y = settings.VIRTUAL_HEIGHT // 2 + 48
+
+        render_text(
+            surface,
+            "Entraste a los records! Escribe tu nombre:",
+            settings.FONTS["hud"],
+            center_x,
+            center_y,
+            pygame.Color(255, 193, 7),
+            center=True,
+            shadowed=True,
+        )
+        render_text(
+            surface,
+            self._record_name + "_",
+            settings.FONTS["hud"],
+            center_x,
+            center_y + 18,
+            pygame.Color("white"),
+            center=True,
+            shadowed=True,
+        )

@@ -13,6 +13,7 @@ from gale.state import BaseState
 from gale.text import render_text
 
 import settings
+from src import records
 
 _OPTIONS = (
     ("classic", "Modo Clasico"),
@@ -38,6 +39,8 @@ class MenuState(BaseState):
 
     def render(self, surface: pygame.Surface) -> None:
         surface.blit(settings.SPRITES["map"], (0, 0))
+
+        self._render_leaderboard(surface)
 
         center_x = settings.VIRTUAL_WIDTH // 2
         title_y = settings.VIRTUAL_HEIGHT // 2 - 46
@@ -78,3 +81,43 @@ class MenuState(BaseState):
             center=True,
             shadowed=True,
         )
+
+    def _render_leaderboard(self, surface: pygame.Surface) -> None:
+        """
+        Top-left panel listing every saved record (name + score), best
+        first -- populated from PlayState's new-record name prompt (see
+        src/records.py).
+        """
+        x, y = 10, 8
+        line_height = 16
+        gold = pygame.Color(255, 193, 7)
+
+        render_text(
+            surface, "RECORDS", settings.FONTS["hud"], x, y, gold, shadowed=True
+        )
+
+        entries = records.load_all()
+
+        if not entries:
+            render_text(
+                surface,
+                "Sin registros aun",
+                settings.FONTS["hud"],
+                x,
+                y + line_height,
+                pygame.Color("white"),
+                shadowed=True,
+            )
+            return
+
+        for i, entry in enumerate(entries):
+            color = gold if i == 0 else pygame.Color("white")
+            render_text(
+                surface,
+                f"{i + 1}. {entry['name']} - {entry['score']}",
+                settings.FONTS["hud"],
+                x,
+                y + line_height * (i + 1),
+                color,
+                shadowed=True,
+            )

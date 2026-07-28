@@ -125,11 +125,176 @@ def _build_apple_sprite() -> pygame.Surface:
     return pygame.transform.scale(pixels, (CELL_SIZE, CELL_SIZE))
 
 
+def _build_trophy_sprite() -> pygame.Surface:
+    """
+    Draws the best-record trophy as pixel art at a tiny native resolution,
+    then scales it up with nearest-neighbor (not smoothscale), same as
+    _build_apple_sprite, so it reads as crisp blocky pixels in the HUD.
+    """
+    native_size = 14
+    pixels = pygame.Surface((native_size, native_size), pygame.SRCALPHA)
+
+    gold = (255, 193, 7, 255)
+    gold_dark = (196, 130, 15, 255)
+    highlight = (255, 235, 160, 255)
+    outline = (110, 74, 15, 255)
+
+    cup_center_x, cup_center_y = 6.5, 4.5
+    cup_radius_x, cup_radius_y = 4.5, 3.5
+
+    for y in range(native_size):
+        for x in range(native_size):
+            nx = (x - cup_center_x) / cup_radius_x
+            ny = (y - cup_center_y) / cup_radius_y
+            dist = nx * nx + ny * ny
+
+            if dist <= 1.0:
+                pixels.set_at((x, y), gold_dark if dist > 0.78 else gold)
+
+    # Shine highlight, upper-left of the cup.
+    for hx, hy in ((4, 2), (5, 2), (4, 3)):
+        pixels.set_at((hx, hy), highlight)
+
+    # Handles: small loops poking out either side of the cup.
+    for hx, hy in ((0, 3), (1, 3), (0, 4), (0, 5), (1, 5)):
+        pixels.set_at((hx, hy), outline)
+    for hx, hy in ((13, 3), (12, 3), (13, 4), (13, 5), (12, 5)):
+        pixels.set_at((hx, hy), outline)
+
+    # Neck connecting the cup to the base.
+    for y in (8, 9):
+        for x in (6, 7):
+            pixels.set_at((x, y), gold_dark)
+
+    # Base plinth.
+    for x in range(4, 10):
+        pixels.set_at((x, 10), gold)
+    for x in range(3, 11):
+        pixels.set_at((x, 11), gold_dark)
+    for x in range(2, 12):
+        pixels.set_at((x, 12), outline)
+
+    return pygame.transform.scale(pixels, (native_size * 2, native_size * 2))
+
+
+# Native resolution/scale shared by the arrow-key and hand sprites below,
+# so the two line up pixel-for-pixel in the controls modal (see
+# src/rendering/controls_modal.py).
+CONTROLS_SPRITE_NATIVE_SIZE = 12
+CONTROLS_SPRITE_SCALE = 3
+
+
+def _build_key_sprite(direction: str) -> pygame.Surface:
+    """
+    One arrow-keycap for the "how to play" modal: a keyboard key
+    silhouette with a triangular arrow glyph pointing `direction`
+    ("up"/"down"/"left"/"right"), drawn at native resolution and
+    scaled up with nearest-neighbor, same technique as
+    _build_apple_sprite/_build_trophy_sprite.
+    """
+    native_size = CONTROLS_SPRITE_NATIVE_SIZE
+    pixels = pygame.Surface((native_size, native_size), pygame.SRCALPHA)
+
+    face = (222, 226, 230, 255)
+    shade = (176, 182, 190, 255)
+    border = (60, 64, 70, 255)
+    glyph = (40, 44, 50, 255)
+
+    pygame.draw.rect(pixels, border, (0, 0, native_size, native_size), border_radius=2)
+    pygame.draw.rect(pixels, face, (1, 1, native_size - 2, native_size - 2), border_radius=2)
+    pygame.draw.line(pixels, shade, (1, native_size - 2), (native_size - 2, native_size - 2))
+
+    center_x, center_y = native_size / 2, native_size / 2
+    reach = 3.2
+
+    tip = {
+        "up": (center_x, center_y - reach),
+        "down": (center_x, center_y + reach),
+        "left": (center_x - reach, center_y),
+        "right": (center_x + reach, center_y),
+    }[direction]
+    # Unit vector perpendicular to the arrow's direction, used to spread
+    # the two base corners of the triangle out from the tip.
+    perp = (1, 0) if direction in ("up", "down") else (0, 1)
+    base_center = (center_x - (tip[0] - center_x) * 0.6, center_y - (tip[1] - center_y) * 0.6)
+    base_a = (base_center[0] + perp[0] * 2.4, base_center[1] + perp[1] * 2.4)
+    base_b = (base_center[0] - perp[0] * 2.4, base_center[1] - perp[1] * 2.4)
+
+    pygame.draw.polygon(pixels, glyph, [tip, base_a, base_b])
+
+    return pygame.transform.scale(
+        pixels, (native_size * CONTROLS_SPRITE_SCALE, native_size * CONTROLS_SPRITE_SCALE)
+    )
+
+
+def _build_hand_sprite() -> pygame.Surface:
+    """
+    Small pointing-hand pixel art for the controls modal's animated cue: a
+    rounded fist/palm (top) with a thumb bump and one extended index
+    finger reaching straight down (bottom) to "press" whichever key the
+    modal is highlighting. The palm and thumb are drawn as ellipses
+    (distance check, like _build_apple_sprite) rather than hard-edged
+    rectangles so the shape reads as a hand instead of a mallet.
+    """
+    native_size = CONTROLS_SPRITE_NATIVE_SIZE
+    pixels = pygame.Surface((native_size, native_size), pygame.SRCALPHA)
+
+    skin = (255, 202, 160, 255)
+    skin_shade = (228, 168, 128, 255)
+    outline = (130, 88, 58, 255)
+
+    palm_center_x, palm_center_y = 6.3, 3.2
+    palm_radius_x, palm_radius_y = 3.6, 2.7
+
+    for y in range(0, 7):
+        for x in range(native_size):
+            nx = (x - palm_center_x) / palm_radius_x
+            ny = (y - palm_center_y) / palm_radius_y
+            dist = nx * nx + ny * ny
+
+            if dist <= 1.0:
+                pixels.set_at((x, y), outline if dist > 0.75 else skin)
+
+    # Thumb: a smaller round bump poking out to the lower-left of the palm.
+    thumb_center_x, thumb_center_y = 1.8, 4.8
+    thumb_radius = 1.6
+
+    for y in range(2, 8):
+        for x in range(0, 4):
+            nx = (x - thumb_center_x) / thumb_radius
+            ny = (y - thumb_center_y) / thumb_radius
+
+            if nx * nx + ny * ny <= 1.0:
+                pixels.set_at((x, y), skin)
+
+    # Extended index finger, reaching down toward the key below -- a
+    # single solid 3px-wide column, not two separate outline strips.
+    finger_left, finger_right = 5, 7
+
+    for y in range(6, native_size):
+        pixels.set_at((finger_left - 1, y), outline)
+        for x in range(finger_left, finger_right + 1):
+            pixels.set_at((x, y), skin)
+        pixels.set_at((finger_right + 1, y), outline)
+    for x in range(finger_left, finger_right + 1):
+        pixels.set_at((x, native_size - 1), skin_shade)
+
+    return pygame.transform.scale(
+        pixels, (native_size * CONTROLS_SPRITE_SCALE, native_size * CONTROLS_SPRITE_SCALE)
+    )
+
+
 _map_texture = pygame.image.load(IMAGES_DIR / "map.jpg")
 
 SPRITES = {
     "map": pygame.transform.smoothscale(_map_texture, (VIRTUAL_WIDTH, VIRTUAL_HEIGHT)),
     "apple": _build_apple_sprite(),
+    "trophy": _build_trophy_sprite(),
+    "key_up": _build_key_sprite("up"),
+    "key_down": _build_key_sprite("down"),
+    "key_left": _build_key_sprite("left"),
+    "key_right": _build_key_sprite("right"),
+    "hand": _build_hand_sprite(),
 }
 
 FONTS = {
@@ -235,3 +400,14 @@ input_handler.InputHandler.set_keyboard_action(input_handler.KEY_DOWN, "move_dow
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_LEFT, "move_left")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RIGHT, "move_right")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RETURN, "restart")
+
+# Raw character keys for the new-record name entry prompt (see PlayState).
+# Bound to shared "text_char"/"text_backspace" actions instead of one
+# binding per letter mattering individually -- the handler reads the
+# actual character off KeyboardData.unicode.
+for _char in "abcdefghijklmnopqrstuvwxyz0123456789":
+    input_handler.InputHandler.set_keyboard_action(
+        getattr(input_handler, f"KEY_{_char}"), "text_char"
+    )
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_SPACE, "text_char")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_BACKSPACE, "text_backspace")
