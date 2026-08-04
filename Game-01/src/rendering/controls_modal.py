@@ -1,11 +1,10 @@
 """
-"How to play" modal: the arrow-key cluster plus a small animated hand
-that cycles through pressing each key, framed by two lines of
-instructional text. Purely pixel art and text over whatever is already
-on the surface -- no panel/background of its own -- so it reads as a
-floating overlay rather than a boxed dialog.
+"How to play" modal: the arrow-key cluster plus, below it, a line of
+text that types itself out describing what each arrow does -- cycling
+through the four keys automatically. Purely pixel art and text over
+whatever is already on the surface -- no panel/background of its own --
+so it reads as a floating overlay rather than a boxed dialog.
 """
-import math
 from typing import Dict, Tuple
 
 import pygame
@@ -16,25 +15,32 @@ import settings
 
 _DIRECTIONS = ("up", "right", "down", "left")
 
-# How long the hand lingers pointing at each key before moving to the
-# next one, and how long the little downward "press" dip at the start
-# of each hold takes.
-_HOLD_SECONDS = 0.8
-_PRESS_SECONDS = 0.18
-_PRESS_DIP = 6
+_MOVEMENT_TEXT = {
+    "up": "Flecha arriba: sube",
+    "right": "Flecha derecha: va a la derecha",
+    "down": "Flecha abajo: baja",
+    "left": "Flecha izquierda: va a la izquierda",
+}
+
+# How long the highlight lingers on each key before moving to the next
+# one, and how long it takes the movement line to finish typing itself
+# out after switching keys.
+_HOLD_SECONDS = 1.4
+_TYPE_SECONDS = 0.6
 
 _ROW_SPACING = 44  # center-to-center distance from "down" out to "left"/"right"
 
-# Center-to-center distance from "down" up to "up". Deliberately much
-# larger than _ROW_SPACING: the hovering hand needs its full sprite
-# height of clearance above whichever key is active, and when that key
-# is "down", the "up" key sitting right above it is what it has to clear
-# -- too tight a gap here and the hand overlaps the "up" keycap instead
-# of reading as pointing at "down" (see _render_hand).
+# Center-to-center distance from "down" up to "up". Deliberately larger
+# than _ROW_SPACING so the highlight ring around "up" never overlaps the
+# "down" keycap sitting right below it.
 _UP_SPACING = 72
 
 _HEADER_OFFSET = -144
+_TEXT_OFFSET = 40  # below the key cluster
 _FOOTER_OFFSET = 150
+
+_HIGHLIGHT_COLOR = pygame.Color(255, 235, 59)
+_HIGHLIGHT_PADDING = 6
 
 
 class ControlsModal:
@@ -58,18 +64,21 @@ class ControlsModal:
             settings.FONTS["hud"],
             self.center_x,
             self.center_y + _HEADER_OFFSET,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
 
         key_positions = self._key_positions()
+        direction = _DIRECTIONS[self._direction_index]
 
-        for direction, position in key_positions.items():
-            sprite = settings.SPRITES[f"key_{direction}"]
+        self._render_highlight(surface, key_positions[direction])
+
+        for key_direction, position in key_positions.items():
+            sprite = settings.SPRITES[f"key_{key_direction}"]
             surface.blit(sprite, sprite.get_rect(center=position))
 
-        self._render_hand(surface, key_positions)
+        self._render_movement_text(surface, direction)
 
         render_text(
             surface,
@@ -77,7 +86,7 @@ class ControlsModal:
             settings.FONTS["hud"],
             self.center_x,
             self.center_y + _FOOTER_OFFSET,
-            pygame.Color("yellow"),
+            settings.UI_ACCENT_COLOR,
             center=True,
             shadowed=True,
         )
@@ -91,20 +100,28 @@ class ControlsModal:
             "right": (cx + _ROW_SPACING, cy),
         }
 
-    def _render_hand(self, surface: pygame.Surface, key_positions: Dict[str, Tuple[float, float]]) -> None:
-        direction = _DIRECTIONS[self._direction_index]
-        key_x, key_y = key_positions[direction]
+    def _render_highlight(self, surface: pygame.Surface, position: Tuple[float, float]) -> None:
+        size = settings.SPRITES["key_up"].get_size()
+        rect = pygame.Rect(0, 0, size[0] + _HIGHLIGHT_PADDING, size[1] + _HIGHLIGHT_PADDING)
+        rect.center = position
+        pygame.draw.rect(surface, _HIGHLIGHT_COLOR, rect, width=3, border_radius=6)
 
-        # A quick downward-then-back dip right after switching keys reads
-        # as the hand pressing the newly-highlighted one.
-        if self._timer < _PRESS_SECONDS:
-            dip = math.sin((self._timer / _PRESS_SECONDS) * math.pi) * _PRESS_DIP
-        else:
-            dip = 0.0
+    def _render_movement_text(self, surface: pygame.Surface, direction: str) -> None:
+        # Typewriter reveal: the fraction of the line shown grows with
+        # how long the current key has been highlighted, so the text
+        # finishes typing itself out shortly after the highlight lands
+        # and then just sits there for the rest of the hold.
+        full_text = _MOVEMENT_TEXT[direction]
+        reveal_ratio = min(1.0, self._timer / _TYPE_SECONDS)
+        visible_chars = int(len(full_text) * reveal_ratio)
 
-        hand = settings.SPRITES["hand"]
-        key_half_height = settings.SPRITES[f"key_{direction}"].get_height() / 2
-        # Rests with its fingertip just touching the key's top edge, dips
-        # further onto the key face for the press.
-        fingertip_y = key_y - key_half_height * 0.6 + dip
-        surface.blit(hand, hand.get_rect(midbottom=(key_x, fingertip_y)))
+        render_text(
+            surface,
+            full_text[:visible_chars],
+            settings.FONTS["hud"],
+            self.center_x,
+            self.center_y + _TEXT_OFFSET,
+            settings.UI_TEXT_COLOR,
+            center=True,
+            shadowed=True,
+        )

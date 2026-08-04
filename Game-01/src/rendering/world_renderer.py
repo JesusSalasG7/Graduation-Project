@@ -20,7 +20,12 @@ class WorldRenderer:
     def __init__(self, world: World) -> None:
         self.world = world
 
-    def render(self, surface: pygame.Surface, awaiting_record_name: bool = False) -> None:
+    def render(
+        self,
+        surface: pygame.Surface,
+        awaiting_record_name: bool = False,
+        game_over_selected: int = 0,
+    ) -> None:
         surface.blit(settings.SPRITES["map"], (0, 0))
         self._render_food(surface)
         self._render_snake(surface)
@@ -28,7 +33,7 @@ class WorldRenderer:
         self._render_hud(surface)
 
         if self.world.game_over:
-            self._render_game_over(surface, awaiting_record_name)
+            self._render_game_over(surface, awaiting_record_name, game_over_selected)
 
     @staticmethod
     def _cell_topleft(cell: Cell) -> Tuple[int, int]:
@@ -295,6 +300,22 @@ class WorldRenderer:
                 pygame.Color("white"),
                 shadowed=True,
             )
+            # Live readout of World.count_apples_in_range() (A01) -- lets
+            # the player check the running count against what they can
+            # see on the board themselves. `or 0` covers it still being a
+            # TODO stub (returns None) so the HUD reads "0/N" instead of
+            # the confusing "None/N" until it's implemented.
+            total_apples = len(self.world.food_field.apples)
+            count_in_range = self.world.count_apples_in_range() or 0
+            render_text(
+                surface,
+                f"En rango: {count_in_range}/{total_apples}",
+                settings.FONTS["hud"],
+                8,
+                42,
+                pygame.Color("white"),
+                shadowed=True,
+            )
 
     def _render_record_badge(self, surface: pygame.Surface, score_text: str) -> None:
         """
@@ -322,7 +343,14 @@ class WorldRenderer:
             shadowed=True,
         )
 
-    def _render_game_over(self, surface: pygame.Surface, awaiting_record_name: bool) -> None:
+    # Labels for PlayState's _GAME_OVER_OPTIONS ("restart", "menu"), in the
+    # same order -- kept here since this module owns everything drawn on
+    # screen, while PlayState owns which one is selected/confirmed.
+    _GAME_OVER_LABELS = ("Volver a jugar", "Menu principal")
+
+    def _render_game_over(
+        self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int
+    ) -> None:
         center_x = settings.VIRTUAL_WIDTH // 2
         center_y = settings.VIRTUAL_HEIGHT // 2
 
@@ -332,22 +360,39 @@ class WorldRenderer:
             settings.FONTS["title"],
             center_x,
             center_y - 12,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
 
         # While PlayState has the new-record name prompt up, ENTER submits
-        # the name rather than restarting -- skip the hint below so it
-        # doesn't contradict what the key is about to do.
-        if not awaiting_record_name:
+        # the name rather than confirming a button -- skip the buttons
+        # below so they don't contradict what the key is about to do.
+        if awaiting_record_name:
+            return
+
+        for i, label in enumerate(self._GAME_OVER_LABELS):
+            selected = i == selected_index
+            color = settings.UI_ACCENT_COLOR if selected else settings.UI_TEXT_COLOR
+            prefix = "> " if selected else "  "
             render_text(
                 surface,
-                "Press ENTER to restart",
+                prefix + label,
                 settings.FONTS["hud"],
                 center_x,
-                center_y + 16,
-                pygame.Color("white"),
+                center_y + 16 + i * 20,
+                color,
                 center=True,
                 shadowed=True,
             )
+
+        render_text(
+            surface,
+            "Flechas arriba/abajo para elegir, ENTER para confirmar",
+            settings.FONTS["hud"],
+            center_x,
+            center_y + 16 + len(self._GAME_OVER_LABELS) * 20 + 8,
+            settings.UI_TEXT_COLOR,
+            center=True,
+            shadowed=True,
+        )

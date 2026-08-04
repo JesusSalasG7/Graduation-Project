@@ -35,7 +35,7 @@ WINDOW_WIDTH = VIRTUAL_WIDTH * WINDOW_SCALE
 WINDOW_HEIGHT = VIRTUAL_HEIGHT * WINDOW_SCALE
 
 # Seconds between grid steps: how often the snake advances one cell.
-MOVE_INTERVAL = 0.12
+MOVE_INTERVAL = 0.15
 
 # Classic green snake palette. The body alternates between the two
 # greens per segment to read as scales; the head, eyes and tongue are
@@ -177,9 +177,8 @@ def _build_trophy_sprite() -> pygame.Surface:
     return pygame.transform.scale(pixels, (native_size * 2, native_size * 2))
 
 
-# Native resolution/scale shared by the arrow-key and hand sprites below,
-# so the two line up pixel-for-pixel in the controls modal (see
-# src/rendering/controls_modal.py).
+# Native resolution/scale for the arrow-key sprites below, used by the
+# controls modal (see src/rendering/controls_modal.py).
 CONTROLS_SPRITE_NATIVE_SIZE = 12
 CONTROLS_SPRITE_SCALE = 3
 
@@ -227,63 +226,6 @@ def _build_key_sprite(direction: str) -> pygame.Surface:
     )
 
 
-def _build_hand_sprite() -> pygame.Surface:
-    """
-    Small pointing-hand pixel art for the controls modal's animated cue: a
-    rounded fist/palm (top) with a thumb bump and one extended index
-    finger reaching straight down (bottom) to "press" whichever key the
-    modal is highlighting. The palm and thumb are drawn as ellipses
-    (distance check, like _build_apple_sprite) rather than hard-edged
-    rectangles so the shape reads as a hand instead of a mallet.
-    """
-    native_size = CONTROLS_SPRITE_NATIVE_SIZE
-    pixels = pygame.Surface((native_size, native_size), pygame.SRCALPHA)
-
-    skin = (255, 202, 160, 255)
-    skin_shade = (228, 168, 128, 255)
-    outline = (130, 88, 58, 255)
-
-    palm_center_x, palm_center_y = 6.3, 3.2
-    palm_radius_x, palm_radius_y = 3.6, 2.7
-
-    for y in range(0, 7):
-        for x in range(native_size):
-            nx = (x - palm_center_x) / palm_radius_x
-            ny = (y - palm_center_y) / palm_radius_y
-            dist = nx * nx + ny * ny
-
-            if dist <= 1.0:
-                pixels.set_at((x, y), outline if dist > 0.75 else skin)
-
-    # Thumb: a smaller round bump poking out to the lower-left of the palm.
-    thumb_center_x, thumb_center_y = 1.8, 4.8
-    thumb_radius = 1.6
-
-    for y in range(2, 8):
-        for x in range(0, 4):
-            nx = (x - thumb_center_x) / thumb_radius
-            ny = (y - thumb_center_y) / thumb_radius
-
-            if nx * nx + ny * ny <= 1.0:
-                pixels.set_at((x, y), skin)
-
-    # Extended index finger, reaching down toward the key below -- a
-    # single solid 3px-wide column, not two separate outline strips.
-    finger_left, finger_right = 5, 7
-
-    for y in range(6, native_size):
-        pixels.set_at((finger_left - 1, y), outline)
-        for x in range(finger_left, finger_right + 1):
-            pixels.set_at((x, y), skin)
-        pixels.set_at((finger_right + 1, y), outline)
-    for x in range(finger_left, finger_right + 1):
-        pixels.set_at((x, native_size - 1), skin_shade)
-
-    return pygame.transform.scale(
-        pixels, (native_size * CONTROLS_SPRITE_SCALE, native_size * CONTROLS_SPRITE_SCALE)
-    )
-
-
 _map_texture = pygame.image.load(IMAGES_DIR / "map.jpg")
 
 SPRITES = {
@@ -294,13 +236,21 @@ SPRITES = {
     "key_down": _build_key_sprite("down"),
     "key_left": _build_key_sprite("left"),
     "key_right": _build_key_sprite("right"),
-    "hand": _build_hand_sprite(),
 }
 
 FONTS = {
     "hud": pygame.font.SysFont("Arial", 14),
     "title": pygame.font.SysFont("Arial", 28, bold=True),
 }
+
+# White/yellow text (the previous choice) barely stands out against the
+# board's lighter green tile -- these two read clearly against both
+# tiles instead. Shared by MenuState and ControlsModal: UI_TEXT_COLOR
+# for regular labels, UI_ACCENT_COLOR for whichever one is selected.
+# UI_ACCENT_COLOR is a dark red rather than a bright one -- pure red
+# washes out on the lighter tile just like the old yellow did.
+UI_TEXT_COLOR = pygame.Color(20, 20, 20)
+UI_ACCENT_COLOR = pygame.Color(139, 0, 0)
 
 # Action SFX sit at full volume; the ambient bed below is deliberately
 # mixed under this (see AMBIENT_BASE_VOLUME) so it never competes with
@@ -376,23 +326,48 @@ AMBIENT_CHANNEL_B = 1
 # Only used when World is built with mode="challenge" (see MenuState). Every
 # apple gets a random numeric value from CHALLENGE_APPLE_VALUES; the snake
 # can only safely eat values inside [filter_min, filter_max] (World, reset
-# per match to the defaults below). The actual accept/reject decision is
-# intentionally left unimplemented -- see World._apple_passes_filter and
-# World._handle_challenge_apple_eaten.
+# per match to the defaults below, then reshuffled periodically -- see
+# World._update_filter_window). Accept/reject is World._apple_passes_filter
+# / World._handle_challenge_apple_eaten.
 CHALLENGE_APPLE_VALUES = (-5, 5, 15)
 CHALLENGE_APPLE_VALUE_COLORS = {
     -5: pygame.Color(198, 40, 40),   # toxic red
     5: pygame.Color(56, 142, 60),    # safe green
     15: pygame.Color(255, 179, 0),   # premium gold
 }
-CHALLENGE_FILTER_MIN_DEFAULT = 0
-CHALLENGE_FILTER_MAX_DEFAULT = 10
+
+# Candidate [min, max] windows the active filter rotates through. Each one
+# deliberately admits a different subset of CHALLENGE_APPLE_VALUES, so "how
+# many apples on the board are in range right now" -- the answer
+# World.count_apples_in_range() computes -- actually changes over a match
+# instead of always landing on the same count.
+CHALLENGE_FILTER_WINDOWS = (
+    (0, 10),    # only +5
+    (-5, 5),    # -5 and +5
+    (5, 15),    # +5 and +15
+    (-5, 15),   # all three
+    (10, 20),   # only +15
+)
+CHALLENGE_FILTER_MIN_DEFAULT, CHALLENGE_FILTER_MAX_DEFAULT = CHALLENGE_FILTER_WINDOWS[0]
+CHALLENGE_FILTER_RESHUFFLE_SECONDS = 8.0
+
+# How many apples challenge mode keeps on the board at once -- this (not
+# just a single apple) is the array World.count_apples_in_range() counts
+# over. Classic mode is unaffected and keeps exactly one.
+CHALLENGE_APPLE_COUNT = 6
 
 # An apple that lands outside the active filter range doesn't sit there
 # forever: it gets a random countdown (seconds) drawn from this range and,
 # once it expires, is replaced by a freshly rolled apple -- see
 # World._spawn_apple / World._update_apple_timers.
 CHALLENGE_OUT_OF_RANGE_LIFETIME_RANGE = (3.0, 6.0)
+
+# Every CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS, World scores
+# count_apples_in_range(): each apple currently sitting inside the active
+# filter window is worth this many bonus points, on top of whatever eating
+# it directly is worth -- see World._update_range_bonus.
+CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS = 5.0
+CHALLENGE_RANGE_BONUS_PER_APPLE = 2
 
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_ESCAPE, "quit")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_UP, "move_up")

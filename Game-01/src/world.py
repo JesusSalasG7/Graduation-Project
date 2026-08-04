@@ -36,8 +36,17 @@ class World:
         # next one (see settings.CHALLENGE_FILTER_MIN_DEFAULT/MAX_DEFAULT).
         self.filter_min = settings.CHALLENGE_FILTER_MIN_DEFAULT
         self.filter_max = settings.CHALLENGE_FILTER_MAX_DEFAULT
+        self._filter_reshuffle_timer = 0.0
 
-        self._spawn_apple()
+        # Classic mode keeps the historical single apple; challenge mode
+        # keeps CHALLENGE_APPLE_COUNT on the board at once -- this is the
+        # array count_apples_in_range() (A01) actually counts over.
+        apple_count = settings.CHALLENGE_APPLE_COUNT if self.mode == "challenge" else 1
+        for _ in range(apple_count):
+            self._spawn_apple()
+
+        self._range_bonus_timer = 0.0
+        self._range_bonus_event = None
 
         self.score = 0
         self.game_over = False
@@ -100,6 +109,16 @@ class World:
         self._eat_event = False
         return happened
 
+    def consume_range_bonus_event(self):
+        """
+        (count, bonus_points) from the last count_apples_in_range() payout,
+        or None if none happened since the last read -- challenge mode only,
+        see _update_range_bonus.
+        """
+        event = self._range_bonus_event
+        self._range_bonus_event = None
+        return event
+
     def set_direction(self, direction: Direction) -> None:
         if not self.finished:
             self.snake.set_direction(direction)
@@ -112,6 +131,11 @@ class World:
 
         self._update_tongue(dt)
         self._update_apple_timers(dt)
+
+        if self.mode == "challenge":
+            self._update_filter_window(dt)
+            self._update_range_bonus(dt)
+
         self._move_timer += dt
 
         while self._move_timer >= self.move_interval:
@@ -186,7 +210,15 @@ class World:
         a "poison" apple doesn't block a cell forever.
         """
         value_choices = settings.CHALLENGE_APPLE_VALUES if self.mode == "challenge" else None
-        apple = self.food_field.spawn_one(self.snake.segments, value_choices=value_choices)
+        # Snake segments AND every apple already on the board -- with only
+        # ever one apple at a time (classic mode) the latter was always
+        # empty and didn't matter, but challenge mode keeps several apples
+        # alive at once, so two of them landing on the same cell is a real
+        # possibility without this.
+        occupied_cells = list(self.snake.segments) + [
+            apple.position for apple in self.food_field.apples
+        ]
+        apple = self.food_field.spawn_one(occupied_cells, value_choices=value_choices)
 
         if apple is not None and self.mode == "challenge" and not self._apple_passes_filter(apple.value):
             apple.expires_in = random.uniform(*settings.CHALLENGE_OUT_OF_RANGE_LIFETIME_RANGE)
@@ -209,14 +241,99 @@ class World:
                 self.food_field.remove(apple)
                 self._spawn_apple()
 
+    def _update_filter_window(self, dt: float) -> None:
+        """
+        Every CHALLENGE_FILTER_RESHUFFLE_SECONDS, swaps [filter_min,
+        filter_max] for a different window from settings.CHALLENGE_FILTER_
+        WINDOWS -- challenge mode only (see update()). Which apples on the
+        board currently pass the filter can change the instant this fires,
+        so every apple's expiry timer is re-synced against the new window
+        right after: freshly-out-of-range apples get one armed (same rule
+        _spawn_apple uses), freshly-back-in-range ones have theirs cleared.
+        """
+        self._filter_reshuffle_timer += dt
+
+        if self._filter_reshuffle_timer < settings.CHALLENGE_FILTER_RESHUFFLE_SECONDS:
+            return
+
+        self._filter_reshuffle_timer -= settings.CHALLENGE_FILTER_RESHUFFLE_SECONDS
+
+        other_windows = [
+            window
+            for window in settings.CHALLENGE_FILTER_WINDOWS
+            if window != (self.filter_min, self.filter_max)
+        ]
+        self.filter_min, self.filter_max = random.choice(other_windows)
+
+        for apple in self.food_field.apples:
+            if self._apple_passes_filter(apple.value):
+                apple.expires_in = None
+            elif apple.expires_in is None:
+                apple.expires_in = random.uniform(*settings.CHALLENGE_OUT_OF_RANGE_LIFETIME_RANGE)
+
+    def _update_range_bonus(self, dt: float) -> None:
+        """
+        Every CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS, scores
+        count_apples_in_range() -- challenge mode only (see update()).
+        Sets _range_bonus_event so PlayState can react (a sound) exactly
+        once per payout; see consume_range_bonus_event.
+        """
+        self._range_bonus_timer += dt
+
+        if self._range_bonus_timer < settings.CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS:
+            return
+
+        self._range_bonus_timer -= settings.CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS
+
+        # `or 0` covers count_apples_in_range() still being a TODO stub
+        # (returns None) -- the bonus is simply 0 until it's implemented,
+        # instead of crashing every 5 seconds.
+        count = self.count_apples_in_range() or 0
+        bonus = count * settings.CHALLENGE_RANGE_BONUS_PER_APPLE
+        self.score += bonus
+        self._range_bonus_event = (count, bonus)
+
     # ------------------------------------------------------------------
     # Mecanica "Filtro Metabolico de Valores" (Modo Desafio)
     # ------------------------------------------------------------------
 
     def _apple_passes_filter(self, value: int) -> bool:
-        # TODO: Reto "Filtro Metabolico de Valores" -- ver Reto_Filtro_Metabolico.html
+        return self.filter_min <= value <= self.filter_max
+
+    def count_apples_in_range(self) -> int:
+        """
+        A01 -- Cuenta cuantos elementos de una matriz se encuentran dentro
+        de un intervalo especificado: recorre food_field.apples (la
+        "matriz") y, por cada elemento cuyo valor cae dentro de
+        [filter_min, filter_max] (los limites del intervalo), incrementa
+        un contador.
+        """
+        # TODO: Reto "Conteo por Intervalo" -- ver Reto_Filtro_Metabolico.html
         pass
 
     def _handle_challenge_apple_eaten(self, apple) -> None:
-        # TODO: Reto "Filtro Metabolico de Valores" -- ver Reto_Filtro_Metabolico.html
-        pass
+        """
+        Runs once, the instant the head lands on `apple`, challenge mode
+        only (_step's classic-mode branch handles the other case). Safe
+        apples behave like a classic-mode eat, scaled by the apple's
+        value; unsafe ones behave like a fatal wall/self collision --
+        same state _step sets for that, so the renderer's star burst and
+        dazed face come along for free.
+        """
+        if self._apple_passes_filter(apple.value):
+            # CHALLENGE_APPLE_VALUES includes -5, and some filter windows
+            # (e.g. (-5, 5)) do let a -5 apple count as "safe" -- it still
+            # shouldn't shrink the snake: Snake.grow's counter isn't meant
+            # to go negative (see grow_pending in src/entities/snake.py),
+            # so a "safe" negative apple costs score without costing length.
+            self.snake.grow(max(0, apple.value))
+            self.score += apple.value
+            self.food_field.remove(apple)
+            self._spawn_apple()
+            self._eat_event = True
+            return
+
+        self.game_over = True
+        self.impact_cell = apple.position
+        self.impact_time = 0.0
+        self._impact_event = True

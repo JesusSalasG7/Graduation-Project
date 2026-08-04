@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reto: Filtro Metabolico de Valores</title>
+<title>Reto: Conteo por Intervalo</title>
 <style>
   :root {
     --bg: #f4f6f2;
@@ -300,139 +300,108 @@
 <div class="wrap">
 
   <header class="hero">
-    <span class="eyebrow">Modo Desafio &middot; Snake</span>
-    <h1>Reto: Filtro Metabolico de Valores</h1>
+    <span class="eyebrow">Modo Desafio &middot; Snake &middot; Filtro Metabolico, Parte 2</span>
+    <h1>Reto: Conteo por Intervalo</h1>
     <p class="subtitle">
-      Te toca completar la mecanica central del Modo Desafio. El juego ya
-      tiene todo lo demas construido (movimiento, colisiones, sonido,
-      HUD, records); lo unico que falta es la decision de "esta manzana,
-      &iquest;la puedo comer o no?" y que pasa despues de esa decision.
+      El filtro metabolico basico ya esta resuelto: el juego ya sabe
+      decidir si una manzana individual es segura o no. Lo que falta es
+      una capacidad nueva &mdash; mirar <strong>todas</strong> las
+      manzanas del tablero a la vez y contar cuantas caen dentro del
+      rango activo. Esa cuenta es la que mueve el marcador
+      "En rango: N/Total" del HUD y paga un bono de puntos cada pocos
+      segundos.
     </p>
   </header>
 
   <section>
-    <h2><span class="num">1</span>Contexto: &iquest;que es el Filtro Metabolico?</h2>
+    <h2><span class="num">1</span>Contexto: lo que el juego ya hace por ti</h2>
     <p>
-      En <strong>Modo Clasico</strong> toda manzana vale 1 y siempre es
-      segura. En <strong>Modo Desafio</strong> cada manzana nace con un
-      valor aleatorio (<code>-5</code>, <code>+5</code> o <code>+15</code>,
-      ver <code>settings.CHALLENGE_APPLE_VALUES</code>) y la serpiente solo
-      puede comer con seguridad las manzanas cuyo valor caiga dentro de un
-      rango activo: <code>[self.filter_min, self.filter_max]</code>.
+      En <strong>Modo Desafio</strong>, cada manzana nace con un valor
+      aleatorio (<code>-5</code>, <code>+5</code> o <code>+15</code>, ver
+      <code>settings.CHALLENGE_APPLE_VALUES</code>) y hay
+      <code>settings.CHALLENGE_APPLE_COUNT</code> manzanas en el tablero
+      <strong>al mismo tiempo</strong> (no una sola). La serpiente solo
+      puede comer con seguridad las que caen dentro del rango activo
+      <code>[self.filter_min, self.filter_max]</code> &mdash; comer una
+      fuera de rango termina la partida, igual que chocar contra la
+      pared. Ese rango, ademas, ya no es fijo: rota cada
+      <code>CHALLENGE_FILTER_RESHUFFLE_SECONDS</code> segundos entre
+      varias ventanas predefinidas
+      (<code>settings.CHALLENGE_FILTER_WINDOWS</code>), asi que cuales
+      manzanas son "seguras" cambia durante la partida.
     </p>
     <div class="grid-two">
       <div class="card">
-        <h4><span class="dot safe"></span>Manzana dentro del filtro</h4>
-        <p>Es alimento: la serpiente crece y el puntaje sube segun el
-        valor de la manzana.</p>
+        <h4><span class="dot safe"></span>Ya implementado</h4>
+        <p><code>World._apple_passes_filter</code> (la pregunta por
+        una sola manzana) y <code>World._handle_challenge_apple_eaten</code>
+        (que pasa al comerla). No necesitas tocarlos.</p>
       </div>
       <div class="card">
-        <h4><span class="dot danger"></span>Manzana fuera del filtro</h4>
-        <p>Es "toxica": comerla termina la partida, igual que chocar
-        contra la pared o contra si misma.</p>
+        <h4><span class="dot danger"></span>Falta por resolver</h4>
+        <p><code>World.count_apples_in_range</code>: la version "para
+        todo el tablero a la vez" de esa misma pregunta.</p>
       </div>
     </div>
-    <p>
-      <code>self.filter_min</code> y <code>self.filter_max</code> ya existen
-      en <code>World</code> (se inicializan en <code>reset()</code> con los
-      valores por defecto de <code>settings.py</code>). No tienes que
-      crearlos ni tocarlos: solo <strong>usarlos</strong> para decidir.
-    </p>
   </section>
 
   <section>
-    <h2><span class="num">2</span>Metodo 1: <code>_apple_passes_filter</code></h2>
+    <h2><span class="num">2</span>El ejercicio: <code>count_apples_in_range</code></h2>
     <p class="file-tag">src/world.py</p>
-    <div class="signature">def _apple_passes_filter(self, value: int) -&gt; bool:</div>
+    <div class="signature">def count_apples_in_range(self) -&gt; int:</div>
     <p>
-      Es la pregunta pura: dado el valor nutricional de una manzana,
-      &iquest;cae dentro del rango activo? No mueve la serpiente, no toca el
-      puntaje, no termina la partida &mdash; solo responde
-      <code>True</code> o <code>False</code>. Este metodo lo usa el resto
-      de <code>World</code> (por ejemplo <code>_spawn_apple</code>, para
-      decidir si a una manzana recien aparecida hay que ponerle un
-      contador de expiracion), asi que conviene que sea correcto antes de
-      seguir con el segundo metodo.
+      Este es el ejercicio <strong>A01</strong> tal cual: dada una matriz
+      y un intervalo <code>[limite_inferior, limite_superior]</code>,
+      recorrer la matriz e incrementar un contador por cada elemento que
+      caiga dentro del intervalo, para terminar devolviendo ese contador.
     </p>
+    <table>
+      <tr><th>Termino de A01</th><th>En este juego, es...</th></tr>
+      <tr><td>La matriz</td><td><code>self.food_field.apples</code> (la lista de manzanas en el tablero ahora mismo)</td></tr>
+      <tr><td>El valor de cada elemento</td><td><code>apple.value</code></td></tr>
+      <tr><td>Limite inferior / superior</td><td><code>self.filter_min</code> / <code>self.filter_max</code></td></tr>
+      <tr><td>&iquest;Esta dentro del intervalo?</td><td>Ya resuelto: <code>self._apple_passes_filter(apple.value)</code></td></tr>
+    </table>
     <div class="callout">
       <strong>Lo que debes resolver</strong>
-      Comparar <code>value</code> contra <code>self.filter_min</code> y
-      <code>self.filter_max</code>. El enunciado del reto (y el
-      comportamiento esperado en el resto del juego) trata los limites
-      como <strong>inclusivos</strong>: una manzana que vale exactamente
-      <code>filter_min</code> o exactamente <code>filter_max</code> debe
-      considerarse segura.
+      Recorrer <code>self.food_field.apples</code> con un contador en
+      <code>0</code>, sumando <code>1</code> cada vez que
+      <code>self._apple_passes_filter(apple.value)</code> sea
+      <code>True</code>, y devolver ese contador al final. No hace falta
+      reimplementar la comparacion de rango: ya existe y esta correcta,
+      solo tienes que <strong>usarla</strong> una vez por manzana.
     </div>
+    <h3>Ejemplo</h3>
+    <p>Con estas 6 manzanas en el tablero (mismo orden en que aparecerian en <code>food_field.apples</code>):</p>
+    <p class="signature">valores = [-5, +5, +15, +5, -5, +15]</p>
     <table>
-      <tr><th>Entrada</th><th>Filtro activo</th><th>Resultado esperado</th></tr>
-      <tr><td><code>value = 5</code></td><td><code>[0, 10]</code></td><td><code>True</code></td></tr>
-      <tr><td><code>value = 0</code></td><td><code>[0, 10]</code></td><td><code>True</code> (limite inclusivo)</td></tr>
-      <tr><td><code>value = 10</code></td><td><code>[0, 10]</code></td><td><code>True</code> (limite inclusivo)</td></tr>
-      <tr><td><code>value = -5</code></td><td><code>[0, 10]</code></td><td><code>False</code></td></tr>
-      <tr><td><code>value = 15</code></td><td><code>[0, 10]</code></td><td><code>False</code></td></tr>
+      <tr><th>Filtro activo</th><th><code>count_apples_in_range()</code> esperado</th><th>Por que</th></tr>
+      <tr><td><code>[0, 10]</code></td><td><code>2</code></td><td>Solo los dos <code>+5</code> caen en <code>[0, 10]</code></td></tr>
+      <tr><td><code>[-5, 5]</code></td><td><code>4</code></td><td>Los dos <code>-5</code> y los dos <code>+5</code> caen en <code>[-5, 5]</code></td></tr>
+      <tr><td><code>[-5, 15]</code></td><td><code>6</code></td><td>Las 6 manzanas caen en el rango</td></tr>
+      <tr><td><code>[10, 20]</code></td><td><code>2</code></td><td>Solo los dos <code>+15</code> caen en <code>[10, 20]</code></td></tr>
     </table>
   </section>
 
   <section>
-    <h2><span class="num">3</span>Metodo 2: <code>_handle_challenge_apple_eaten</code></h2>
-    <p class="file-tag">src/world.py</p>
-    <div class="signature">def _handle_challenge_apple_eaten(self, apple) -&gt; None:</div>
+    <h2><span class="num">3</span>Donde se usa este conteo</h2>
     <p>
-      Este se ejecuta <strong>una sola vez</strong>, justo en el instante
-      en que la cabeza de la serpiente pisa la celda de <code>apple</code>
-      (y solo en Modo Desafio &mdash; en Modo Clasico ese caso lo maneja
-      otra rama de <code>_step</code>). Tu trabajo es decidir que pasa
-      segun si esa manzana es segura o no, usando el metodo que ya
-      resolviste en el paso anterior.
-    </p>
-
-    <h3>a) Si la manzana pasa el filtro (es segura)</h3>
-    <p>Debe comportarse como "comer": la serpiente crece, el puntaje sube,
-    la manzana desaparece y aparece una nueva.</p>
-    <ul class="checklist">
-      <li>Hacer crecer la serpiente segun el valor de la manzana &mdash;
-      revisa la firma de <code>self.snake.grow(...)</code>.</li>
-      <li>Sumar ese mismo valor a <code>self.score</code>.</li>
-      <li>Quitar la manzana comida del tablero
-      (<code>self.food_field</code> tiene un metodo para eso).</li>
-      <li>Hacer aparecer una manzana nueva (ya existe un metodo de
-      <code>World</code> para esto &mdash; buscalo mas arriba en el mismo
-      archivo, empieza con <code>_spawn</code>).</li>
-      <li>Marcar que acaba de ocurrir un "comer" para que
-      <code>PlayState</code> reproduzca el sonido correspondiente
-      (hay una bandera <code>_eat_event</code> pensada exactamente para
-      esto; revisa <code>consume_eat_event</code> para ver como se
-      consume).</li>
-    </ul>
-
-    <h3>b) Si la manzana NO pasa el filtro (es toxica)</h3>
-    <p>
-      Debe comportarse igual que un choque fatal contra la pared o contra
-      el propio cuerpo &mdash; de hecho, reutiliza exactamente el mismo
-      mecanismo que ya usa <code>_step</code> para ese caso (revisalo mas
-      arriba en el archivo: busca donde se pone
-      <code>self.game_over = True</code> tras una colision). No necesitas
-      inventar una animacion nueva: el renderer ya sabe dibujar el burst de
-      estrellas y la cara mareada a partir de este mismo estado.
+      No es un metodo de adorno: dos partes del juego ya lo estan
+      llamando, esperando a que devuelvas un numero de verdad en vez de
+      nada.
     </p>
     <ul class="checklist">
-      <li>Terminar la partida.</li>
-      <li>Guardar la posicion de la manzana como el punto de impacto (para
-      que el burst de estrellas aparezca ahi).</li>
-      <li>Reiniciar el cronometro del impacto en cero.</li>
-      <li>Marcar que acaba de ocurrir un impacto (misma bandera que usa el
-      choque contra la pared; revisa <code>consume_impact_event</code> para
-      ver como la consume <code>PlayState</code>).</li>
+      <li><strong>HUD</strong> (<code>src/rendering/world_renderer.py</code>):
+      la linea "En rango: N/Total" llama a
+      <code>count_apples_in_range()</code> en cada cuadro. Mientras el
+      metodo no este resuelto, se ve fija en "0/Total".</li>
+      <li><strong>Bono periodico</strong> (<code>World._update_range_bonus</code>):
+      cada <code>CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS</code> segundos,
+      multiplica tu resultado por
+      <code>settings.CHALLENGE_RANGE_BONUS_PER_APPLE</code> y lo suma al
+      puntaje. Mientras el metodo no este resuelto, el bono es siempre 0
+      (no rompe la partida, simplemente no paga nada).</li>
     </ul>
-
-    <div class="callout">
-      <strong>Pista</strong>
-      No hace falta descubrir nombres de atributos a ciegas: <code>_step</code>,
-      un poco mas arriba en el mismo archivo, ya resuelve un caso casi
-      identico para el Modo Clasico (comer) y para una colision fatal.
-      Los nombres de los atributos que necesitas aqui son los mismos que
-      se usan alli.
-    </div>
   </section>
 
   <section>
@@ -440,24 +409,25 @@
     <p>Desde el menu principal, elige <strong>Modo Desafio</strong> y
     juega unas rondas. Deberias ver:</p>
     <ul>
-      <li>Cada manzana muestra su valor con signo (por ejemplo
-      <code>+5</code>, <code>-5</code>, <code>+15</code>) y un color segun
-      su categoria.</li>
-      <li>Comer una manzana <em>dentro</em> del filtro activo (mostrado en
-      el HUD como <code>Filtro activo: [min, max]</code>) hace crecer a la
-      serpiente y sube el puntaje.</li>
-      <li>Comer una manzana <em>fuera</em> del filtro termina la partida
-      con el mismo efecto visual/sonoro que chocar contra la pared.</li>
-      <li>Una manzana fuera de rango que nadie come termina expirando sola
-      y siendo reemplazada (eso ya esta implementado; si no ocurre, es
-      señal de que <code>_apple_passes_filter</code> no quedo bien).</li>
+      <li>El numero en "En rango: N/Total" coincide con lo que tu mismo
+      contarias mirando los valores mostrados sobre cada manzana
+      (<code>+5</code>, <code>-5</code>, <code>+15</code>) contra el
+      <code>Filtro activo: [min, max]</code> de la linea de arriba.</li>
+      <li>Ese numero cambia solo cuando el filtro activo rota (cada
+      <code>CHALLENGE_FILTER_RESHUFFLE_SECONDS</code> segundos) o cuando
+      una manzana es comida o reemplazada &mdash; no en cada cuadro porque
+      si.</li>
+      <li>El puntaje sube por si solo cada
+      <code>CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS</code> segundos,
+      incluso sin comer nada, en una cantidad igual a
+      <code>N &times; CHALLENGE_RANGE_BONUS_PER_APPLE</code>.</li>
     </ul>
   </section>
 
   <footer>
-    Archivo a editar: <code>src/world.py</code> &middot; busca los
-    comentarios <code>#TODO</code> dentro de
-    <code>_apple_passes_filter</code> y <code>_handle_challenge_apple_eaten</code>.
+    Archivo a editar: <code>src/world.py</code> &middot; busca el
+    comentario <code>#TODO</code> dentro de
+    <code>count_apples_in_range</code>.
   </footer>
 
 </div>

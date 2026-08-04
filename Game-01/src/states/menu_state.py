@@ -51,14 +51,14 @@ class MenuState(BaseState):
             settings.FONTS["title"],
             center_x,
             title_y,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
 
         for i, (_, label) in enumerate(_OPTIONS):
             selected = i == self._selected
-            color = pygame.Color("yellow") if selected else pygame.Color("white")
+            color = settings.UI_ACCENT_COLOR if selected else settings.UI_TEXT_COLOR
             prefix = "> " if selected else "  "
             render_text(
                 surface,
@@ -77,7 +77,7 @@ class MenuState(BaseState):
             settings.FONTS["hud"],
             center_x,
             settings.VIRTUAL_HEIGHT - 20,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
@@ -90,10 +90,15 @@ class MenuState(BaseState):
         """
         x, y = 10, 8
         line_height = 16
-        gold = pygame.Color(255, 193, 7)
 
         render_text(
-            surface, "RECORDS", settings.FONTS["hud"], x, y, gold, shadowed=True
+            surface,
+            "RECORDS",
+            settings.FONTS["hud"],
+            x,
+            y,
+            settings.UI_ACCENT_COLOR,
+            shadowed=True,
         )
 
         entries = records.load_all()
@@ -105,13 +110,13 @@ class MenuState(BaseState):
                 settings.FONTS["hud"],
                 x,
                 y + line_height,
-                pygame.Color("white"),
+                settings.UI_TEXT_COLOR,
                 shadowed=True,
             )
             return
 
         for i, entry in enumerate(entries):
-            color = gold if i == 0 else pygame.Color("white")
+            color = settings.UI_ACCENT_COLOR if i == 0 else settings.UI_TEXT_COLOR
             render_text(
                 surface,
                 f"{i + 1}. {entry['name']} - {entry['score']}",

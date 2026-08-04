@@ -27,6 +27,11 @@ _DIRECTION_BY_ACTION = {
 
 _MAX_RECORD_NAME_LENGTH = 12
 
+# Shown as the two selectable "buttons" once a match ends -- navigated
+# with move_up/move_down and confirmed with "restart" (ENTER), same
+# input vocabulary MenuState uses to pick a mode.
+_GAME_OVER_OPTIONS = ("restart", "menu")
+
 
 class PlayState(BaseState):
     def enter(self, *args: Tuple[Any], mode: str = "classic", **kwargs: Dict[str, Any]) -> None:
@@ -44,6 +49,10 @@ class PlayState(BaseState):
         self._entering_record_name = False
         self._record_name = ""
 
+        # Which game-over button is highlighted; reset every match so a
+        # new round never inherits the previous one's selection.
+        self._game_over_selected = 0
+
         # Shown once per match, right as the chosen mode starts (not back
         # in the menu), so the player sees how to move before the snake
         # actually starts responding -- dismissed with "restart" (ENTER),
@@ -52,6 +61,13 @@ class PlayState(BaseState):
         self._controls_modal = ControlsModal(
             settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2
         )
+
+    def exit(self) -> None:
+        # Only reachable via the "menu" game-over button today -- without
+        # this the ambient drone (looped on fixed mixer channels) would
+        # keep playing under the menu forever.
+        self.ambient.stop()
+        pygame.mixer.music.stop()
 
     def _start_theme_music(self) -> None:
         pygame.mixer.music.load(str(settings.THEME_MUSIC_PATH))
@@ -71,16 +87,26 @@ class PlayState(BaseState):
             self._handle_record_name_input(input_id, input_data)
             return
 
+        if self.world.finished:
+            self._handle_game_over_input(input_id)
+            return
+
         direction = _DIRECTION_BY_ACTION.get(input_id)
 
         if direction is not None:
-            if not self.world.finished:
-                settings.SOUNDS["move"].play()
-
+            settings.SOUNDS["move"].play()
             self.world.set_direction(direction)
-        elif input_id == "restart" and self.world.finished:
-            self.world.reset()
-            self._start_theme_music()
+
+    def _handle_game_over_input(self, input_id: str) -> None:
+        if input_id in ("move_up", "move_down"):
+            self._game_over_selected = 1 - self._game_over_selected
+        elif input_id == "restart":
+            if _GAME_OVER_OPTIONS[self._game_over_selected] == "restart":
+                self.world.reset()
+                self._game_over_selected = 0
+                self._start_theme_music()
+            else:
+                self.state_machine.change("menu")
 
     def _handle_record_name_input(self, input_id: str, input_data: InputData) -> None:
         if input_id == "text_backspace":
@@ -113,6 +139,12 @@ class PlayState(BaseState):
             settings.SOUNDS["eat"].play()
             self.ambient.duck()
 
+        range_bonus = self.world.consume_range_bonus_event()
+
+        if range_bonus is not None and range_bonus[1] > 0:
+            settings.SOUNDS["eat"].play()
+            self.ambient.duck()
+
         self.ambient.sync_with_world(self.world)
         self.ambient.update(dt)
 
@@ -125,7 +157,11 @@ class PlayState(BaseState):
             self._controls_modal.render(surface)
             return
 
-        self.renderer.render(surface, awaiting_record_name=self._entering_record_name)
+        self.renderer.render(
+            surface,
+            awaiting_record_name=self._entering_record_name,
+            game_over_selected=self._game_over_selected,
+        )
 
         if self._entering_record_name:
             self._render_record_name_prompt(surface)
@@ -140,7 +176,7 @@ class PlayState(BaseState):
             settings.FONTS["hud"],
             center_x,
             center_y,
-            pygame.Color(255, 193, 7),
+            settings.UI_ACCENT_COLOR,
             center=True,
             shadowed=True,
         )
@@ -150,7 +186,7 @@ class PlayState(BaseState):
             settings.FONTS["hud"],
             center_x,
             center_y + 18,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
