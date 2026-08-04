@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Game-01: locally persisted best-score record
+Game-01/records.json
+
+# Claude Code local settings
+.claude/
