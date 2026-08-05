@@ -8,7 +8,7 @@ import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState
-from gale.text import render_text
+from src.rendering.pixel_text import render_text
 
 import settings
 from src import records
@@ -27,6 +27,18 @@ _DIRECTION_BY_ACTION = {
 
 _MAX_RECORD_NAME_LENGTH = 12
 
+# Shown when the typed name already has an entry on the leaderboard --
+# navigated/confirmed the same way as _GAME_OVER_OPTIONS. "rename" is
+# listed second and is the default selection (see enter()) so mashing
+# ENTER never silently overwrites a previous run by accident.
+_OVERWRITE_OPTIONS = ("overwrite", "rename")
+_OVERWRITE_LABELS = ("Sobrescribir", "Cambiar nombre")
+
+# Shown as the two selectable "buttons" once a match ends -- navigated
+# with move_up/move_down and confirmed with "restart" (ENTER), same
+# input vocabulary MenuState uses to pick a mode.
+_GAME_OVER_OPTIONS = ("restart", "menu")
+
 
 class PlayState(BaseState):
     def enter(self, *args: Tuple[Any], mode: str = "classic", **kwargs: Dict[str, Any]) -> None:
@@ -44,6 +56,18 @@ class PlayState(BaseState):
         self._entering_record_name = False
         self._record_name = ""
 
+        # Set instead of committing the record the instant the typed name
+        # turns out to already be on the leaderboard, so the player can
+        # choose to overwrite that entry or go back and pick another name
+        # -- see _handle_record_name_input/_handle_overwrite_confirm_input.
+        self._confirming_overwrite = False
+        self._overwrite_selected = 1
+        self._pending_record_name = ""
+
+        # Which game-over button is highlighted; reset every match so a
+        # new round never inherits the previous one's selection.
+        self._game_over_selected = 0
+
         # Shown once per match, right as the chosen mode starts (not back
         # in the menu), so the player sees how to move before the snake
         # actually starts responding -- dismissed with "restart" (ENTER),
@@ -52,6 +76,13 @@ class PlayState(BaseState):
         self._controls_modal = ControlsModal(
             settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2
         )
+
+    def exit(self) -> None:
+        # Only reachable via the "menu" game-over button today -- without
+        # this the ambient drone (looped on fixed mixer channels) would
+        # keep playing under the menu forever.
+        self.ambient.stop()
+        pygame.mixer.music.stop()
 
     def _start_theme_music(self) -> None:
         pygame.mixer.music.load(str(settings.THEME_MUSIC_PATH))
@@ -67,20 +98,34 @@ class PlayState(BaseState):
                 self._showing_controls = False
             return
 
+        if self._confirming_overwrite:
+            self._handle_overwrite_confirm_input(input_id)
+            return
+
         if self._entering_record_name:
             self._handle_record_name_input(input_id, input_data)
+            return
+
+        if self.world.finished:
+            self._handle_game_over_input(input_id)
             return
 
         direction = _DIRECTION_BY_ACTION.get(input_id)
 
         if direction is not None:
-            if not self.world.finished:
-                settings.SOUNDS["move"].play()
-
+            settings.SOUNDS["move"].play()
             self.world.set_direction(direction)
-        elif input_id == "restart" and self.world.finished:
-            self.world.reset()
-            self._start_theme_music()
+
+    def _handle_game_over_input(self, input_id: str) -> None:
+        if input_id in ("move_up", "move_down"):
+            self._game_over_selected = 1 - self._game_over_selected
+        elif input_id == "restart":
+            if _GAME_OVER_OPTIONS[self._game_over_selected] == "restart":
+                self.world.reset()
+                self._game_over_selected = 0
+                self._start_theme_music()
+            else:
+                self.state_machine.change("menu")
 
     def _handle_record_name_input(self, input_id: str, input_data: InputData) -> None:
         if input_id == "text_backspace":
@@ -90,8 +135,29 @@ class PlayState(BaseState):
             # state the player actually typed with.
             self._record_name += input_data.unicode.upper()
         elif input_id == "restart":
-            records.add(self._record_name.strip() or "JUGADOR", self.world.score)
-            self._entering_record_name = False
+            name = self._record_name.strip() or "JUGADOR"
+
+            if records.name_exists(name):
+                self._pending_record_name = name
+                self._overwrite_selected = 1
+                self._confirming_overwrite = True
+            else:
+                records.add(name, self.world.score)
+                self._entering_record_name = False
+
+    def _handle_overwrite_confirm_input(self, input_id: str) -> None:
+        if input_id in ("move_up", "move_down"):
+            self._overwrite_selected = 1 - self._overwrite_selected
+        elif input_id == "restart":
+            if _OVERWRITE_OPTIONS[self._overwrite_selected] == "overwrite":
+                records.overwrite(self._pending_record_name, self.world.score)
+                self._entering_record_name = False
+            else:
+                # "rename": back to the name prompt with a clean slate so
+                # the player doesn't just resubmit the same duplicate.
+                self._record_name = ""
+
+            self._confirming_overwrite = False
 
     def update(self, dt: float) -> None:
         if self._showing_controls:
@@ -113,6 +179,12 @@ class PlayState(BaseState):
             settings.SOUNDS["eat"].play()
             self.ambient.duck()
 
+        range_bonus = self.world.consume_range_bonus_event()
+
+        if range_bonus is not None and range_bonus[1] > 0:
+            settings.SOUNDS["eat"].play()
+            self.ambient.duck()
+
         self.ambient.sync_with_world(self.world)
         self.ambient.update(dt)
 
@@ -125,7 +197,11 @@ class PlayState(BaseState):
             self._controls_modal.render(surface)
             return
 
-        self.renderer.render(surface, awaiting_record_name=self._entering_record_name)
+        self.renderer.render(
+            surface,
+            awaiting_record_name=self._entering_record_name,
+            game_over_selected=self._game_over_selected,
+        )
 
         if self._entering_record_name:
             self._render_record_name_prompt(surface)
@@ -134,13 +210,17 @@ class PlayState(BaseState):
         center_x = settings.VIRTUAL_WIDTH // 2
         center_y = settings.VIRTUAL_HEIGHT // 2 + 48
 
+        if self._confirming_overwrite:
+            self._render_overwrite_confirm(surface, center_x, center_y)
+            return
+
         render_text(
             surface,
             "Entraste a los records! Escribe tu nombre:",
             settings.FONTS["hud"],
             center_x,
             center_y,
-            pygame.Color(255, 193, 7),
+            settings.UI_ACCENT_COLOR,
             center=True,
             shadowed=True,
         )
@@ -150,7 +230,34 @@ class PlayState(BaseState):
             settings.FONTS["hud"],
             center_x,
             center_y + 18,
-            pygame.Color("white"),
+            settings.UI_TEXT_COLOR,
             center=True,
             shadowed=True,
         )
+
+    def _render_overwrite_confirm(self, surface: pygame.Surface, center_x: int, center_y: int) -> None:
+        render_text(
+            surface,
+            f"Ya existe el nombre '{self._pending_record_name}' en los records",
+            settings.FONTS["hud"],
+            center_x,
+            center_y,
+            settings.UI_ACCENT_COLOR,
+            center=True,
+            shadowed=True,
+        )
+
+        for i, label in enumerate(_OVERWRITE_LABELS):
+            selected = i == self._overwrite_selected
+            color = settings.UI_ACCENT_COLOR if selected else settings.UI_TEXT_COLOR
+            prefix = "> " if selected else "  "
+            render_text(
+                surface,
+                prefix + label,
+                settings.FONTS["menu"],
+                center_x,
+                center_y + 20 + i * 20,
+                color,
+                center=True,
+                shadowed=True,
+            )

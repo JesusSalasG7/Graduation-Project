@@ -50,17 +50,49 @@ def qualifies(score: int) -> bool:
     return score > best_score()
 
 
+def name_exists(name: str) -> bool:
+    """Whether `name` already has an entry on the leaderboard (case/space-insensitive)."""
+    normalized = name.strip().upper()
+    return any(entry["name"].strip().upper() == normalized for entry in load_all())
+
+
+def _save(entries: List[RecordEntry]) -> None:
+    entries.sort(key=lambda entry: entry["score"], reverse=True)
+    entries = entries[:MAX_ENTRIES]
+
+    with open(_RECORDS_PATH, "w", encoding="utf-8") as file:
+        json.dump(entries, file)
+
+
 def add(name: str, score: int) -> None:
     """
     Inserts (name, score), keeping only the top MAX_ENTRIES afterward.
     Since add() is only ever called after qualifies() confirms a new
     best (see PlayState), this doubles as a capped history of the runs
     that broke the record over time.
+
+    Assumes name_exists(name) is already False -- PlayState routes an
+    existing name through overwrite() instead (see its record-name
+    entry flow), so two entries never end up sharing a name.
     """
     entries = load_all()
     entries.append({"name": name, "score": score})
-    entries.sort(key=lambda entry: entry["score"], reverse=True)
-    entries = entries[:MAX_ENTRIES]
+    _save(entries)
 
-    with open(_RECORDS_PATH, "w", encoding="utf-8") as file:
-        json.dump(entries, file)
+
+def overwrite(name: str, score: int) -> None:
+    """
+    Like add(), but first drops any existing entry with the same name
+    (case/space-insensitive) so the leaderboard never ends up with two
+    rows for the same player -- used when the player chooses to
+    overwrite instead of picking a different name.
+    """
+    normalized = name.strip().upper()
+    entries = [entry for entry in load_all() if entry["name"].strip().upper() != normalized]
+    entries.append({"name": name, "score": score})
+    _save(entries)
+
+
+def clear() -> None:
+    """Wipes the leaderboard -- used by the main menu's "Borrar Records" option."""
+    _save([])
