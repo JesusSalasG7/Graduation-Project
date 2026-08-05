@@ -8,7 +8,7 @@ from typing import Tuple
 
 import pygame
 
-from gale.text import render_text
+from src.rendering.pixel_text import render_text
 
 import settings
 from src.world import World
@@ -300,11 +300,6 @@ class WorldRenderer:
                 pygame.Color("white"),
                 shadowed=True,
             )
-            # Live readout of World.count_apples_in_range() (A01) -- lets
-            # the player check the running count against what they can
-            # see on the board themselves. `or 0` covers it still being a
-            # TODO stub (returns None) so the HUD reads "0/N" instead of
-            # the confusing "None/N" until it's implemented.
             total_apples = len(self.world.food_field.apples)
             count_in_range = self.world.count_apples_in_range() or 0
             render_text(
@@ -378,7 +373,7 @@ class WorldRenderer:
             render_text(
                 surface,
                 prefix + label,
-                settings.FONTS["hud"],
+                settings.FONTS["menu"],
                 center_x,
                 center_y + 16 + i * 20,
                 color,

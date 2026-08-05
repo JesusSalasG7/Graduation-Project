@@ -293,22 +293,13 @@ class World:
         self.score += bonus
         self._range_bonus_event = (count, bonus)
 
-    # ------------------------------------------------------------------
-    # Mecanica "Filtro Metabolico de Valores" (Modo Desafio)
-    # ------------------------------------------------------------------
-
     def _apple_passes_filter(self, value: int) -> bool:
         return self.filter_min <= value <= self.filter_max
 
     def count_apples_in_range(self) -> int:
         """
-        A01 -- Cuenta cuantos elementos de una matriz se encuentran dentro
-        de un intervalo especificado: recorre food_field.apples (la
-        "matriz") y, por cada elemento cuyo valor cae dentro de
-        [filter_min, filter_max] (los limites del intervalo), incrementa
-        un contador.
+        TODO
         """
-        # TODO: Reto "Conteo por Intervalo" -- ver Reto_Filtro_Metabolico.html
         pass
 
     def _handle_challenge_apple_eaten(self, apple) -> None:

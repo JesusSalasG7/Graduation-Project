@@ -20,6 +20,7 @@ BASE_DIR = pathlib.Path(__file__).parent
 ASSETS_DIR = BASE_DIR / "assets"
 IMAGES_DIR = ASSETS_DIR / "images"
 SOUNDS_DIR = ASSETS_DIR / "sounds"
+FONTS_DIR = ASSETS_DIR / "fonts"
 
 # Grid / virtual resolution
 CELL_SIZE = 24
@@ -226,10 +227,39 @@ def _build_key_sprite(direction: str) -> pygame.Surface:
     )
 
 
+def _build_cover_sprite() -> pygame.Surface:
+    """
+    Scales the title-screen artwork (assets/images/Cover.png, shown by
+    CoverState at boot) to fill the virtual canvas -- fit to width (wider
+    than a fit-to-height would be, so it reads bigger with no side bars),
+    then crop the vertical overflow instead of distorting the aspect
+    ratio.
+
+    The crop is biased to trim mostly off the top -- empty background
+    there, well clear of the logo (which starts about 30% down the
+    source image) -- rather than the bottom, where the artwork's sparkle
+    accent sits close to the edge and a centered crop would come close
+    to clipping it.
+    """
+    texture = pygame.image.load(IMAGES_DIR / "Cover.png")
+
+    scale = VIRTUAL_WIDTH / texture.get_width()
+    scaled_size = (VIRTUAL_WIDTH, round(texture.get_height() * scale))
+    scaled = pygame.transform.smoothscale(texture, scaled_size)
+
+    overflow = scaled_size[1] - VIRTUAL_HEIGHT
+    crop_top = round(overflow * 0.75)
+
+    canvas = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
+    canvas.blit(scaled, (0, -crop_top))
+    return canvas
+
+
 _map_texture = pygame.image.load(IMAGES_DIR / "map.jpg")
 
 SPRITES = {
     "map": pygame.transform.smoothscale(_map_texture, (VIRTUAL_WIDTH, VIRTUAL_HEIGHT)),
+    "cover": _build_cover_sprite(),
     "apple": _build_apple_sprite(),
     "trophy": _build_trophy_sprite(),
     "key_up": _build_key_sprite("up"),
@@ -238,19 +268,30 @@ SPRITES = {
     "key_right": _build_key_sprite("right"),
 }
 
+# Retro arcade pixel font (Press Start 2P, SIL OFL -- see assets/fonts/OFL.txt),
+# matching the cover art's typeface. Sized in three tiers instead of one:
+# "hud" stays small so dense/long info lines (HUD readouts, hint sentences)
+# fit the 480px-wide virtual canvas; "menu" is deliberately bigger for the
+# handful of short, primary choices a player picks between (mode select,
+# game-over buttons, overwrite/clear confirmations); "title" is for the
+# one-word screen headers ("SNAKE", "GAME OVER").
+PIXEL_FONT_PATH = FONTS_DIR / "PressStart2P-Regular.ttf"
+
 FONTS = {
-    "hud": pygame.font.SysFont("Arial", 14),
-    "title": pygame.font.SysFont("Arial", 28, bold=True),
+    "hud": pygame.font.Font(str(PIXEL_FONT_PATH), 7),
+    "menu": pygame.font.Font(str(PIXEL_FONT_PATH), 10),
+    "title": pygame.font.Font(str(PIXEL_FONT_PATH), 20),
 }
 
-# White/yellow text (the previous choice) barely stands out against the
-# board's lighter green tile -- these two read clearly against both
-# tiles instead. Shared by MenuState and ControlsModal: UI_TEXT_COLOR
-# for regular labels, UI_ACCENT_COLOR for whichever one is selected.
-# UI_ACCENT_COLOR is a dark red rather than a bright one -- pure red
-# washes out on the lighter tile just like the old yellow did.
-UI_TEXT_COLOR = pygame.Color(20, 20, 20)
-UI_ACCENT_COLOR = pygame.Color(139, 0, 0)
+# Solid white fill, per the retro-arcade art direction -- src/rendering/
+# pixel_text.render_text already adds the black outline and gold bevel
+# shadow around it, so plain white (rather than the old near-black) is
+# what actually reads as "engraved" text instead of a flat block.
+# UI_ACCENT_COLOR is a light green, for whichever line is currently
+# selected -- distinct enough from the white fill and the gold bevel
+# shadow underneath it. Shared by MenuState, PlayState and ControlsModal.
+UI_TEXT_COLOR = pygame.Color(255, 255, 255)
+UI_ACCENT_COLOR = pygame.Color(144, 238, 144)
 
 # Action SFX sit at full volume; the ambient bed below is deliberately
 # mixed under this (see AMBIENT_BASE_VOLUME) so it never competes with

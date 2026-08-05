@@ -9,7 +9,7 @@ from typing import Dict, Tuple
 
 import pygame
 
-from gale.text import render_text
+from src.rendering.pixel_text import render_text
 
 import settings
 

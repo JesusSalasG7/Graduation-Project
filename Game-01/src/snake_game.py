@@ -8,6 +8,7 @@ from gale.game import Game
 from gale.input_handler import InputData, InputListener
 from gale.state import StateMachine
 
+from src.states.cover_state import CoverState
 from src.states.menu_state import MenuState
 from src.states.play_state import PlayState
 
@@ -18,8 +19,10 @@ class SnakeGame(Game, InputListener):
         # calling init() -- registering again here would make on_input
         # fire twice per event (e.g. a menu toggle that immediately
         # cancels itself out).
-        self.state_machine = StateMachine({"menu": MenuState, "play": PlayState})
-        self.state_machine.change("menu")
+        self.state_machine = StateMachine(
+            {"cover": CoverState, "menu": MenuState, "play": PlayState}
+        )
+        self.state_machine.change("cover")
 
     def on_input(self, input_id: str, input_data: InputData) -> None:
         if input_id == "quit" and input_data.pressed:
