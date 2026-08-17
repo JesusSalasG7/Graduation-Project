@@ -13,27 +13,30 @@ bruta, aplicado al propio estado del cubo.
 ## Estructura
 
 ```
-cubo_rubik/
+Game-03/
 ├── main.py                      # punto de entrada: crea el Game y lo ejecuta
 ├── settings.py                   # configuración (resolución, input)
 ├── test_search_3d_pattern.py      # caso de prueba integrado del desafío A03
+├── GUIA_A03_find_3d_pattern.md    # guía del desafío A03 para el participante
 └── src/
-    ├── cubo_rubik.py             # clase Game: arranca el StateMachine
-    ├── algorithm.py                # *** desafío A03: buscar_patron_3d *** (sin pygame)
+    ├── cube_game.py               # clase Game: arranca el StateMachine
+    ├── algorithm.py                # *** desafío A03: find_3d_pattern *** (sin pygame)
     ├── rubik_cube.py               # *** lógica del cubo: matriz 3x3x3, movimientos *** (sin pygame)
-    ├── vista_3d.py                  # proyección 3D del cubo (rotación, perspectiva, culling)
+    ├── view_3d.py                  # proyección 3D del cubo (rotación, perspectiva, culling)
     └── states/
-        └── play_state.py          # interfaz/animación (gale.ui + pygame)
+        ├── menu_state.py           # menú inicial
+        ├── instructions_state.py   # pantalla de instrucciones
+        └── play_state.py           # interfaz/animación (gale.ui + pygame)
 ```
 
 `src/algorithm.py` y `src/rubik_cube.py` no importan pygame ni gale:
 son lógica pura sobre listas anidadas de enteros, para poder leerlos,
 probarlos y calificarlos de forma aislada de la parte gráfica (que
-vive en `src/vista_3d.py` y `src/states/play_state.py`).
+vive en `src/view_3d.py` y `src/states/play_state.py`).
 
 ## Modelo del cubo
 
-`RubikCube.matriz` es una lista de listas de listas (`matriz[x][y][z]`,
+`RubikCube.matrix` es una lista de listas de listas (`matrix[x][y][z]`,
 cada eje con valores 0, 1 o 2) donde cada una de las 27 celdas guarda
 el **identificador entero** de la pieza física que ocupa esa posición:
 `0` es el núcleo central (no es una pieza visible en un cubo real) y
@@ -43,10 +46,10 @@ la matriz siempre refleja qué pieza está en cada posición — el estado
 que necesita el desafío A03 (recorrer y comparar bloques de una matriz
 3D).
 
-En paralelo, `RubikCube.colores` modela los stickers: para cada
+En paralelo, `RubikCube.colors` modela los stickers: para cada
 `(x, y, z, dirección_hacia_afuera)` donde hay una cara visible, guarda
 su color (uno de los 6 oficiales, ver más abajo). A diferencia de
-`matriz`, `colores` sí rota tanto de posición como de orientación al
+`matrix`, `colors` sí rota tanto de posición como de orientación al
 girar una capa, así que un giro o una mezcla cambian realmente los
 colores visibles, igual que en un cubo real.
 
@@ -60,8 +63,8 @@ Los movimientos usan la notación estándar de un cubo de Rubik:
 Todos, sentido horario por defecto; con un apóstrofe al final (por
 ejemplo `U'` o `Uw'`), sentido antihorario. Internamente, cada
 movimiento es el giro de una o dos capas (3x3 piezas cada una)
-alrededor de un eje (`RubikCube.girar_capa`), y actualiza `matriz` y
-`colores` en conjunto.
+alrededor de un eje (`RubikCube.rotate_layer`), y actualiza `matrix` y
+`colors` en conjunto.
 
 ## El desafío A03
 
@@ -76,21 +79,24 @@ alrededor de un eje (`RubikCube.girar_capa`), y actualiza `matriz` y
 > **Key Concept:** Recorrido por una matriz 3D.
 > **Enfoque en la comprensión:** Reconocimiento de patrones.
 
-- La implementación exacta, comentada paso a paso, está en
-  `src/algorithm.py::buscar_patron_3d` (fuerza bruta pura, sin
+- La guía paso a paso para resolverlo, pensada para el participante
+  (sin spoilear el código terminado), está en
+  [`GUIA_A03_find_3d_pattern.md`](GUIA_A03_find_3d_pattern.md).
+- La función a implementar es
+  `src/algorithm.py::find_3d_pattern` (fuerza bruta pura, sin
   depender del cubo).
 - `RubikCube.search_3d_pattern(target_submatrix)` (en
   `src/rubik_cube.py`) es el punto de entrada pedido específicamente
   para el cubo: busca `target_submatrix` (por ejemplo, un bloque
-  2x2x2) dentro del estado actual del cubo (`self.matriz`) usando
-  `buscar_patron_3d`, y devuelve la posición `(x, y, z)` donde
+  2x2x2) dentro del estado actual del cubo (`self.matrix`) usando
+  `find_3d_pattern`, y devuelve la posición `(x, y, z)` donde
   empieza la coincidencia, o `None` si no se encontró.
 
 ## Caso de prueba integrado
 
 ```bash
-cd cubo_rubik
-../.venv/bin/python test_search_3d_pattern.py
+cd Game-03
+.venv/bin/python test_search_3d_pattern.py
 ```
 
 No necesita pygame ni una ventana (`rubik_cube.py` y `algorithm.py` no
@@ -109,15 +115,15 @@ lo importan). Corre 4 casos y los imprime en consola:
 ## Cómo correr la simulación interactiva
 
 ```bash
-cd cubo_rubik
-../.venv/bin/python main.py
+cd Game-03
+.venv/bin/python main.py
 ```
 
-El cubo se dibuja en una **proyección 3D real** (`src/vista_3d.py`):
+El cubo se dibuja en una **proyección 3D real** (`src/view_3d.py`):
 sus 6 caras, cada una con su grilla 3x3 de "stickers" pintados con los
 colores oficiales de un cubo de Rubik (blanco `#FFFFFF`, amarillo
 `#FFD500`, rojo `#B71234`, naranja `#FF5800`, azul `#0046AD` y verde
-`#009B48` — ver `RubikCube.colores`), rotadas en el espacio con
+`#009B48` — ver `RubikCube.colors`), rotadas en el espacio con
 perspectiva simple. Como los colores viajan con cada pieza al girar
 una capa, tanto los movimientos individuales como "Mezclar" cambian
 realmente el aspecto del cubo, igual que uno físico. En cada cuadro se
@@ -129,11 +135,11 @@ de la más lejana a la más cercana ("algoritmo del pintor").
 La pantalla solo muestra el cubo, centrado (`src/states/play_state.py`)
 -- se controla enteramente con mouse y teclado, sin botones en
 pantalla. Cada giro de capa por teclado se **anima** (180ms, ver
-`DURACION_ANIMACION_MOVIMIENTO`): la capa gira visualmente de 0 a 90
-grados (`vista_3d.AnimacionCapa`) antes de aplicarse de verdad sobre
+`MOVE_ANIMATION_DURATION`): la capa gira visualmente de 0 a 90
+grados (`view_3d.LayerAnimation`) antes de aplicarse de verdad sobre
 `RubikCube` -- mientras dura, se ignoran teclas nuevas, para que nunca
 haya dos giros superpuestos. Al terminar, se imprime en la consola
-junto con el estado de las 6 caras (`RubikCube.imprimir_colores`,
+junto con el estado de las 6 caras (`RubikCube.print_colors`,
 letras W/Y/R/O/B/G).
 
 ### Controles
