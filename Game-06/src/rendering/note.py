@@ -33,6 +33,17 @@ from src.rendering.pixel_text import render_text
 _GLOW_RINGS = ((3, 30), (2, 55), (1, 90))  # (extra radius, alpha), outer to inner
 
 
+def _dim(color: pygame.Color, visibility: float) -> pygame.Color:
+    """`color` lerped towards settings.BACKGROUND_COLOR as `visibility` (0..1) drops."""
+    target = settings.BACKGROUND_COLOR
+    amount = 1.0 - visibility
+    return pygame.Color(
+        round(color.r + (target.r - color.r) * amount),
+        round(color.g + (target.g - color.g) * amount),
+        round(color.b + (target.b - color.b) * amount),
+    )
+
+
 class Note:
     def __init__(self, char: str, x: float, color: pygame.Color, spawn_time: float, hit_time: float) -> None:
         self.char = char
@@ -76,8 +87,17 @@ class Note:
         # well before elapsed could ever drift this far past hit_time.
         return elapsed - self._hit_time > settings.OK_WINDOW_SECONDS + 1.0
 
-    def render(self, surface: pygame.Surface) -> None:
+    def render(self, surface: pygame.Surface, visibility: float = 1.0) -> None:
+        """
+        `visibility` mirrors World.highway_visibility -- 1.0 normally,
+        fading towards 0.0 during a long song pause so a note never sits
+        fully bright over an otherwise blacked-out highway (see
+        TypingRenderer.render, the one caller that passes anything other
+        than the default).
+        """
         color = settings.JUDGEMENT_COLORS[self.judgement] if self.resolved else self.color
+        if visibility < 1.0:
+            color = _dim(color, visibility)
         center = (round(self.x), round(self.y))
         radius = settings.NOTE_RADIUS
 

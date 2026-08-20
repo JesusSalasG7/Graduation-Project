@@ -7,9 +7,9 @@ numbers matter, e.g. under test).
 
 sort_task() is deliberately the one function PlayState ever calls to do
 that (see PlayState._begin_sort_task) -- swap its body for any other
-correct ascending sort (quicksort, merge, selection...) and nothing
+correct ascending sort (quicksort, merge, bubble...) and nothing
 else in the game has to change, since nothing else knows or cares that
-this one happens to be bubble sort. It's also deliberately safe to leave
+this one happens to be selection sort. It's also deliberately safe to leave
 unimplemented: run_sort_task below is what PlayState actually calls, and
 it treats "raises" and "returns None" (an empty `pass` body falls
 through to that implicitly) the same way -- no sorted result, so
@@ -42,27 +42,7 @@ def generate_word_lengths(count: int, seed: Optional[int] = None) -> List[int]:
 
 
 def sort_task(lengths: List[int]) -> List[int]:
-    """
-    Sorts `lengths` ascending via bubble sort: repeatedly walk the list
-    swapping adjacent out-of-order pairs until a full pass makes no swap.
-    Not in-place (returns a new list) -- clearer to read and verify than
-    swapping in the caller's array, and correctness/timing here matter
-    more than shaving off the allocation.
-    """
-    result = list(lengths)
-    n = len(result)
-
-    for i in range(n - 1):
-        swapped = False
-        for j in range(n - 1 - i):
-            if result[j] > result[j + 1]:
-                result[j], result[j + 1] = result[j + 1], result[j]
-                swapped = True
-        if not swapped:
-            break
-
-    return result
-
+    pass
 
 def run_sort_task(lengths: List[int]) -> Tuple[Optional[List[int]], float]:
     """

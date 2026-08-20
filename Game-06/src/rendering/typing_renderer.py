@@ -6,7 +6,7 @@ queue, and the HUD. All rendering concerns live here so the model in
 src/world.py never has to know pygame exists -- the same split Game-01's
 WorldRenderer keeps for Snake's grid.
 """
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import pygame
 
@@ -92,9 +92,9 @@ class TypingRenderer:
         self,
         surface: pygame.Surface,
         notes: List[Note],
-        difficulty_label: str,
         awaiting_record_name: bool = False,
         game_over_selected: int = 0,
+        win_selected: int = 0,
     ) -> None:
         # The song's own macro loudness (World.energy_at_elapsed), not
         # just its beat -- a quiet verse and the loudest drop shouldn't
@@ -109,8 +109,13 @@ class TypingRenderer:
         self._render_combo_watermark(surface)
         self._render_hit_zone(surface)
 
+        # Same fade the highway/hit zone/target word already get during a
+        # long song pause (see World.highway_visibility) -- without this a
+        # falling note would sit fully bright over an otherwise
+        # blacked-out highway while the music is silent.
+        visibility = self.world.highway_visibility()
         for note in notes:
-            note.render(surface)
+            note.render(surface, visibility)
 
         self._render_popups(surface)
 
@@ -119,10 +124,12 @@ class TypingRenderer:
             self._render_target_word(surface, word)
 
         self._render_word_queue(surface)
-        self._render_hud(surface, difficulty_label)
+        self._render_hud(surface)
 
         if self.world.game_over:
             self._render_game_over(surface, awaiting_record_name, game_over_selected)
+        elif self.world.won:
+            self._render_victory(surface, awaiting_record_name, win_selected)
 
     def _render_lanes(self, surface: pygame.Surface, energy: float) -> None:
         top = settings.FALL_START_Y - 10
@@ -273,7 +280,7 @@ class TypingRenderer:
 
         self._popups = still_active
 
-    def _render_hud(self, surface: pygame.Surface, difficulty_label: str) -> None:
+    def _render_hud(self, surface: pygame.Surface) -> None:
         render_text(
             surface,
             f"SCORE {self.world.score:06d}",
@@ -299,7 +306,7 @@ class TypingRenderer:
         right_x = settings.VIRTUAL_WIDTH - 10
         self._render_right_aligned(
             surface,
-            f"DIFICULTAD: {difficulty_label.upper()}",
+            f"PRECISION: {self.world.accuracy_percent:.1f}%",
             settings.FONTS["hud"],
             right_x,
             8,
@@ -307,18 +314,10 @@ class TypingRenderer:
         )
         self._render_right_aligned(
             surface,
-            f"PRECISION: {self.world.accuracy_percent:.1f}%",
-            settings.FONTS["hud"],
-            right_x,
-            22,
-            settings.UI_MUTED_COLOR,
-        )
-        self._render_right_aligned(
-            surface,
             f"SPEED: {self.world.speed_multiplier:.2f}x",
             settings.FONTS["hud"],
             right_x,
-            36,
+            22,
             settings.UI_ACCENT_COLOR,
         )
 
@@ -349,8 +348,29 @@ class TypingRenderer:
     # drawn on screen, while PlayState owns which one is selected.
     _GAME_OVER_LABELS = ("Volver a jugar", "Volver al inicio")
 
+    # Labels for PlayState's _WIN_OPTIONS ("same_track", "change_track",
+    # "cover"), in the same order.
+    _WIN_LABELS = ("Usar misma pista", "Cambiar pista", "Menu principal")
+
     def _render_game_over(
         self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int
+    ) -> None:
+        self._render_end_screen(surface, "GAME OVER", self._GAME_OVER_LABELS, awaiting_record_name, selected_index)
+
+    def _render_victory(
+        self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int
+    ) -> None:
+        self._render_end_screen(
+            surface, "CANCION COMPLETADA", self._WIN_LABELS, awaiting_record_name, selected_index
+        )
+
+    def _render_end_screen(
+        self,
+        surface: pygame.Surface,
+        title: str,
+        labels: Tuple[str, ...],
+        awaiting_record_name: bool,
+        selected_index: int,
     ) -> None:
         center_x = settings.VIRTUAL_WIDTH // 2
         center_y = settings.VIRTUAL_HEIGHT // 2
@@ -361,7 +381,7 @@ class TypingRenderer:
 
         render_text(
             surface,
-            "GAME OVER",
+            title,
             settings.FONTS["title"],
             center_x,
             center_y - 60,
@@ -386,7 +406,7 @@ class TypingRenderer:
         if awaiting_record_name:
             return
 
-        for i, label in enumerate(self._GAME_OVER_LABELS):
+        for i, label in enumerate(labels):
             selected = i == selected_index
             color = settings.UI_ACCENT_COLOR if selected else settings.UI_TEXT_COLOR
             prefix = "> " if selected else "  "
@@ -406,7 +426,7 @@ class TypingRenderer:
             "Flechas arriba/abajo para elegir, ENTER para confirmar",
             settings.FONTS["hud"],
             center_x,
-            center_y + 10 + len(self._GAME_OVER_LABELS) * 22 + 10,
+            center_y + 10 + len(labels) * 22 + 10,
             settings.UI_MUTED_COLOR,
             center=True,
         )

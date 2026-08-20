@@ -20,9 +20,10 @@ not fixed), then dismisses the controls screen, then types their name
 _begin_sort_task, an unrelated sorting exercise (see
 src/algorithms/sort_task.py) that only ever shows its own loading
 screen if that module's sort_task is actually implemented. That name is
-what a qualifying run's score (and, only when sort_task turned out to
-be implemented, the sort exercise's elapsed time) gets saved under once
-the run ends -- see _handle_game_over/_save_record.
+what every run's score (and, only when sort_task turned out to be
+implemented, the sort exercise's elapsed time) gets saved under once
+the run ends, regardless of whether it beat the previous best -- see
+_handle_game_over/_save_record and src/records.py's module docstring.
 """
 import pathlib
 import time
@@ -59,6 +60,11 @@ _OVERWRITE_LABELS = ("Sobrescribir", "Cambiar nombre")
 # input vocabulary CoverState uses to dismiss its own screen.
 _GAME_OVER_OPTIONS = ("restart", "cover")
 
+# Shown as the three selectable "buttons" once a run is WON (the song
+# played all the way through without running out of lives) -- same
+# navigation vocabulary as _GAME_OVER_OPTIONS, just one more choice.
+_WIN_OPTIONS = ("same_track", "change_track", "cover")
+
 _INSTRUCTIONS = (
     "Las palabras pueden aparecer en espanol o en ingles.",
     "Escribe cada letra justo cuando cruce la linea de impacto.",
@@ -71,7 +77,6 @@ class PlayState(BaseState):
     def enter(
         self, *args: Tuple[Any], difficulty: str = settings.DEFAULT_DIFFICULTY, **kwargs: Dict[str, Any]
     ) -> None:
-        self._difficulty_label = settings.DIFFICULTIES[difficulty]["label"]
         self._travel_time = settings.DIFFICULTIES[difficulty]["travel_time"]
 
         # Shown first, before even the controls screen -- "A que ritmo
@@ -85,6 +90,18 @@ class PlayState(BaseState):
         self._beats: Optional[List[float]] = None
         self._song_duration: Optional[float] = None
         self._energy_curve = None
+
+        # Set the instant the song select menu is confirmed, cleared once
+        # _confirm_song_selection actually runs -- see _handle_song_select_input
+        # for why the heavy librosa analysis is deferred a frame instead of
+        # running straight from on_input.
+        self._analyzing_song = False
+        self._analysis_screen_shown = False
+        # Set by the win screen's "cambiar pista" option -- tells
+        # _confirm_song_selection to skip straight back into a run
+        # instead of showing the controls screen again (see that method
+        # and _handle_victory_input).
+        self._song_reselect = False
 
         # World itself isn't built until _start_run, which needs to wait
         # for _begin_sort_task to know whether there's a preset word
@@ -106,16 +123,16 @@ class PlayState(BaseState):
         # on_input) so the participant types their name BEFORE a run
         # starts, not after -- self.world is still None at that point,
         # which render()/update() use to tell "typing the name up front"
-        # apart from this same flag's other use: getting reused after a
-        # qualifying run ends, if that name turns out to collide with an
-        # existing leaderboard entry (see _attempt_save_record's "rename"
-        # branch) and the participant has to type a different one.
+        # apart from this same flag's other use: getting reused once a run
+        # ends, if that name turns out to collide with an existing saved
+        # entry (see _attempt_save_record's "rename" branch) and the
+        # participant has to type a different one.
         # Entirely PlayState-side UI flow, not part of World's model.
         self._entering_record_name = False
         self._record_name = ""
 
-        # Set instead of committing the record the instant a qualifying
-        # run's name turns out to already be on the leaderboard, so the
+        # Set instead of committing the record the instant a finished
+        # run's name turns out to already have a saved entry, so the
         # player can choose to overwrite that entry or pick another name.
         self._confirming_overwrite = False
         self._overwrite_selected = 1
@@ -128,6 +145,11 @@ class PlayState(BaseState):
         # exactly once per run, not on every subsequent letter event
         # while the game-over screen sits there.
         self._game_over_handled = False
+
+        self._win_selected = 0
+        # Same one-shot-latch idea as _game_over_handled, but for
+        # World.won (see update() / _handle_victory).
+        self._win_handled = False
 
         # Shown once per run, right after the song's chosen (see
         # _confirm_song_selection), before the first letter starts
@@ -170,21 +192,32 @@ class PlayState(BaseState):
 
     def _confirm_song_selection(self) -> None:
         """
-        Called once the "A que ritmo quieres ir" menu is confirmed (see
-        on_input) -- locks in settings.SONGS[self._song_select_index] as
-        this run's song and runs the one-time beat analysis on it (cached
-        on disk after the first-ever run, a few seconds otherwise -- see
+        Called from update() once the "A que ritmo quieres ir" menu has been
+        confirmed and the loading screen has had a frame to actually appear
+        on screen (see _handle_song_select_input / update()'s
+        self._analyzing_song handling) -- locks in
+        settings.SONGS[self._song_select_index] as this run's song and runs
+        the one-time beat analysis on it (cached on disk after the
+        first-ever run, a few seconds otherwise -- see
         src/audio/beat_detector.py). World snaps every letter's hit_time
-        onto one of these beats, so the fall is timed to the song's
-        actual pulse instead of a fixed cadence.
+        onto one of these beats, so the fall is timed to the song's actual
+        pulse instead of a fixed cadence.
         """
         self._song_path = settings.SONGS[self._song_select_index]
 
         detector = BeatDetector(str(self._song_path), delta=settings.BEAT_DETECTION_DELTA)
         self._beats, self._song_duration, self._energy_curve = detector.detect()
 
-        self._showing_song_select = False
-        self._showing_controls = True
+        if self._song_reselect:
+            # "cambiar pista" from the win screen -- the participant's
+            # name and the controls screen are both already behind them,
+            # so drop straight back into a run on the newly picked song,
+            # same as a game-over "restart" does for the same song.
+            self._song_reselect = False
+            self._notes.clear()
+            self._begin_sort_task()
+        else:
+            self._showing_controls = True
 
     def _start_song(self) -> None:
         """
@@ -200,7 +233,11 @@ class PlayState(BaseState):
         """
         pygame.mixer.music.load(str(self._song_path))
         pygame.mixer.music.set_volume(settings.SONG_VOLUME)
-        pygame.mixer.music.play(loops=-1)
+        # Plays once (not loops=-1) -- World.won now fires the instant
+        # elapsed reaches the song's own duration (see World.update), so
+        # looping the audio underneath that would leave it playing on
+        # into the victory screen.
+        pygame.mixer.music.play()
         self._song_start_perf = time.perf_counter()
 
     def _current_song_time(self) -> Optional[float]:
@@ -290,6 +327,14 @@ class PlayState(BaseState):
         if not input_data.pressed:
             return
 
+        if self._analyzing_song:
+            # Swallow every input while the (blocking) beat analysis runs --
+            # otherwise a held ENTER's autorepeat piles up in the event
+            # queue during the freeze and all fires at once the instant it
+            # unblocks, cascading straight through the controls/name
+            # screens instead of stopping on each one.
+            return
+
         if self._showing_song_select:
             self._handle_song_select_input(input_id)
             return
@@ -312,7 +357,10 @@ class PlayState(BaseState):
             return
 
         if self.world.finished:
-            self._handle_game_over_input(input_id)
+            if self.world.won:
+                self._handle_victory_input(input_id)
+            else:
+                self._handle_game_over_input(input_id)
             return
 
         if input_id == "text_char" and input_data.unicode.isalpha():
@@ -330,7 +378,16 @@ class PlayState(BaseState):
         elif input_id == "move_down":
             self._song_select_index = (self._song_select_index + 1) % len(settings.SONGS)
         elif input_id == "restart":
-            self._confirm_song_selection()
+            # Don't call _confirm_song_selection() straight from here -- it
+            # runs a several-seconds-long librosa analysis the first time a
+            # given song is picked, and calling it inline would block this
+            # very on_input dispatch before a single frame of feedback ever
+            # gets drawn, making the game look frozen/stuck. Flipping this
+            # flag instead lets update()/render() show a loading screen for
+            # (at least) one frame first -- see update().
+            self._showing_song_select = False
+            self._analyzing_song = True
+            self._analysis_screen_shown = False
 
     def _handle_game_over_input(self, input_id: str) -> None:
         if input_id in ("move_up", "move_down"):
@@ -345,6 +402,33 @@ class PlayState(BaseState):
                 self._game_over_selected = 0
                 self._game_over_handled = False
                 self._begin_sort_task()
+            else:
+                self.state_machine.change("cover")
+
+    def _handle_victory_input(self, input_id: str) -> None:
+        if input_id in ("move_up", "move_down"):
+            step = -1 if input_id == "move_up" else 1
+            self._win_selected = (self._win_selected + step) % len(_WIN_OPTIONS)
+        elif input_id == "restart":
+            choice = _WIN_OPTIONS[self._win_selected]
+
+            if choice == "same_track":
+                # Same song already cached on self (self._song_path/
+                # _beats/_song_duration/_energy_curve) -- a fresh World
+                # and a fresh sorted preset batch, exactly like a
+                # game-over restart.
+                self._notes.clear()
+                self._win_selected = 0
+                self._win_handled = False
+                self._begin_sort_task()
+            elif choice == "change_track":
+                self._notes.clear()
+                self._win_selected = 0
+                self._win_handled = False
+                self.world = None
+                self.renderer = None
+                self._showing_song_select = True
+                self._song_reselect = True
             else:
                 self.state_machine.change("cover")
 
@@ -374,8 +458,8 @@ class PlayState(BaseState):
 
     def _attempt_save_record(self) -> None:
         """
-        Called once a run ends with a qualifying score (see
-        _handle_game_over) -- the name is already known by then (typed
+        Called once a run ends (see _handle_game_over -- every run now,
+        regardless of score) -- the name is already known by then (typed
         right after the controls screen, see _handle_record_name_input),
         so this either saves straight away or, if that name already has
         an entry, defers to _confirming_overwrite the same choice
@@ -418,6 +502,21 @@ class PlayState(BaseState):
             self._confirming_overwrite = False
 
     def update(self, dt: float) -> None:
+        if self._analyzing_song:
+            if not self._analysis_screen_shown:
+                # First tick after the flag flipped -- render() hasn't drawn
+                # the loading screen yet this frame (update() always runs
+                # before render() within a frame, see gale's Game.exec), so
+                # wait one more tick before actually blocking on the
+                # analysis. That way the loading screen is already on
+                # screen (from the previous frame's flip) once the freeze
+                # hits, instead of the song-select screen looking stuck.
+                self._analysis_screen_shown = True
+                return
+            self._confirm_song_selection()
+            self._analyzing_song = False
+            return
+
         if self._showing_song_select or self._showing_controls:
             return
 
@@ -444,6 +543,12 @@ class PlayState(BaseState):
         self._sync_notes()
 
         self.world.consume_word_clean_event()  # bonus already landed in World.score
+
+        # Unlike game_over (only ever flipped from inside a letter event,
+        # see _consume_letter_event), World.won flips here -- purely from
+        # elapsed crossing song_duration, with no letter involved at all.
+        if self.world.won and not self._win_handled:
+            self._handle_victory()
 
     def _sync_notes(self) -> None:
         """
@@ -524,10 +629,27 @@ class PlayState(BaseState):
         # case a restart never happens first.)
         pygame.mixer.music.stop()
 
-        if records.qualifies(self.world.score):
-            self._attempt_save_record()
+        # Every run gets saved now, not just ones that beat the previous
+        # best -- the sort_time each run carries is data this project
+        # needs from every participant (see src/records.py's module
+        # docstring), not only whoever currently tops the leaderboard.
+        self._attempt_save_record()
+
+    def _handle_victory(self) -> None:
+        self._win_handled = True
+
+        # The song already stopped on its own (see _start_song -- it no
+        # longer loops), but this covers the same "leaving PlayState
+        # entirely" edge case exit() does for game over.
+        pygame.mixer.music.stop()
+
+        self._attempt_save_record()
 
     def render(self, surface: pygame.Surface) -> None:
+        if self._analyzing_song:
+            self._render_analyzing_song(surface)
+            return
+
         if self._showing_song_select:
             self._render_song_select(surface)
             return
@@ -553,9 +675,9 @@ class PlayState(BaseState):
         self.renderer.render(
             surface,
             notes=list(self._notes.values()),
-            difficulty_label=self._difficulty_label,
             awaiting_record_name=self._entering_record_name or self._confirming_overwrite,
             game_over_selected=self._game_over_selected,
+            win_selected=self._win_selected,
         )
 
         if self._entering_record_name or self._confirming_overwrite:
@@ -575,7 +697,7 @@ class PlayState(BaseState):
 
         render_text(
             surface,
-            "A que ritmo quieres ir?",
+            "¿A que ritmo quieres ir?",
             settings.FONTS["menu"],
             center_x,
             center_y - 60,
@@ -610,6 +732,31 @@ class PlayState(BaseState):
             settings.VIRTUAL_HEIGHT - 20,
             settings.UI_MUTED_COLOR,
             center=True,
+        )
+
+    def _render_analyzing_song(self, surface: pygame.Surface) -> None:
+        """
+        Shown for the (at least one-frame-long, several-seconds the first
+        time a given song is picked) gap between confirming the song select
+        menu and the beat analysis actually finishing -- see
+        self._analyzing_song. Without this the screen would just sit frozen
+        on the song select menu for however long BeatDetector.detect() takes,
+        which read as the game hanging/looping.
+        """
+        surface.fill(settings.BACKGROUND_COLOR)
+
+        center_x = settings.VIRTUAL_WIDTH // 2
+        center_y = settings.VIRTUAL_HEIGHT // 2
+
+        render_text(
+            surface,
+            "Analizando el ritmo...",
+            settings.FONTS["menu"],
+            center_x,
+            center_y,
+            settings.UI_ACCENT_COLOR,
+            center=True,
+            shadowed=True,
         )
 
     def _render_instructions(self, surface: pygame.Surface) -> None:
@@ -717,8 +864,8 @@ class PlayState(BaseState):
         """
         Overlay on top of the (finished) gameplay screen -- unlike
         _render_participant_name_prompt, only ever reachable post-game,
-        when a qualifying run's already-typed name collides with an
-        existing leaderboard entry and _handle_overwrite_confirm_input's
+        when a finished run's already-typed name collides with an
+        existing saved entry and _handle_overwrite_confirm_input's
         "rename" branch sends the player back here for a different one.
         """
         center_x = settings.VIRTUAL_WIDTH // 2

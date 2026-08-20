@@ -224,11 +224,11 @@ SORT_LOADING_DISPLAY_SECONDS = 1.5
 # overall, but see src/algorithms/word_length_variety.py's
 # group_in_ascending_blocks, an unrelated presentation filter PlayState
 # runs it through afterward: this many words of one length before moving
-# up to the next (5 of length 3, then 5 of length 4, then the next
+# up to the next (3 of length 3, then 3 of length 4, then the next
 # length that actually exists, looping back to the shortest for
 # whatever's left) instead of every word of one length in a single
 # uninterrupted block.
-WORD_LENGTH_BLOCK_SIZE = 5
+WORD_LENGTH_BLOCK_SIZE = 3
 
 # --- Scoring / precision windows -----------------------------------------
 # Distance (seconds) between the key press and the letter's ideal

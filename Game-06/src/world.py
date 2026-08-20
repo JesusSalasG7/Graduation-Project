@@ -156,6 +156,13 @@ class World:
         self.lives = settings.STARTING_LIVES
         self.words_completed = 0
         self.game_over = False
+        # Set once elapsed reaches _song_duration without game_over having
+        # beaten it there first (see update()) -- "survived the whole
+        # song" as a run-ending condition distinct from "ran out of
+        # lives". Stays False forever when _song_duration <= 0 (e.g.
+        # every existing test), same as every other song-duration-gated
+        # behavior in this class.
+        self.won = False
 
         # Climbs as the player's streak grows (see _maybe_increase_speed)
         # and divides travel_time (see effective_travel_time) -- so a
@@ -196,7 +203,7 @@ class World:
 
     @property
     def finished(self) -> bool:
-        return self.game_over
+        return self.game_over or self.won
 
     def time_since_last_beat(self) -> Optional[float]:
         """
@@ -414,7 +421,7 @@ class World:
         and what every existing call in the test suite passes) falls
         back to plain dt accumulation.
         """
-        if self.game_over:
+        if self.game_over or self.won:
             return
 
         self.elapsed = song_time if song_time is not None else self.elapsed + dt
@@ -424,6 +431,14 @@ class World:
         # inside _expire_missed_letter -- don't let the run's very last
         # word get silently replaced by a new one the player never sees.
         if self.game_over:
+            return
+
+        # Checked after _expire_missed_letter (so a miss right at the
+        # boundary still counts) but before spawning anything new -- once
+        # the song itself has played all the way through, there's no
+        # letter left worth falling.
+        if self._song_duration > 0 and self.elapsed >= self._song_duration:
+            self.won = True
             return
 
         if self.active_word is not None and self.active_word.complete:

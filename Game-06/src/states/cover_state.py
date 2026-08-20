@@ -67,7 +67,7 @@ class CoverState(BaseState):
             surface, "RECORDS", settings.FONTS["hud"], x, y, settings.UI_ACCENT_COLOR, shadowed=True
         )
 
-        entries = records.load_all()
+        entries = records.leaderboard()
 
         if not entries:
             render_text(

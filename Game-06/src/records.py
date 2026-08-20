@@ -1,14 +1,18 @@
 """
-Persists the TypeBeat leaderboard (name, score, and -- only for runs
+Persists every participant's run (name, score, and -- only for runs
 where src/algorithms/sort_task.py's sort_task was actually implemented
 -- the sort exercise's elapsed time) to a JSON file next to the
 project, so it survives between runs.
 
-Same shape as Game-01/src/records.py -- copied deliberately rather than
-reinvented, since the leaderboard rules (top MAX_ENTRIES, strictly-beats
-to qualify, case-insensitive overwrite) are project-wide conventions,
-not something specific to Snake -- plus the sort_time field this game
-adds on top.
+Unlike Game-01/src/records.py (a straight top-scorers leaderboard this
+was originally copied from), storage here is NOT capped at
+MAX_ENTRIES and NOT gated behind beating the previous best -- every run
+gets a saved entry regardless of score, since the sort_time each one
+carries is data this project needs to collect from every participant,
+not just whoever currently has the top score (see PlayState._handle_game_over,
+which always attempts a save now). MAX_ENTRIES instead only bounds
+leaderboard(), the top-N view CoverState renders -- load_all() itself
+always returns the full history.
 """
 import json
 from typing import List, Optional, TypedDict
@@ -17,6 +21,9 @@ import settings
 
 _RECORDS_PATH = settings.BASE_DIR / "records.json"
 
+# Display-only cap for leaderboard() (e.g. CoverState's top scorers list)
+# -- load_all()/_save() never trim to this, so no participant's run is
+# ever discarded just because someone else scored higher.
 MAX_ENTRIES = 5
 
 
@@ -54,13 +61,23 @@ def load_all() -> List[RecordEntry]:
     return entries
 
 
+def leaderboard(limit: int = MAX_ENTRIES) -> List[RecordEntry]:
+    """
+    The top `limit` entries by score -- what CoverState actually renders.
+    Unlike load_all(), this is a display view, not the full participant
+    history: it's fine for this to leave weaker runs off screen since
+    nothing about storage depends on it.
+    """
+    return load_all()[:limit]
+
+
 def best_score() -> int:
     entries = load_all()
     return entries[0]["score"] if entries else 0
 
 
 def qualifies(score: int) -> bool:
-    """Whether `score` earns a spot on the leaderboard: strictly beats the current best."""
+    """Whether `score` would earn a spot on the displayed leaderboard: strictly beats the current best."""
     return score > best_score()
 
 
@@ -71,15 +88,16 @@ def name_exists(name: str) -> bool:
 
 
 def _save(entries: List[RecordEntry]) -> None:
+    # No MAX_ENTRIES trim here -- every participant's run is kept, not
+    # just the top scorers (see the module docstring / leaderboard()).
     entries.sort(key=lambda entry: entry["score"], reverse=True)
-    entries = entries[:MAX_ENTRIES]
 
     with open(_RECORDS_PATH, "w", encoding="utf-8") as file:
         json.dump(entries, file)
 
 
 def add(name: str, score: int, sort_time: Optional[float] = None) -> None:
-    """Inserts (name, score, sort_time), keeping only the top MAX_ENTRIES afterward."""
+    """Inserts (name, score, sort_time) -- every run is kept, see the module docstring."""
     entries = load_all()
     entries.append({"name": name, "score": score, "sort_time": sort_time})
     _save(entries)
