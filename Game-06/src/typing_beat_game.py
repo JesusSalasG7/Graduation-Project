@@ -1,0 +1,36 @@
+"""
+The Game entry point wiring input handling to a StateMachine, following
+gale's standard game/state architecture -- identical shape to Game-01's
+src/snake_game.py, just with TypeBeat's own two states. There is no
+menu/difficulty-select state: CoverState's ENTER drops straight into
+PlayState (see src/states/cover_state.py).
+"""
+import pygame
+
+from gale.game import Game
+from gale.input_handler import InputData, InputListener
+from gale.state import StateMachine
+
+from src.states.cover_state import CoverState
+from src.states.play_state import PlayState
+
+
+class TypeBeatGame(Game, InputListener):
+    def init(self) -> None:
+        # Game.__init__ already registered `self` as a listener before
+        # calling init() -- registering again here would make on_input
+        # fire twice per event.
+        self.state_machine = StateMachine({"cover": CoverState, "play": PlayState})
+        self.state_machine.change("cover")
+
+    def on_input(self, input_id: str, input_data: InputData) -> None:
+        if input_id == "quit" and input_data.pressed:
+            self.quit()
+        else:
+            self.state_machine.on_input(input_id, input_data)
+
+    def update(self, dt: float) -> None:
+        self.state_machine.update(dt)
+
+    def render(self, surface: pygame.Surface) -> None:
+        self.state_machine.render(surface)
