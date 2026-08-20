@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+
+# Telemetria local generada al jugar (ver src/telemetry/logger.py)
+telemetry/
