@@ -8,10 +8,10 @@ the Match-4 Catalysis rule, which clears the whole line instead of
 just the run), and computes gravity for the tiles that fall to fill
 the gaps.
 
-This module knows nothing about HP, essence, or turns -- it only
-reports which TileKind was cleared and how many times, plus whether a
-catalysis happened. Translating that into combat effects is the job of
-src.combat.combat_controller (Modulo C).
+This module knows nothing about score or turns -- it only reports
+which TileKind was cleared and how many times, plus whether a
+catalysis happened. Translating that into score/feedback is the job of
+src.states.play_state.
 """
 
 import random

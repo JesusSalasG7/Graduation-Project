@@ -1,7 +1,7 @@
 """
 This file contains the class TransmutacionArcana, the gale.game.Game
-specialization that owns the top-level state machine (menu, battle
-transition, battle, game over).
+specialization that owns the top-level state machine (menu, match-3
+play).
 """
 
 import pygame
@@ -19,9 +19,7 @@ class TransmutacionArcana(Game):
         self.state_machine = StateMachine(
             {
                 "start": lambda sm: states.StartState(sm, self),
-                "begin": states.BeginGameState,
-                "battle": states.BattleState,
-                "game-over": states.GameOverState,
+                "play": states.PlayState,
             }
         )
         self.state_machine.change("start")

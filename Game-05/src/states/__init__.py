@@ -1,6 +1,4 @@
 from src.states.start_state import StartState
-from src.states.begin_game_state import BeginGameState
-from src.states.battle_state import BattleState
-from src.states.game_over_state import GameOverState
+from src.states.play_state import PlayState
 
-(StartState, BeginGameState, BattleState, GameOverState)
+(StartState, PlayState)

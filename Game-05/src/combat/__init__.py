@@ -1,4 +1,5 @@
-from src.combat.enemies import make_enemy, ENEMY_COUNT
-from src.combat.combat_controller import CombatController
+from src.combat.character import Character
+from src.combat.combat_manager import CombatManager
+from src.combat.elements import ELEMENTOS
 
-(make_enemy, ENEMY_COUNT, CombatController)
+(Character, CombatManager, ELEMENTOS)

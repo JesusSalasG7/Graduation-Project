@@ -72,7 +72,7 @@ class StartState(BaseState):
         )
         render_text(
             surface,
-            "Un RPG de alquimia y match-3",
+            "Un juego de match-3",
             settings.FONTS["small"],
             settings.VIRTUAL_WIDTH // 2,
             settings.VIRTUAL_HEIGHT // 2 - 16,
@@ -124,7 +124,7 @@ class StartState(BaseState):
                 Timer.tween(
                     0.5,
                     [(self, {"alpha_transition": 255})],
-                    on_finish=lambda: self.state_machine.change("begin"),
+                    on_finish=lambda: self.state_machine.change("play"),
                 )
             else:
                 self.game.quit()
