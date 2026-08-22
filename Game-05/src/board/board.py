@@ -9,9 +9,10 @@ just the run), and computes gravity for the tiles that fall to fill
 the gaps.
 
 This module knows nothing about score or turns -- it only reports
-which TileKind was cleared and how many times, plus whether a
-catalysis happened. Translating that into score/feedback is the job of
-src.states.play_state.
+which TileKind was cleared and how many times, whether a catalysis
+happened, and how many distinct kinds a catalysis line carried (via
+src.algorithm.remove_duplicates -- Desafio A05). Translating that into
+score/feedback is the job of src.states.play_state.
 """
 
 import random
@@ -22,6 +23,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import pygame
 
 import settings
+from src.algorithm import remove_duplicates
 from src.board.tile import Tile, TileKind
 
 
@@ -43,6 +45,12 @@ class Board:
         self.y = y
         self.tiles: List[List[Optional[Tile]]] = []
         self._initialize_tiles()
+        # _initialize_tiles only guarantees no match exists yet -- it
+        # says nothing about whether the player can ever *make* one.
+        # Keep re-rolling the whole board until at least one swap
+        # would produce a match, so we never hand out a dead board.
+        while not self.has_possible_moves():
+            self._initialize_tiles()
 
     def render(self, surface: pygame.Surface) -> None:
         for row in self.tiles:
@@ -120,23 +128,83 @@ class Board:
 
         return runs
 
+    # -- Deadlock detection --------------------------------------------
+
+    def _swap_would_match(self, i1: int, j1: int, i2: int, j2: int) -> bool:
+        # Swap just the two tiles' kind (not their i/j/x/y, which the
+        # rest of the board relies on for position), check, then
+        # revert -- a cheap way to try a move without disturbing state.
+        t1, t2 = self.tiles[i1][j1], self.tiles[i2][j2]
+        t1.kind, t2.kind = t2.kind, t1.kind
+        matched = bool(self.find_matches())
+        t1.kind, t2.kind = t2.kind, t1.kind
+        return matched
+
+    def find_hint(self) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+        """
+        Returns the (i, j) coordinates of two adjacent tiles whose swap
+        would produce a match, or None if no such swap exists. Used
+        both to detect a "dead" board (has_possible_moves below) and,
+        by PlayState, to highlight a legal move after a few idle
+        seconds -- some valid swaps produce a match nowhere near the
+        two tiles moved, so they're easy to miss just by looking.
+        """
+        for i in range(settings.BOARD_HEIGHT):
+            for j in range(settings.BOARD_WIDTH):
+                if j + 1 < settings.BOARD_WIDTH and self._swap_would_match(i, j, i, j + 1):
+                    return (i, j), (i, j + 1)
+                if i + 1 < settings.BOARD_HEIGHT and self._swap_would_match(i, j, i + 1, j):
+                    return (i, j), (i + 1, j)
+        return None
+
+    def has_possible_moves(self) -> bool:
+        """
+        True if at least one adjacent swap would produce a match.
+        Used to detect a "dead" board (no legal move left after a
+        cascade settles) so it can be reshuffled instead of leaving
+        the player stuck.
+        """
+        return self.find_hint() is not None
+
+    def shuffle(self) -> None:
+        """
+        Reshuffles the kinds currently on the board (tile positions/
+        identities don't change) until the result has no pre-existing
+        match and at least one legal move -- called when a cascade
+        leaves the board dead.
+        """
+        kinds = [tile.kind for row in self.tiles for tile in row]
+        while True:
+            random.shuffle(kinds)
+            it = iter(kinds)
+            for row in self.tiles:
+                for tile in row:
+                    tile.kind = next(it)
+            if not self.find_matches() and self.has_possible_moves():
+                return
+
     # -- Resolution --------------------------------------------------------
 
     def resolve_runs(
         self, runs: List[MatchRun]
-    ) -> Tuple[Dict[TileKind, int], bool, int]:
+    ) -> Tuple[Dict[TileKind, int], bool, int, int]:
         """
         Clears every run from the board. A run of length >= 4 (Regla de
         Catalisis) additionally clears every remaining tile on its full
         row/column, whatever kind they are.
 
-        :returns: (kind_counts, catalysis_triggered, total_tiles_cleared)
-        kind_counts maps each TileKind to how many tiles of that kind
-        were cleared (used by Modulo C to compute damage/essence).
+        :returns: (kind_counts, catalysis_triggered, total_tiles_cleared,
+            catalysis_diversity_kinds). kind_counts maps each TileKind
+            to how many tiles of that kind were cleared (used by
+            Modulo C to compute damage/essence). catalysis_diversity_kinds
+            is how many *distinct* element kinds a Catalisis line swept
+            this call (Desafio A05 -- see src.algorithm.remove_duplicates),
+            0 if no Catalisis triggered.
         """
         cleared: Set[Tile] = set()
         kind_counts: Dict[TileKind, int] = {kind: 0 for kind in TileKind}
         catalysis = False
+        catalysis_diversity_kinds = 0
 
         for run in runs:
             for tile in run.tiles:
@@ -151,6 +219,13 @@ class Board:
                 else:
                     line_tiles = [self.tiles[i][run.line_index] for i in range(settings.BOARD_HEIGHT)]
 
+                # Desafio A05: la fila/columna completa es una matriz
+                # de enteros (una fila, los TileKind.value de cada
+                # ficha) -- remove_duplicates dice cuantos elementos
+                # realmente distintos arrastro esta Catalisis.
+                line_kinds = [[tile.kind.value for tile in line_tiles if tile is not None]]
+                catalysis_diversity_kinds += len(remove_duplicates(line_kinds))
+
                 for tile in line_tiles:
                     if tile is not None and tile not in cleared:
                         cleared.add(tile)
@@ -159,7 +234,7 @@ class Board:
         for tile in cleared:
             self.tiles[tile.i][tile.j] = None
 
-        return kind_counts, catalysis, len(cleared)
+        return kind_counts, catalysis, len(cleared), catalysis_diversity_kinds
 
     # -- Gravity -------------------------------------------------------
 

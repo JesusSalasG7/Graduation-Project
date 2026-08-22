@@ -76,6 +76,11 @@ HP_BAR_OFFSET_Y = CHARACTER_SPRITE_SIZE // 2 + 14  # above the sprite's anchor
 # --- Match-3 scoring -------------------------------------------------------
 POINTS_PER_TILE = 10
 CATALYSIS_BONUS = 50
+# Desafio A05 (src/algorithm.py::remove_duplicates, aplicado en
+# Board.resolve_runs): la Catalisis paga esto por cada elemento
+# DISTINTO que arrastro la fila/columna que limpio, para premiar
+# limpiar una linea mixta y no solo una larga del mismo tipo.
+DIVERSITY_BONUS_PER_KIND = 15
 
 # --- Tile kinds -------------------------------------------------------
 # Matches src.board.tile.TileKind ordering: FUEGO, AGUA, TIERRA, AIRE,

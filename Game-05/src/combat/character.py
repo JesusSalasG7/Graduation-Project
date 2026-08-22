@@ -2,10 +2,15 @@
 Modulo C - Combate RPG.
 
 Character: un personaje de combate (jugador o enemigo). Su sprite es
-pixel-art generado con pygame.draw sobre una superficie chica (16x16)
-y despues escalado sin suavizado -- no se cargan imagenes externas.
-Solo tiene 3 estados: idle, atacando (con su propio frame) y danado
-(parpadeo rojo sobre el frame idle).
+pixel-art original, autogenerado (ver tools/generate_character_sprites.py,
+misma tecnica que tools/generate_portraits.py) y guardado como una hoja
+de 5 frames en assets/graphics/characters/ -- no hay ninguna imagen de
+stock, IP de terceros ni asset "ripeado" involucrado. Character solo
+recorta esos 5 frames y los anima:
+    idle_a/idle_b      -- loop de respiracion (bob en la cabeza/postura)
+    attack_a/attack_b  -- golpe en dos tiempos: impulso y puñetazo/impacto
+    hurt               -- pose de reaccion (guardia baja, cabeza atras),
+                           mostrada junto con el parpadeo rojo al recibir dano
 """
 
 from typing import Callable, Optional, Tuple
@@ -14,6 +19,21 @@ import pygame
 
 import settings
 from gale.timer import Timer
+
+_SPRITES_DIR = settings.BASE_DIR / "assets" / "graphics" / "characters"
+_FRAME_NAMES = ("idle_a", "idle_b", "attack_a", "attack_b", "hurt")
+_IDLE_BOB_INTERVAL = 0.45
+
+
+def _load_frames(is_player: bool) -> dict:
+    path = _SPRITES_DIR / ("player.png" if is_player else "enemy.png")
+    sheet = pygame.image.load(path).convert_alpha()
+    size = settings.CHARACTER_SPRITE_SIZE
+    frames = {}
+    for index, name in enumerate(_FRAME_NAMES):
+        rect = pygame.Rect(index * size, 0, size, size)
+        frames[name] = sheet.subsurface(rect).copy()
+    return frames
 
 
 class Character:
@@ -33,59 +53,42 @@ class Character:
         # rival lo dejan en 0.5 ("lo ralentizan") hasta que ataque.
         self.next_attack_multiplier = 1.0
 
-        self._palette = (
-            {"piel": (235, 200, 160), "ropa": (70, 110, 200), "borde": (20, 18, 30)}
-            if is_player
-            else {"piel": (150, 200, 120), "ropa": (170, 60, 60), "borde": (20, 18, 30)}
-        )
+        frames = _load_frames(is_player)
         self._sprites = {
-            "idle": self._build_sprite(attacking=False),
-            "atacando": self._build_sprite(attacking=True),
+            "idle": [frames["idle_a"], frames["idle_b"]],
+            "atacando": [frames["attack_a"], frames["attack_b"]],
+            "danado": frames["hurt"],
         }
-        self.sprite = self._sprites["idle"]
-
-    # -- Pixel-art ----------------------------------------------------
-
-    def _build_sprite(self, attacking: bool) -> pygame.Surface:
-        size = settings.CHARACTER_SPRITE_BASE_SIZE
-        base = pygame.Surface((size, size), pygame.SRCALPHA)
-        p = self._palette
-        # El enemigo mira hacia la izquierda (hacia el jugador).
-        facing = 1 if self.is_player else -1
-
-        pygame.draw.rect(base, p["ropa"], pygame.Rect(4, 7, 8, 7))
-        pygame.draw.rect(base, p["piel"], pygame.Rect(5, 2, 6, 6))
-        pygame.draw.rect(base, p["borde"], pygame.Rect(5, 2, 6, 6), width=1)
-        pygame.draw.rect(base, p["ropa"], pygame.Rect(5, 14, 2, 2))
-        pygame.draw.rect(base, p["ropa"], pygame.Rect(9, 14, 2, 2))
-
-        # Brazo: pegado al torso en idle, extendido hacia el rival
-        # (2px mas lejos) en la pose de ataque.
-        reach = 2 if attacking else 0
-        arm_x = 11 + reach if facing > 0 else 3 - reach
-        pygame.draw.rect(base, p["piel"], pygame.Rect(arm_x, 8, 2, 4))
-
-        return pygame.transform.scale(base, (settings.CHARACTER_SPRITE_SIZE,) * 2)
+        self._idle_frame = 0
+        self.sprite = self._sprites["idle"][0]
+        Timer.every(_IDLE_BOB_INTERVAL, self._advance_idle)
 
     # -- Animacion ------------------------------------------------------
 
+    def _advance_idle(self) -> None:
+        self._idle_frame = 1 - self._idle_frame
+        if self.state == "idle":
+            self.sprite = self._sprites["idle"][self._idle_frame]
+
     def play_attack(self, on_finish: Optional[Callable[[], None]] = None) -> None:
         self.state = "atacando"
-        self.sprite = self._sprites["atacando"]
+        self.sprite = self._sprites["atacando"][0]  # impulso
 
         def _impact():
+            self.sprite = self._sprites["atacando"][1]  # golpe
             if on_finish:
                 on_finish()
 
         def _recover():
             self.state = "idle"
-            self.sprite = self._sprites["idle"]
+            self.sprite = self._sprites["idle"][self._idle_frame]
 
         Timer.after(0.15, _impact)
         Timer.after(0.35, _recover)
 
     def play_hurt(self) -> None:
         self.state = "danado"
+        self.sprite = self._sprites["danado"]
 
         def _toggle():
             self.hurt_flash = not self.hurt_flash
@@ -93,6 +96,7 @@ class Character:
         def _stop():
             self.hurt_flash = False
             self.state = "idle"
+            self.sprite = self._sprites["idle"][self._idle_frame]
 
         Timer.every(0.08, _toggle, limit=4, on_finish=_stop)
 

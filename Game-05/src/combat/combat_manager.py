@@ -4,29 +4,62 @@ Modulo C - Combate RPG.
 CombatManager conecta los matches del tablero (Modulo A) con los
 Character de combate: traduce (elemento, cantidad de fichas) en un
 EffectResult via src.combat.elements, lo anima y lo aplica sobre
-HP/estado, y maneja el turno automatico del enemigo. No conoce Board
-ni PlayState mas alla de lo que le pasan como argumentos.
+HP/estado, y maneja el turno automatico del enemigo. Tambien dispara
+el efecto visual de cada elemento (ver _EFFECT_FACTORIES y
+src.combat.effects) del atacante al objetivo -- o sobre el propio
+atacante, para Agua, que cura en vez de danar. No conoce Board ni
+PlayState mas alla de lo que le pasan como argumentos.
 """
 
 import random
 
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from gale.timer import Timer
 
 from src.board.tile import TileKind
 from src.combat.character import Character
+from src.combat.effects import (
+    ArcaneOrb,
+    Fireball,
+    IceShard,
+    LightningBolt,
+    RockSpikes,
+    VoidPortal,
+    WaterSplash,
+    WindSlash,
+)
 from src.combat.elements import compute_effect
+
+# Cada entrada recibe (atacante, objetivo) y arma el efecto visual con
+# los anchors que le correspondan -- la mayoria vuela atacante->objetivo,
+# pero Agua viaja al reves (cura al atacante) y Electricidad/Tierra/
+# Oscuridad son puntos fijos sobre el objetivo (ver cada clase en
+# src.combat.effects para el porque).
+_EFFECT_FACTORIES = {
+    TileKind.FUEGO: lambda a, d: Fireball(a.anchor, d.anchor),
+    TileKind.AGUA: lambda a, d: WaterSplash(d.anchor, a.anchor),
+    TileKind.TIERRA: lambda a, d: RockSpikes(d.anchor),
+    TileKind.AIRE: lambda a, d: WindSlash(a.anchor, d.anchor),
+    TileKind.ELECTRICIDAD: lambda a, d: LightningBolt(d.anchor),
+    TileKind.HIELO: lambda a, d: IceShard(a.anchor, d.anchor),
+    TileKind.MAGIA: lambda a, d: ArcaneOrb(a.anchor, d.anchor),
+    TileKind.OSCURIDAD: lambda a, d: VoidPortal(d.anchor),
+}
 
 
 class CombatManager:
     def __init__(self, player: Character, enemy: Character) -> None:
         self.player = player
         self.enemy = enemy
+        self._effects: List[object] = []
 
     def render(self, surface) -> None:
         self.player.render(surface)
         self.enemy.render(surface)
+        self._effects = [effect for effect in self._effects if not effect.done]
+        for effect in self._effects:
+            effect.render(surface)
 
     def check_result(self) -> Optional[str]:
         if self.enemy.hp <= 0:
@@ -72,6 +105,8 @@ class CombatManager:
             if on_finish:
                 on_finish()
             return
+
+        self._effects.append(_EFFECT_FACTORIES[kind](attacker, defender))
 
         effect = compute_effect(kind, count)
         mult = attacker.next_attack_multiplier
