@@ -6,7 +6,7 @@ first) instead of one long same-length run per length.
 """
 from collections import Counter
 
-from src.algorithms.sort_task import generate_words, sort_words_by_length
+from src.algorithms.sort_task import generate_words
 from src.algorithms.word_length_variety import group_in_ascending_blocks
 
 
@@ -55,7 +55,12 @@ def test_group_in_ascending_blocks_handles_fewer_words_than_block_size():
 
 def test_group_in_ascending_blocks_on_a_real_generated_batch_stays_lossless():
     words = generate_words(500)
-    sorted_words = sort_words_by_length(words)
+    # Independent of the sort_words_by_length exercise (see
+    # src/algorithms/sort_task.py) -- this file only exercises
+    # group_in_ascending_blocks itself, so it supplies its own
+    # known-correct sort rather than depending on that exercise being
+    # solved.
+    sorted_words = sorted(words, key=len)
     result = group_in_ascending_blocks(sorted_words, block_size=5)
 
     assert Counter(result) == Counter(sorted_words)

@@ -1,7 +1,7 @@
 """
 Persists every participant's run (name, score, and -- only for runs
-where src/algorithms/sort_task.py's sort_task was actually implemented
--- the sort exercise's elapsed time) to a JSON file next to the
+where src/algorithms/sort_task.py's sort_words_by_length was actually
+implemented -- the sort exercise's elapsed time) to a JSON file next to the
 project, so it survives between runs.
 
 Unlike Game-01/src/records.py (a straight top-scorers leaderboard this
@@ -30,7 +30,7 @@ MAX_ENTRIES = 5
 class RecordEntry(TypedDict):
     name: str
     score: int
-    # None whenever the run's sort_task wasn't implemented (see
+    # None whenever the run's sort_words_by_length wasn't implemented (see
     # PlayState._save_record) -- there's no elapsed time to report, and
     # storing 0.0 there would misleadingly read as "instant".
     sort_time: Optional[float]

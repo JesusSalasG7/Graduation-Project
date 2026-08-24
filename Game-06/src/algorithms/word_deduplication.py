@@ -5,8 +5,7 @@ Faker's providers only have so many distinct values to draw from (twelve
 month names, a finite city/name list...), so a batch of
 settings.SORT_TASK_WORD_COUNT generated words routinely comes back with
 the same word appearing dozens of times ("MAYO" showed up 34 times out
-of 500 in one real run). Fine for sort_task's own numbers-only exercise,
-but repetitive -- and a little strange -- to actually type the same word
+of 500 in one real run). Repetitive -- and a little strange -- to actually type the same word
 over and over during play.
 """
 from typing import List

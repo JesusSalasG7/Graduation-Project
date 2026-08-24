@@ -209,15 +209,16 @@ MAX_WORD_GENERATION_ATTEMPTS = 40
 WORD_LOOKAHEAD_COUNT = QUEUE_PREVIEW_COUNT
 
 # --- Sorting exercise (src/algorithms/sort_task.py) -----------------------
-# How many words' lengths get generated and handed to sort_task() every
+# How many words get generated and handed to sort_words_by_length() every
 # time a run starts (see PlayState._begin_sort_task) -- unrelated to
 # WORD_LOOKAHEAD_COUNT above, this is a one-shot batch sorted before
 # gameplay begins, not the actual falling-letter word supply.
 SORT_TASK_WORD_COUNT = 500
-# How long the loading/result screen stays up once sort_task() actually
-# returns something -- purely cosmetic pacing (real quicksort over 500
-# ints takes well under a millisecond), so the "N palabras ordenadas en
-# X ms" readout is actually readable instead of flashing by in one frame.
+# How long the loading/result screen stays up once sort_words_by_length()
+# actually returns something -- purely cosmetic pacing (real quicksort
+# over 500 words takes well under a millisecond), so the "N palabras
+# ordenadas en X ms" readout is actually readable instead of flashing by
+# in one frame.
 SORT_LOADING_DISPLAY_SECONDS = 1.5
 
 # The length-sorted preset batch above is still strictly ascending

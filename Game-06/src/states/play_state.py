@@ -19,9 +19,9 @@ not fixed), then dismisses the controls screen, then types their name
 (see _entering_record_name/enter()'s "world is None" branch), then
 _begin_sort_task, an unrelated sorting exercise (see
 src/algorithms/sort_task.py) that only ever shows its own loading
-screen if that module's sort_task is actually implemented. That name is
-what every run's score (and, only when sort_task turned out to be
-implemented, the sort exercise's elapsed time) gets saved under once
+screen if that module's sort_words_by_length is actually implemented.
+That name is what every run's score (and, only when sort_words_by_length
+turned out to be implemented, the sort exercise's elapsed time) gets saved under once
 the run ends, regardless of whether it beat the previous best -- see
 _handle_game_over/_save_record and src/records.py's module docstring.
 """
@@ -37,7 +37,7 @@ from src.rendering.pixel_text import render_text
 
 import settings
 from src import records, scoring
-from src.algorithms.sort_task import generate_words, run_sort_task, sort_words_by_length
+from src.algorithms.sort_task import generate_words, run_sort_words_by_length
 from src.algorithms.word_deduplication import deduplicate_words
 from src.algorithms.word_length_variety import group_in_ascending_blocks
 from src.audio.beat_detector import BeatDetector
@@ -162,12 +162,14 @@ class PlayState(BaseState):
         self._song_start_perf: Optional[float] = None
 
         # Shown between "dismiss the controls" and the song actually
-        # starting, only when src/algorithms/sort_task.py's sort_task is
-        # actually implemented (see _begin_sort_task) -- an unimplemented
-        # one (raises, or is just `pass`) skips straight past this,
-        # exactly like a run before this screen existed at all.
+        # starting, only when src/algorithms/sort_task.py's
+        # sort_words_by_length is actually implemented (see
+        # _begin_sort_task) -- an unimplemented one (raises, is just
+        # `pass`, or returns something that isn't a list of words) skips
+        # straight past this, exactly like a run before this screen
+        # existed at all.
         self._sorting_screen_active = False
-        self._sort_result: Optional[List[int]] = None
+        self._sort_result: Optional[List[str]] = None
         self._sort_elapsed_seconds = 0.0
         self._sort_screen_timer = 0.0
         # The length-sorted words themselves, stashed here between
@@ -270,25 +272,29 @@ class PlayState(BaseState):
         settings.SORT_TASK_WORD_COUNT real words, deduplicates them (see
         src/algorithms/word_deduplication.py -- Faker's limited provider
         pools mean the same word routinely comes back dozens of times in
-        one batch), and hands what's left to sort_task via run_sort_task
-        (see src/algorithms/sort_task.py for why that never lets an
-        unimplemented sort_task crash this). Only once that's confirmed
-        to actually be implemented does it sort those SAME words by
-        length too (sort_words_by_length), so the words a run falls in
-        are visibly in the order the loading screen is about to claim,
-        not just a number sitting apart from what's on screen. That
-        sorted batch then goes through group_in_ascending_blocks -- an
-        unrelated presentation filter (see
-        src/algorithms/word_length_variety.py) that turns "every word of
-        the shortest length, then every word of the next, ..." into
-        settings.WORD_LENGTH_BLOCK_SIZE words of one length before moving
-        up to the next -- still strictly ascending lap by lap, just paced
-        instead of one long same-length block per length.
+        one batch), and hands what's left to sort_words_by_length via
+        run_sort_words_by_length (see src/algorithms/sort_task.py for why
+        that never lets an unimplemented -- or badly implemented --
+        sort_words_by_length crash this). The words a run falls in are
+        therefore visibly in the exact order the loading screen is about
+        to claim, not a number sitting apart from what's on screen: there
+        is only ever one sort, over the one batch. That sorted batch then
+        goes through group_in_ascending_blocks -- an unrelated
+        presentation filter (see src/algorithms/word_length_variety.py)
+        that turns "every word of the shortest length, then every word of
+        the next, ..." into settings.WORD_LENGTH_BLOCK_SIZE words of one
+        length before moving up to the next -- still strictly ascending
+        lap by lap, just paced instead of one long same-length block per
+        length.
 
         A real sorted result shows the loading screen (see update()),
         which is what actually calls _start_run once its timer runs out.
-        None (not implemented) calls _start_run right away with no
-        preset, exactly as every run behaved before this existed.
+        None (not implemented, or implemented incorrectly) skips that
+        screen and calls _start_run right away -- but still WITH the
+        already-generated words batch as its preset, just in generation
+        order rather than sorted/blocked, so an unsolved exercise costs
+        the run its loading screen and elapsed-time readout, not the
+        word batch itself.
         """
         words = deduplicate_words(generate_words(settings.SORT_TASK_WORD_COUNT))
         # Also drop anything an earlier attempt THIS SESSION already used
@@ -298,17 +304,20 @@ class PlayState(BaseState):
         words = [word for word in words if word not in self._used_preset_words]
         self._used_preset_words.update(words)
 
-        lengths = [len(word) for word in words]
-        sorted_lengths, elapsed = run_sort_task(lengths)
+        sorted_words, elapsed = run_sort_words_by_length(words)
 
-        if sorted_lengths is None:
-            self._start_run(preset_words=None)
+        if sorted_words is None:
+            # Unsolved/broken sort_words_by_length only cancels the
+            # loading screen and the elapsed-time readout -- the batch
+            # already generated above (deduplicated, filtered against
+            # earlier restarts) still gets played, just not presented in
+            # ascending-length order or grouped into blocks.
+            self._start_run(preset_words=words)
             self._start_song()
             return
 
-        sorted_words = sort_words_by_length(words)
         self._pending_preset_words = group_in_ascending_blocks(sorted_words, settings.WORD_LENGTH_BLOCK_SIZE)
-        self._sort_result = sorted_lengths
+        self._sort_result = sorted_words
         self._sort_elapsed_seconds = elapsed
         self._sort_screen_timer = 0.0
         self._sorting_screen_active = True
@@ -475,9 +484,10 @@ class PlayState(BaseState):
             self._save_record(name, overwrite=False)
 
     def _save_record(self, name: str, overwrite: bool) -> None:
-        # None (not len(...)) whenever sort_task wasn't implemented for
-        # this run -- self._sort_elapsed_seconds never leaves its enter()
-        # default of 0.0 in that case (see _begin_sort_task), and 0.0
+        # None (not len(...)) whenever sort_words_by_length wasn't
+        # implemented for this run -- self._sort_elapsed_seconds never
+        # leaves its enter() default of 0.0 in that case (see
+        # _begin_sort_task), and 0.0
         # would misleadingly read as "sorted instantly" rather than
         # "didn't run".
         sort_time = self._sort_elapsed_seconds if self._sort_result is not None else None

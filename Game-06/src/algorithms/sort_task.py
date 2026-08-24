@@ -1,28 +1,28 @@
 """
 Standalone sorting exercise layered on top of the game's own word
 generation: generate_words() draws settings.SORT_TASK_WORD_COUNT real
-words from WordStream; their LENGTHS are what sort_task() actually sorts
-ascending (generate_word_lengths() is the same thing when only the
-numbers matter, e.g. under test).
+words from WordStream, and sort_words_by_length() is what actually
+sorts them ascending by len(word).
 
-sort_task() is deliberately the one function PlayState ever calls to do
-that (see PlayState._begin_sort_task) -- swap its body for any other
-correct ascending sort (quicksort, merge, bubble...) and nothing
-else in the game has to change, since nothing else knows or cares that
-this one happens to be selection sort. It's also deliberately safe to leave
-unimplemented: run_sort_task below is what PlayState actually calls, and
-it treats "raises" and "returns None" (an empty `pass` body falls
-through to that implicitly) the same way -- no sorted result, so
-PlayState skips the loading screen entirely and drops straight into the
-game, exactly as it behaved before this module existed.
+sort_words_by_length() is deliberately the one function PlayState ever
+calls to do that (see PlayState._begin_sort_task) -- swap its body for
+any other correct ascending-by-length sort (quicksort, heapsort,
+bubble...) and nothing else in the game has to change, since nothing
+else knows or cares that this one happens to be mergesort. It's also
+deliberately safe
+to leave unimplemented: run_sort_words_by_length below is what PlayState
+actually calls, and it treats "raises", "returns None" (an empty `pass`
+body falls through to that implicitly), and "returns something that
+isn't a list of words" all the same way -- no sorted result, so
+PlayState skips the loading screen entirely, but still plays the same
+already-generated word batch, just in generation order instead of
+sorted/blocked (see PlayState._begin_sort_task).
 
-That "no sorted result" case is also why sort_words_by_length is its own
-function rather than something PlayState derives from sort_task's output
-(e.g. by re-looking-up a word for each sorted length): it needs to be
-callable ONLY once sort_task has proven itself implemented, on the exact
-same words sort_task's lengths came from, so the words a run actually
-falls in are the same order the loading screen just reported timing
-for -- not two independent, potentially-inconsistent sorts.
+sort_words_by_length works directly on the words PlayState is about to
+hand World as its preset word supply (see World.__init__ / WordStream),
+not on their lengths, so the order a run's words actually fall in is
+never a separate computation from what the loading screen just reported
+timing for -- there's only ever one sort, over the one batch.
 """
 import time
 from typing import List, Optional, Tuple
@@ -36,53 +36,62 @@ def generate_words(count: int, seed: Optional[int] = None) -> List[str]:
     return [stream.next_word() for _ in range(count)]
 
 
-def generate_word_lengths(count: int, seed: Optional[int] = None) -> List[int]:
-    """The LENGTHS (not the words themselves) of `count` freshly generated words."""
-    return [len(word) for word in generate_words(count, seed=seed)]
+def sort_words_by_length(words: List[str]) -> List[str]:
+    """Mergesort, keyed by len(word) instead of the word itself."""
+    if len(words) <= 1:
+        return list(words)
+
+    mid = len(words) // 2
+    left = sort_words_by_length(words[:mid])
+    right = sort_words_by_length(words[mid:])
+
+    return _merge_by_length(left, right)
 
 
-def sort_task(lengths: List[int]) -> List[int]:
-    pass
+def _merge_by_length(left: List[str], right: List[str]) -> List[str]:
+    """Merges two already-length-sorted lists into one, stably."""
+    merged = []
+    i = j = 0
 
-def run_sort_task(lengths: List[int]) -> Tuple[Optional[List[int]], float]:
+    while i < len(left) and j < len(right):
+        if len(left[i]) <= len(right[j]):
+            merged.append(left[i])
+            i += 1
+        else:
+            merged.append(right[j])
+            j += 1
+
+    merged.extend(left[i:])
+    merged.extend(right[j:])
+    return merged
+
+
+def run_sort_words_by_length(words: List[str]) -> Tuple[Optional[List[str]], float]:
     """
-    Times sort_task(lengths) without ever letting it take the caller
-    down with it:
-      - sort_task raises  -> (None, 0.0)
-      - sort_task returns nothing (a stub that's just `pass`, say)
+    Times sort_words_by_length(words) without ever letting it take the
+    caller down with it:
+      - sort_words_by_length raises
+        -> (None, 0.0)
+      - sort_words_by_length returns nothing (a stub that's just `pass`,
+        say), or returns something that isn't a list of strings
         -> (None, elapsed)
-      - sort_task is for real implemented -> (sorted_list, elapsed)
-    PlayState's loading screen only ever appears for that last case.
+      - sort_words_by_length is for real implemented
+        -> (sorted_words, elapsed)
+    PlayState's loading screen -- and the sorted/blocked preset word
+    order -- only ever appear for that last case; every other case still
+    plays the run with the same word batch as preset (see
+    PlayState._begin_sort_task), just not sorted or blocked.
     """
     start = time.perf_counter()
 
     try:
-        result = sort_task(lengths)
+        result = sort_words_by_length(words)
     except Exception:
         return None, 0.0
 
     elapsed = time.perf_counter() - start
+
+    if not isinstance(result, list) or not all(isinstance(word, str) for word in result):
+        return None, elapsed
+
     return result, elapsed
-
-
-def sort_words_by_length(words: List[str]) -> List[str]:
-    """
-    Same quicksort shape as sort_task, keyed by len(word) instead of a
-    bare int -- what PlayState actually feeds World as its preset word
-    supply (see World.__init__ / WordStream) once sort_task has proven
-    itself implemented, so the words a run falls in during play are
-    visibly in the same ascending-length order the loading screen
-    reported timing for, not just a number sitting apart from what's
-    on screen. Always available (unlike sort_task, this one is never
-    meant to be left unimplemented) -- PlayState only ever calls it
-    after run_sort_task's own result confirms the exercise is "on".
-    """
-    if len(words) <= 1:
-        return list(words)
-
-    pivot_length = len(words[len(words) // 2])
-    less = [w for w in words if len(w) < pivot_length]
-    equal = [w for w in words if len(w) == pivot_length]
-    greater = [w for w in words if len(w) > pivot_length]
-
-    return sort_words_by_length(less) + equal + sort_words_by_length(greater)

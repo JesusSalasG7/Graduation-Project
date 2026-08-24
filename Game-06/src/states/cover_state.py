@@ -84,7 +84,7 @@ class CoverState(BaseState):
             color = settings.UI_ACCENT_COLOR if i == 0 else settings.UI_TEXT_COLOR
             line = f"{i + 1}. {entry['name']} - {entry['score']}"
 
-            # None whenever that run's sort_task wasn't implemented (see
+            # None whenever that run's sort_words_by_length wasn't implemented (see
             # PlayState._save_record) -- nothing to report then, so the
             # line just falls back to name/score like before this field
             # existed.
