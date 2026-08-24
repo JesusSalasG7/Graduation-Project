@@ -23,7 +23,12 @@ Game-05/
 ├── settings.py                       # configuración (ventana, tablero, sprites, puntaje)
 ├── test_remove_duplicates.py          # caso de prueba integrado del desafío A05
 ├── GUIA_A05_remove_duplicates.md      # guía del desafío A05 para el participante
-├── tiles.png                          # spritesheet de los 8 iconos elementales
+├── assets/graphics/
+│   ├── ui/cover.jpg                   # portada de la pantalla de inicio (StartState)
+│   ├── board/tiles.png                # spritesheet de los 8 iconos elementales
+│   ├── portraits/                     # retratos generados por tools/generate_portraits.py
+│   ├── characters/                    # hojas de sprites de jugador/enemigo
+│   └── effects/                       # hojas de sprites de proyectiles/impactos
 ├── tools/
 │   ├── generate_portraits.py          # genera los retratos de assets/graphics/portraits/
 │   ├── generate_character_sprites.py  # genera las hojas de sprites de assets/graphics/characters/
@@ -36,11 +41,11 @@ Game-05/
     │   └── tile.py                     # TileKind (los 8 elementos) y Tile
     ├── combat/                         # Módulo C -- combate RPG
     │   ├── character.py                # sprites/animación de jugador y enemigo
-    │   ├── combat_manager.py           # traduce matches en daño/curación + efectos visuales
+    │   ├── combat_manager.py           # traduce matches en daño/curación + efectos visuales + escalado de dificultad
     │   ├── elements.py                 # daño/curación/efecto de cada uno de los 8 elementos
     │   └── effects.py                  # proyectiles/impactos por elemento (pixel art)
     └── states/
-        ├── start_state.py              # menú inicial
+        ├── start_state.py              # pantalla de inicio: portada + Enter para jugar
         └── play_state.py               # tablero + combate + puntaje (gale.state)
 ```
 
@@ -110,12 +115,26 @@ externo.
 .venv/bin/python main.py
 ```
 
+Al arrancar se muestra la portada (`assets/graphics/ui/cover.jpg`,
+`StartState`) de fondo; presionar **Enter** pasa directo al tablero.
+
 El tablero es de 6x6 con 8 tipos de ficha (uno por elemento). El
 jugador y el enemigo empiezan con 100 HP; el combate termina cuando el
 HP de alguno llega a 0. Intercambiar dos fichas adyacentes que no
 forman ningún match las revierte automáticamente. Si una cascada deja
 el tablero sin ningún movimiento posible, se reordena solo (con aviso
 en pantalla) en vez de dejar al jugador trabado.
+
+El enemigo no juega el tablero: cada turno suyo elige un elemento al
+azar y ataca. Como escalado de dificultad, el tamaño de match que
+simula ese ataque crece con la duración del combate — empieza en 3
+fichas (multiplicador base x1.0) y sube una ficha cada
+`ENEMY_RAMP_TURNS` (3) turnos suyos, hasta el tope
+`ENEMY_MAX_MATCH` (5, multiplicador x2.0, ver
+`src/combat/combat_manager.py::_enemy_match_size`) — mismo tramo de
+multiplicador 3/4/5+ que usa el jugador. Alargar el combate lo hace
+más peligroso; resolverlo rápido con combos y Catálisis grandes lo
+mantiene fácil.
 
 ### Controles
 

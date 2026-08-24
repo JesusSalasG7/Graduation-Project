@@ -7,12 +7,12 @@ photo/AI/ripped source image involved -- these are hand-placed grid
 cells, in the same spirit as an .aseprite pixel-art editor, just
 authored in Python instead of by mouse.
 
-GRID here is 48 with UNIT=1 (one grid cell per final pixel) so each
-frame comes out at settings.CHARACTER_SPRITE_SIZE (48px) and drops
-straight into Character without any further scaling -- a much finer
-authoring grid than the 16x16 used for portraits, so there's room for
-a real fighting stance (raised guard, punching arm, planted stance)
-instead of a flat color block.
+GRID here is 48 with UNIT=2 (each grid cell becomes a 2x2 block of
+final pixels) so each frame comes out at settings.CHARACTER_SPRITE_SIZE
+(96px) and drops straight into Character without any further scaling
+-- a much finer authoring grid than the 16x16 used for portraits, so
+there's room for a real fighting stance (raised guard, punching arm,
+planted stance) instead of a flat color block.
 
 Each character is saved as one horizontal sheet of 5 frames:
     idle_a, idle_b     -- a breathing bob loop
@@ -32,7 +32,7 @@ import pygame
 
 pygame.init()
 
-UNIT = 1
+UNIT = 2
 GRID = 48
 SIZE = GRID * UNIT
 FRAME_NAMES = ("idle_a", "idle_b", "attack_a", "attack_b", "hurt")

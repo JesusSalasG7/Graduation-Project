@@ -18,7 +18,7 @@ class TransmutacionArcana(Game):
     def init(self) -> None:
         self.state_machine = StateMachine(
             {
-                "start": lambda sm: states.StartState(sm, self),
+                "start": states.StartState,
                 "play": states.PlayState,
             }
         )

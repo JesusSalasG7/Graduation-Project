@@ -31,6 +31,18 @@ from src.combat.effects import (
 )
 from src.combat.elements import compute_effect
 
+# Escalado de dificultad: el enemigo no juega el tablero, asi que no
+# puede "mejorar" armando combos el mismo. En cambio, cada
+# ENEMY_RAMP_TURNS turnos suyos su ataque simula un match una ficha mas
+# grande -- el mismo tramo de multiplicador (3/4/5+) que
+# elements.DAMAGE_MULTIPLIER ya le aplica a los matches del jugador --
+# hasta el tope ENEMY_MAX_MATCH (5, el mismo limite de
+# DAMAGE_MULTIPLIER_MAX). Asi el combate se pone mas duro cuanto mas se
+# alarga en vez de quedarse plano para siempre, y premia resolverlo
+# rapido con Catalisis grandes.
+ENEMY_RAMP_TURNS = 3
+ENEMY_MAX_MATCH = 5
+
 # Cada entrada recibe (atacante, objetivo) y arma el efecto visual con
 # los anchors que le correspondan -- la mayoria vuela atacante->objetivo,
 # pero Agua viaja al reves (cura al atacante) y Electricidad/Tierra/
@@ -53,6 +65,7 @@ class CombatManager:
         self.player = player
         self.enemy = enemy
         self._effects: List[object] = []
+        self.enemy_turn_count = 0
 
     def render(self, surface) -> None:
         self.player.render(surface)
@@ -76,6 +89,8 @@ class CombatManager:
     # -- Turno del enemigo --------------------------------------------------
 
     def enemy_turn(self, on_finish: Callable[[], None]) -> None:
+        self.enemy_turn_count += 1
+
         if self.enemy.stunned:
             # Aturdido: pierde el turno, no ataca.
             self.enemy.stunned = False
@@ -83,10 +98,21 @@ class CombatManager:
             return
 
         # El enemigo no juega el tablero -- elige un elemento al azar
-        # de la misma tabla y siempre lo resuelve como un match base
-        # (3 fichas, multiplicador x1.0).
+        # de la misma tabla y lo resuelve con un tamano de match que
+        # crece con la duracion del combate (ver _enemy_match_size).
         kind = random.choice(list(TileKind))
-        self._apply_match(self.enemy, self.player, kind, count=3, on_finish=on_finish)
+        count = self._enemy_match_size()
+        self._apply_match(self.enemy, self.player, kind, count=count, on_finish=on_finish)
+
+    def _enemy_match_size(self) -> int:
+        """
+        Cuantas fichas simula el proximo ataque del enemigo, a efectos
+        del multiplicador de elements.compute_effect. Empieza en 3
+        (turnos 1..ENEMY_RAMP_TURNS) y sube una ficha cada
+        ENEMY_RAMP_TURNS turnos, hasta ENEMY_MAX_MATCH.
+        """
+        extra = (self.enemy_turn_count - 1) // ENEMY_RAMP_TURNS
+        return min(3 + extra, ENEMY_MAX_MATCH)
 
     # -- Comun --------------------------------------------------------------
 
