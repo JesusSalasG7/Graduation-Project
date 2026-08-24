@@ -16,6 +16,8 @@ from src import states
 
 class TransmutacionArcana(Game):
     def init(self) -> None:
+        settings.play_background_music()
+
         self.state_machine = StateMachine(
             {
                 "start": states.StartState,

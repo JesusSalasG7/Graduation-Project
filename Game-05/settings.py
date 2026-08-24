@@ -73,6 +73,22 @@ ENEMY_PANEL = pygame.Rect(
 PLAYER_ANCHOR = PLAYER_PANEL.center
 ENEMY_ANCHOR = ENEMY_PANEL.center
 
+# --- Combat balance -----------------------------------------------------
+# El enemigo tiene mas vida que el jugador: no juega el tablero (ver
+# CombatManager.enemy_turn), asi que su unica forma de ser un rival
+# duro es aguantar mas turnos mientras su ataque escala (ver
+# src.combat.combat_manager.ENEMY_RAMP_TURNS/ENEMY_ELEMENT_WEIGHTS).
+PLAYER_MAX_HP = 100
+ENEMY_MAX_HP = 115
+
+# Limite de tiempo del combate, en segundos: si se agota antes de que
+# el jugador derrote al enemigo, gana el enemigo (ver
+# PlayState.update/COMBAT_TIME_LIMIT en src/states/play_state.py). Corre
+# en tiempo real desde que arranca el combate, sin importar de quien
+# sea el turno, para meter presion incluso mientras el jugador piensa
+# la proxima jugada.
+COMBAT_TIME_LIMIT = 50
+
 CHARACTER_SPRITE_BASE_SIZE = 16  # pixel-art drawn on a 16x16 surface...
 CHARACTER_SPRITE_SCALE = 6  # ...then blown up 6x with nearest-neighbor scaling.
 CHARACTER_SPRITE_SIZE = CHARACTER_SPRITE_BASE_SIZE * CHARACTER_SPRITE_SCALE
@@ -84,11 +100,12 @@ HP_BAR_OFFSET_Y = CHARACTER_SPRITE_SIZE // 2 + 28  # above the sprite's anchor
 # --- Match-3 scoring -------------------------------------------------------
 POINTS_PER_TILE = 10
 CATALYSIS_BONUS = 50
-# Desafio A05 (src/algorithm.py::remove_duplicates, aplicado en
-# Board.resolve_runs): la Catalisis paga esto por cada elemento
-# DISTINTO que arrastro la fila/columna que limpio, para premiar
-# limpiar una linea mixta y no solo una larga del mismo tipo.
-DIVERSITY_BONUS_PER_KIND = 15
+# Desafio A05 (src/algorithm.py::find_repeated, aplicado en
+# Board.resolve_runs): la Catalisis paga esto por cada elemento que
+# se REPITE (aparece 2 o mas veces) dentro de la fila/columna que
+# limpio, para premiar que un mismo elemento "resuene" varias veces
+# en la misma linea, no solo el tamano del match.
+RESONANCE_BONUS_PER_KIND = 15
 
 # --- Tile kinds -------------------------------------------------------
 # Matches src.board.tile.TileKind ordering: FUEGO, AGUA, TIERRA, AIRE,
@@ -156,6 +173,53 @@ def _load_tile_sprites() -> dict:
 
 
 TILE_SPRITES = _load_tile_sprites()
+
+# --- Element sounds ---------------------------------------------------
+# One cue per TileKind, played by CombatManager the moment a match of
+# that element triggers its combat effect (src/combat/combat_manager.py).
+# Keyed by the same plain ints as TILE_SPRITE_ROW/TileKind's values
+# (FUEGO=0, AGUA=1, TIERRA=2, AIRE=3, ELECTRICIDAD=4, HIELO=5, MAGIA=6,
+# OSCURIDAD=7) rather than importing TileKind, since src.board.tile
+# already imports this module.
+AUDIO_DIR = BASE_DIR / "assets" / "audio"
+ELEMENT_SOUND_FILES = {
+    0: AUDIO_DIR / "Fire.mp3",  # FUEGO
+    1: AUDIO_DIR / "Water.mp3",  # AGUA
+    2: AUDIO_DIR / "Earth.mp3",  # TIERRA
+    3: AUDIO_DIR / "Air.mp3",  # AIRE
+    4: AUDIO_DIR / "Electric.mp3",  # ELECTRICIDAD
+    5: AUDIO_DIR / "Ice.mp3",  # HIELO
+    6: AUDIO_DIR / "Magic.mp3",  # MAGIA
+    7: AUDIO_DIR / "Darkness.mp3",  # OSCURIDAD
+}
+
+
+def _load_element_sounds() -> dict:
+    pygame.mixer.init()
+    return {kind: pygame.mixer.Sound(path) for kind, path in ELEMENT_SOUND_FILES.items()}
+
+
+ELEMENT_SOUNDS = _load_element_sounds()
+
+# --- Background music ---------------------------------------------------
+# Un solo tema (Bucle_Music.mp3) suena de punta a punta del juego --
+# arranca una vez desde TransmutacionArcana.init() (src/transmutacion_arcana.py)
+# y sigue de fondo sin importar el estado (start/play) o cuantas
+# partidas se reinicien. Se reproduce con pygame.mixer.music (pensado
+# para streaming de un solo tema largo) en vez de mixer.Sound como
+# ELEMENT_SOUNDS (pensado para efectos cortos que se disparan y
+# superponen entre si) y a menor volumen que esos efectos -- que no
+# fijan volumen propio, es decir quedan al maximo (1.0) -- para que no
+# tape las senales de combate.
+BACKGROUND_MUSIC_PATH = AUDIO_DIR / "Bucle_Music.mp3"
+BACKGROUND_MUSIC_VOLUME = 0.4
+
+
+def play_background_music() -> None:
+    pygame.mixer.music.load(BACKGROUND_MUSIC_PATH)
+    pygame.mixer.music.set_volume(BACKGROUND_MUSIC_VOLUME)
+    pygame.mixer.music.play(loops=-1)
+
 
 BACKGROUND_COLOR = (18, 14, 26)
 

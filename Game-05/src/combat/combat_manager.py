@@ -17,6 +17,7 @@ from typing import Callable, List, Optional
 
 from gale.timer import Timer
 
+import settings
 from src.board.tile import TileKind
 from src.combat.character import Character
 from src.combat.effects import (
@@ -42,6 +43,27 @@ from src.combat.elements import compute_effect
 # rapido con Catalisis grandes.
 ENEMY_RAMP_TURNS = 3
 ENEMY_MAX_MATCH = 5
+
+# El enemigo ya no elige elemento 100% al azar: pesa la eleccion hacia
+# los elementos mas ofensivos (Fuego, Oscuridad, Electricidad -- esta
+# ultima ademas puede aturdir) para que el jugador no pueda contar con
+# que "en promedio" le va a tocar poco dano. Agua pesa poco en
+# condiciones normales porque cura al propio enemigo en vez de danar
+# (ver _apply_match/effect.heal), pero por debajo de
+# ENEMY_LOW_HP_RATIO de vida ese peso se dispara para que el enemigo se
+# cure activamente en vez de seguir atacando a ciegas.
+ENEMY_ELEMENT_WEIGHTS = {
+    TileKind.FUEGO: 3,
+    TileKind.OSCURIDAD: 3,
+    TileKind.ELECTRICIDAD: 2,
+    TileKind.TIERRA: 2,
+    TileKind.MAGIA: 2,
+    TileKind.HIELO: 1,
+    TileKind.AIRE: 1,
+    TileKind.AGUA: 1,
+}
+ENEMY_LOW_HP_RATIO = 0.35
+ENEMY_LOW_HP_AGUA_WEIGHT = 6
 
 # Cada entrada recibe (atacante, objetivo) y arma el efecto visual con
 # los anchors que le correspondan -- la mayoria vuela atacante->objetivo,
@@ -97,12 +119,30 @@ class CombatManager:
             on_finish()
             return
 
-        # El enemigo no juega el tablero -- elige un elemento al azar
-        # de la misma tabla y lo resuelve con un tamano de match que
-        # crece con la duracion del combate (ver _enemy_match_size).
-        kind = random.choice(list(TileKind))
+        # El enemigo no juega el tablero -- elige un elemento de la
+        # misma tabla con un sesgo hacia el dano (ver
+        # _choose_enemy_element) y lo resuelve con un tamano de match
+        # que crece con la duracion del combate (ver
+        # _enemy_match_size).
+        kind = self._choose_enemy_element()
         count = self._enemy_match_size()
         self._apply_match(self.enemy, self.player, kind, count=count, on_finish=on_finish)
+
+    def _choose_enemy_element(self) -> TileKind:
+        """
+        Elige el elemento del proximo ataque del enemigo con pesos
+        fijos (ENEMY_ELEMENT_WEIGHTS) en vez de puramente al azar, para
+        que en promedio pegue mas fuerte que el jugador con un match
+        parejo. Si el enemigo esta por debajo de ENEMY_LOW_HP_RATIO de
+        vida, sube mucho el peso de Agua para que se cure en vez de
+        seguir atacando a ciegas mientras se muere.
+        """
+        weights = dict(ENEMY_ELEMENT_WEIGHTS)
+        if self.enemy.hp / self.enemy.max_hp < ENEMY_LOW_HP_RATIO:
+            weights[TileKind.AGUA] = ENEMY_LOW_HP_AGUA_WEIGHT
+
+        kinds = list(weights.keys())
+        return random.choices(kinds, weights=[weights[k] for k in kinds], k=1)[0]
 
     def _enemy_match_size(self) -> int:
         """
@@ -133,6 +173,7 @@ class CombatManager:
             return
 
         self._effects.append(_EFFECT_FACTORIES[kind](attacker, defender))
+        settings.ELEMENT_SOUNDS[kind].play()
 
         effect = compute_effect(kind, count)
         mult = attacker.next_attack_multiplier

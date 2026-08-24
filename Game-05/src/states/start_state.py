@@ -10,6 +10,7 @@ import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState, StateMachine
+from gale.text import render_text
 from gale.timer import Timer
 
 import settings
@@ -33,6 +34,17 @@ class StartState(BaseState):
 
     def render(self, surface: pygame.Surface) -> None:
         surface.blit(self.cover, (0, 0))
+
+        render_text(
+            surface,
+            "Presiona Enter para jugar",
+            settings.FONTS["small"],
+            settings.VIRTUAL_WIDTH // 2,
+            settings.VIRTUAL_HEIGHT - 40,
+            (235, 235, 240),
+            center=True,
+            shadowed=True,
+        )
 
         pygame.draw.rect(
             self.screen_alpha_surface,

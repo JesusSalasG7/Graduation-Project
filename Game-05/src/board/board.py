@@ -10,8 +10,8 @@ the gaps.
 
 This module knows nothing about score or turns -- it only reports
 which TileKind was cleared and how many times, whether a catalysis
-happened, and how many distinct kinds a catalysis line carried (via
-src.algorithm.remove_duplicates -- Desafio A05). Translating that into
+happened, and how many kinds *repeated* within a catalysis line (via
+src.algorithm.find_repeated -- Desafio A05). Translating that into
 score/feedback is the job of src.states.play_state.
 """
 
@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import pygame
 
 import settings
-from src.algorithm import remove_duplicates
+from src.algorithm import find_repeated
 from src.board.tile import Tile, TileKind
 
 
@@ -194,17 +194,18 @@ class Board:
         row/column, whatever kind they are.
 
         :returns: (kind_counts, catalysis_triggered, total_tiles_cleared,
-            catalysis_diversity_kinds). kind_counts maps each TileKind
+            catalysis_resonance_kinds). kind_counts maps each TileKind
             to how many tiles of that kind were cleared (used by
-            Modulo C to compute damage/essence). catalysis_diversity_kinds
-            is how many *distinct* element kinds a Catalisis line swept
-            this call (Desafio A05 -- see src.algorithm.remove_duplicates),
-            0 if no Catalisis triggered.
+            Modulo C to compute damage/essence). catalysis_resonance_kinds
+            is how many element kinds *repeated* (appeared 2+ times)
+            within a Catalisis line this call (Desafio A05 -- see
+            src.algorithm.find_repeated), 0 if no Catalisis triggered
+            or if every element in the line appeared only once.
         """
         cleared: Set[Tile] = set()
         kind_counts: Dict[TileKind, int] = {kind: 0 for kind in TileKind}
         catalysis = False
-        catalysis_diversity_kinds = 0
+        catalysis_resonance_kinds = 0
 
         for run in runs:
             for tile in run.tiles:
@@ -221,10 +222,11 @@ class Board:
 
                 # Desafio A05: la fila/columna completa es una matriz
                 # de enteros (una fila, los TileKind.value de cada
-                # ficha) -- remove_duplicates dice cuantos elementos
-                # realmente distintos arrastro esta Catalisis.
+                # ficha) -- find_repeated dice cuantos elementos
+                # aparecieron 2 o mas veces en esta Catalisis (osea,
+                # cuantos "resuenan" dentro de la misma linea).
                 line_kinds = [[tile.kind.value for tile in line_tiles if tile is not None]]
-                catalysis_diversity_kinds += len(remove_duplicates(line_kinds))
+                catalysis_resonance_kinds += len(find_repeated(line_kinds))
 
                 for tile in line_tiles:
                     if tile is not None and tile not in cleared:
@@ -234,7 +236,7 @@ class Board:
         for tile in cleared:
             self.tiles[tile.i][tile.j] = None
 
-        return kind_counts, catalysis, len(cleared), catalysis_diversity_kinds
+        return kind_counts, catalysis, len(cleared), catalysis_resonance_kinds
 
     # -- Gravity -------------------------------------------------------
 

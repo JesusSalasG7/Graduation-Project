@@ -11,8 +11,8 @@ jugador combina fichas de 8 elementos para infligir daño directo al
 enemigo o curarse, alineando 4 o más para activar la **Regla de
 Catálisis** (limpia toda la fila/columna, no solo el match).
 
-El eje central de este proyecto es el **desafío A05**: eliminar los
-valores duplicados de una matriz de enteros, aplicado a las líneas que
+El eje central de este proyecto es el **desafío A05**: detectar los
+valores repetidos de una matriz de enteros, aplicado a las líneas que
 limpia la Catálisis del propio tablero.
 
 ## Estructura
@@ -21,8 +21,8 @@ limpia la Catálisis del propio tablero.
 Game-05/
 ├── main.py                          # punto de entrada: crea el Game y lo ejecuta
 ├── settings.py                       # configuración (ventana, tablero, sprites, puntaje)
-├── test_remove_duplicates.py          # caso de prueba integrado del desafío A05
-├── GUIA_A05_remove_duplicates.md      # guía del desafío A05 para el participante
+├── test_find_repeated.py              # caso de prueba integrado del desafío A05
+├── GUIA_A05_find_repeated.md          # guía del desafío A05 para el participante
 ├── assets/graphics/
 │   ├── ui/cover.jpg                   # portada de la pantalla de inicio (StartState)
 │   ├── board/tiles.png                # spritesheet de los 8 iconos elementales
@@ -35,7 +35,7 @@ Game-05/
 │   └── generate_effect_sprites.py     # genera las hojas de sprites de assets/graphics/effects/
 └── src/
     ├── transmutacion_arcana.py        # clase Game: arranca el StateMachine
-    ├── algorithm.py                    # *** desafío A05: remove_duplicates *** (sin pygame)
+    ├── algorithm.py                    # *** desafío A05: find_repeated *** (sin pygame)
     ├── board/                          # Módulo A -- motor del tablero
     │   ├── board.py                    # matriz, gravedad, matches, Catálisis
     │   └── tile.py                     # TileKind (los 8 elementos) y Tile
@@ -55,41 +55,45 @@ poder leerse, probarse y calificarse de forma aislada de lo gráfico.
 
 ## El desafío A05
 
-> Elimina los valores duplicados de una matriz de enteros. El
-> algoritmo recorre la matriz, comparando cada elemento con los
-> valores siguientes y eliminando los duplicados. La matriz se rellena
-> inicialmente con los valores introducidos por el usuario.
+> Detecta los valores repetidos de una línea del tablero (fila o
+> columna), comparando cada ficha con las que le siguen. La línea se
+> rellena inicialmente con los elementos que fue dejando el jugador
+> con sus jugadas (sus swaps).
 >
 > **Key Concept:** Conjuntos, iteración.
 > **Enfoque en la comprensión:** Filtrado de datos.
 
 - La guía paso a paso para resolverlo, pensada para el participante
   (sin spoilear el código terminado), está en
-  [`GUIA_A05_remove_duplicates.md`](GUIA_A05_remove_duplicates.md).
-- La función a implementar es `src/algorithm.py::remove_duplicates`
+  [`GUIA_A05_find_repeated.md`](GUIA_A05_find_repeated.md).
+- La función a implementar es `src/algorithm.py::find_repeated`
   (lógica pura, sin depender del tablero).
 - `Board.resolve_runs` (en `src/board/board.py`) es el punto de
   entrada pedido específicamente para el tablero: cada vez que una
   **Catálisis** (match-4+) limpia una fila o columna entera, esa línea
   de fichas (los `TileKind.value` de cada una, es decir, una matriz de
   enteros rellenada por las jugadas del jugador) se pasa por
-  `remove_duplicates` para saber cuántos elementos **distintos**
-  arrastró, y esa cantidad paga el bonus de **Diversidad Elemental**
-  (`settings.DIVERSITY_BONUS_PER_KIND` por elemento distinto, sumado
-  en `PlayState._process_matches`). Una Catálisis de un solo elemento
-  repetido no suma nada extra; una que mezcla varios, sí.
+  `find_repeated` para saber cuántos elementos **se repitieron**
+  (aparecieron 2 o más veces) dentro de esa línea, y esa cantidad paga
+  el bonus de **Resonancia Elemental** (`settings.RESONANCE_BONUS_PER_KIND`
+  por elemento repetido, sumado en `PlayState._process_matches`, con
+  un mensaje flotante "¡Resonancia x…!" sobre el tablero). Una
+  Catálisis totalmente mixta (cada elemento aparece una sola vez) no
+  suma nada extra; una donde algún elemento se repite dentro de la
+  misma línea, sí.
 
 ## Caso de prueba integrado
 
 ```bash
-.venv/bin/python test_remove_duplicates.py
+.venv/bin/python test_find_repeated.py
 ```
 
-No necesita ventana. Corre dos grupos de casos: `remove_duplicates` en
+No necesita ventana. Corre dos grupos de casos: `find_repeated` en
 aislamiento (matrices sueltas) y `Board.resolve_runs` con una
-Catálisis armada a mano (línea mixta, línea homogénea, y un Match-3
-común sin Catálisis) para confirmar que el bonus de diversidad se
-calcula bien en cada caso.
+Catálisis armada a mano (línea totalmente mixta, línea con dos
+elementos repetidos, línea homogénea, y un Match-3 común sin
+Catálisis) para confirmar que el bonus de resonancia se calcula bien
+en cada caso.
 
 ## Los 8 elementos
 
