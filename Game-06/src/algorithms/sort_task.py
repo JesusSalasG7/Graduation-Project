@@ -38,32 +38,55 @@ def generate_words(count: int, seed: Optional[int] = None) -> List[str]:
 
 def sort_words_by_length(words: List[str]) -> List[str]:
     """Mergesort, keyed by len(word) instead of the word itself."""
-    if len(words) <= 1:
-        return list(words)
-
-    mid = len(words) // 2
-    left = sort_words_by_length(words[:mid])
-    right = sort_words_by_length(words[mid:])
-
-    return _merge_by_length(left, right)
+    result = list(words)
+    buffer: List[Optional[str]] = [None] * len(result)
+    _merge_sort(result, buffer, 0, len(result))
+    return result
 
 
-def _merge_by_length(left: List[str], right: List[str]) -> List[str]:
-    """Merges two already-length-sorted lists into one, stably."""
-    merged = []
-    i = j = 0
+def _merge_sort(items: List[str], buffer: List[Optional[str]], start: int, end: int) -> None:
+    """
+    Sorts items[start:end] in place, by len(). Splits by index instead of
+    slicing (words[:mid] / words[mid:]) so each recursive call reuses the
+    same pair of lists instead of allocating two fresh ones per level --
+    the usual top-down mergesort has O(n log n) list allocations just from
+    slicing; this has one buffer allocated once, in sort_words_by_length.
+    """
+    if end - start <= 1:
+        return
 
-    while i < len(left) and j < len(right):
-        if len(left[i]) <= len(right[j]):
-            merged.append(left[i])
+    mid = (start + end) // 2
+    _merge_sort(items, buffer, start, mid)
+    _merge_sort(items, buffer, mid, end)
+    _merge_by_length(items, buffer, start, mid, end)
+
+
+def _merge_by_length(
+    items: List[str], buffer: List[Optional[str]], start: int, mid: int, end: int
+) -> None:
+    """Merges the already-length-sorted items[start:mid] and items[mid:end], stably, via buffer."""
+    i, j, k = start, mid, start
+
+    while i < mid and j < end:
+        if len(items[i]) <= len(items[j]):
+            buffer[k] = items[i]
             i += 1
         else:
-            merged.append(right[j])
+            buffer[k] = items[j]
             j += 1
+        k += 1
 
-    merged.extend(left[i:])
-    merged.extend(right[j:])
-    return merged
+    while i < mid:
+        buffer[k] = items[i]
+        i += 1
+        k += 1
+
+    while j < end:
+        buffer[k] = items[j]
+        j += 1
+        k += 1
+
+    items[start:end] = buffer[start:end]
 
 
 def run_sort_words_by_length(words: List[str]) -> Tuple[Optional[List[str]], float]:

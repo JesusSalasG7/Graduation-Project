@@ -297,10 +297,13 @@ class World:
         return self.filter_min <= value <= self.filter_max
 
     def count_apples_in_range(self) -> int:
-        """
-        TODO
-        """
-        pass
+        count = 0
+        
+        for apple in self.food_field.apples:
+            if self._apple_passes_filter(apple.value):
+                count += 1
+        
+        return count
 
     def _handle_challenge_apple_eaten(self, apple) -> None:
         """
