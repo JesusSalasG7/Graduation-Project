@@ -7,6 +7,8 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
+from challenges import get_challenge
+from comprehension_questions import get_questions
 from game_launcher import (
     PROJECT_ROOT,
     discover_games,
@@ -71,11 +73,15 @@ class App(ctk.CTk):
         self.content.grid_columnconfigure(0, weight=1)
 
         self.tab_games = ctk.CTkFrame(self.content, fg_color=BG_APP)
+        self.tab_prompts = ctk.CTkFrame(self.content, fg_color=BG_APP)
+        self.tab_questions = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_participants = ctk.CTkFrame(self.content, fg_color=BG_APP)
-        for frame in (self.tab_games, self.tab_participants):
+        for frame in (self.tab_games, self.tab_prompts, self.tab_questions, self.tab_participants):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self._build_games_tab()
+        self._build_prompts_tab()
+        self._build_questions_tab()
         self._build_participants_tab()
         self._select_nav("games")
 
@@ -99,6 +105,8 @@ class App(ctk.CTk):
         nav.pack(fill="x", padx=14)
 
         self._nav_buttons["games"] = self._nav_button(nav, "🕹️  Juegos", "games")
+        self._nav_buttons["prompts"] = self._nav_button(nav, "🧠  Prompts IA", "prompts")
+        self._nav_buttons["questions"] = self._nav_button(nav, "❓  Preguntas de comprensión", "questions")
         self._nav_buttons["participants"] = self._nav_button(nav, "🧑‍🤝‍🧑  Participantes", "participants")
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
@@ -142,7 +150,12 @@ class App(ctk.CTk):
         return btn
 
     def _select_nav(self, key):
-        frames = {"games": self.tab_games, "participants": self.tab_participants}
+        frames = {
+            "games": self.tab_games,
+            "prompts": self.tab_prompts,
+            "questions": self.tab_questions,
+            "participants": self.tab_participants,
+        }
         for name, btn in self._nav_buttons.items():
             active = name == key
             btn.configure(
@@ -368,6 +381,167 @@ class App(ctk.CTk):
         except FileNotFoundError as exc:
             messagebox.showerror("No se pudo lanzar el juego", str(exc))
 
+    # ---------------- Prompts IA ----------------
+    def _build_prompts_tab(self):
+        header = ctk.CTkFrame(self.tab_prompts, fg_color="transparent")
+        header.pack(fill="x", padx=26, pady=(24, 6))
+
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(
+            title_box, text="Prompts IA", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            title_box,
+            text="Enunciado y prompt de IA del desafio de cada juego, listo para copiar.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
+        scroll = ctk.CTkScrollableFrame(self.tab_prompts, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=10)
+
+        games = discover_games()
+        if not games:
+            ctk.CTkLabel(
+                scroll, text="No se encontraron carpetas Game-*.", text_color=TEXT_MUTED
+            ).pack(pady=20)
+            return
+
+        for game in games:
+            challenge = get_challenge(game.name)
+
+            card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+            card.pack(fill="x", pady=6, padx=4)
+
+            header_row = ctk.CTkFrame(card, fg_color="transparent")
+            header_row.pack(fill="x", padx=18, pady=(16, 4))
+
+            title_text = f"🎲  {game.name}"
+            if challenge:
+                title_text += f"   ·   {challenge.challenge_id} — {challenge.title}"
+            elif game.display_name and game.display_name != game.name:
+                title_text += f"   ·   {game.display_name}"
+            ctk.CTkLabel(
+                header_row, text=title_text, font=ctk.CTkFont(family=FONT_FAMILY, size=15, weight="bold"),
+            ).pack(anchor="w")
+
+            if not challenge:
+                ctk.CTkLabel(
+                    card, text="Sin desafio/prompt registrado todavia para este juego.",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+                ).pack(anchor="w", padx=18, pady=(0, 16))
+                continue
+
+            ctk.CTkLabel(
+                card, text=f"📄  {challenge.location}",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=11), text_color=TEXT_MUTED,
+            ).pack(anchor="w", padx=18, pady=(0, 10))
+
+            ctk.CTkLabel(
+                card, text="Enunciado del desafio", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            ).pack(anchor="w", padx=18)
+            statement_box = ctk.CTkTextbox(
+                card, wrap="word", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+                fg_color=BG_CARD_ALT, corner_radius=8, height=110,
+            )
+            statement_box.pack(fill="x", padx=18, pady=(4, 12))
+            statement_box.insert("1.0", challenge.statement)
+            statement_box.configure(state="disabled")
+
+            prompt_header = ctk.CTkFrame(card, fg_color="transparent")
+            prompt_header.pack(fill="x", padx=18)
+            ctk.CTkLabel(
+                prompt_header, text="Prompt para resolverlo con IA",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            ).pack(side="left")
+            ctk.CTkButton(
+                prompt_header, text="📋  Copiar prompt", width=140, height=26, corner_radius=6,
+                font=ctk.CTkFont(family=FONT_FAMILY, size=11),
+                fg_color=ACCENT, hover_color=ACCENT_HOVER,
+                command=lambda c=challenge: self._copy_prompt(c),
+            ).pack(side="right")
+
+            prompt_box = ctk.CTkTextbox(
+                card, wrap="word", font=ctk.CTkFont(family="monospace", size=11),
+                fg_color=BG_CARD_ALT, corner_radius=8, height=260,
+            )
+            prompt_box.pack(fill="x", padx=18, pady=(4, 16))
+            prompt_box.insert("1.0", challenge.prompt)
+            prompt_box.configure(state="disabled")
+
+    def _copy_prompt(self, challenge):
+        self.clipboard_clear()
+        self.clipboard_append(challenge.prompt)
+        self.update()
+
+    # ---------------- Preguntas de comprension ----------------
+    def _build_questions_tab(self):
+        header = ctk.CTkFrame(self.tab_questions, fg_color="transparent")
+        header.pack(fill="x", padx=26, pady=(24, 6))
+
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(
+            title_box, text="Preguntas de comprensión", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            title_box,
+            text="Test de selección múltiple por juego, para verificar la comprensión del desafío.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
+        scroll = ctk.CTkScrollableFrame(self.tab_questions, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=10)
+
+        games = discover_games()
+        if not games:
+            ctk.CTkLabel(
+                scroll, text="No se encontraron carpetas Game-*.", text_color=TEXT_MUTED
+            ).pack(pady=20)
+            return
+
+        for game in games:
+            challenge = get_challenge(game.name)
+            questions = get_questions(game.name)
+
+            card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+            card.pack(fill="x", pady=6, padx=4)
+
+            title_text = f"🎲  {game.name}"
+            if challenge:
+                title_text += f"   ·   {challenge.challenge_id} — {challenge.title}"
+            elif game.display_name and game.display_name != game.name:
+                title_text += f"   ·   {game.display_name}"
+            ctk.CTkLabel(
+                card, text=title_text, font=ctk.CTkFont(family=FONT_FAMILY, size=15, weight="bold"),
+            ).pack(anchor="w", padx=18, pady=(16, 4))
+
+            if not questions:
+                ctk.CTkLabel(
+                    card, text="Sin preguntas de comprensión registradas todavía para este juego.",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+                ).pack(anchor="w", padx=18, pady=(0, 16))
+                continue
+
+            for i, question in enumerate(questions, start=1):
+                ctk.CTkLabel(
+                    card, text=f"{i}. {question.text}",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
+                    wraplength=760, justify="left", anchor="w",
+                ).pack(anchor="w", padx=18, pady=(10, 4))
+                for j, option in enumerate(question.options):
+                    is_correct = j == question.correct_index
+                    ctk.CTkLabel(
+                        card,
+                        text=f"{'✓' if is_correct else '•'}  {option}",
+                        font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+                        text_color="#4ade80" if is_correct else "#c9cdd9",
+                        wraplength=740, justify="left", anchor="w",
+                    ).pack(anchor="w", padx=34, pady=1)
+            ctk.CTkLabel(card, text="").pack(pady=(0, 8))  # espaciado inferior
+
     # ---------------- Participantes ----------------
     def _active_label_text(self) -> str:
         active = self.store.get_active()
@@ -375,13 +549,26 @@ class App(ctk.CTk):
             return f"👤 Participante activo: {active['nombre']} {active['apellido']} (C.I. {active['cedula']})"
         return "👤 Participante activo: ninguno"
 
+    def _participant_count_text(self) -> str:
+        count = len(self.store.list_participants())
+        label = "participante registrado" if count == 1 else "participantes registrados"
+        return f"👥 {count} {label}"
+
     def _build_participants_tab(self):
         wrapper = ctk.CTkFrame(self.tab_participants, fg_color="transparent")
         wrapper.pack(fill="both", expand=True, padx=26, pady=(24, 20))
 
+        title_row = ctk.CTkFrame(wrapper, fg_color="transparent")
+        title_row.pack(fill="x")
         ctk.CTkLabel(
-            wrapper, text="Participantes", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
-        ).pack(anchor="w")
+            title_row, text="Participantes", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+        ).pack(side="left")
+        self.participant_count_label = ctk.CTkLabel(
+            title_row, text=self._participant_count_text(),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            fg_color=BG_CARD_ALT, corner_radius=10, text_color="#c9cdd9", padx=12, pady=4,
+        )
+        self.participant_count_label.pack(side="right")
         ctk.CTkLabel(
             wrapper, text="Registra sujetos de prueba y selecciona el participante activo de la sesion.",
             font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
@@ -495,6 +682,9 @@ class App(ctk.CTk):
             self.tree.insert("", "end", iid=p["id"], values=(p["nombre"], p["apellido"], p["cedula"], p["created_at"]))
         self.active_label.configure(text=self._active_label_text())
         self.participants_active_label.configure(text=self._active_label_text())
+        self.participant_count_label.configure(text=self._participant_count_text())
+        count = len(self.store.list_participants())
+        self._nav_buttons["participants"].configure(text=f"🧑‍🤝‍🧑  Participantes ({count})")
 
     def _save_participant(self):
         nombre = self.entry_nombre.get().strip()
