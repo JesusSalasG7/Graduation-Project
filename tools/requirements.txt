@@ -1,0 +1,12 @@
+# Dependencias para tools/emotion_tracker.py
+# Recoleccion de datos emocionales - modulo de tesis "Vibe Coding"
+#
+# tensorflow>=2.19 y sin fijar numpy: las versiones anteriores de TF exigen
+# numpy<2.0, lo cual choca con scipy/librosa (Game-06) que ya viven en el
+# mismo .venv unificado y requieren numpy>=2.0.
+
+opencv-python==4.10.0.84
+deepface==0.0.93
+tensorflow==2.21.0
+tf-keras==2.21.0
+pandas==2.2.2

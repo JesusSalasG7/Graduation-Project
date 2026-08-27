@@ -1,0 +1,2 @@
+# Dependencia de la GUI (tkinter y json son de la libreria estandar)
+customtkinter==5.2.2

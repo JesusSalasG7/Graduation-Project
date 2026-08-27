@@ -222,3 +222,10 @@ Game-01/records.json
 
 # Claude Code local settings
 .claude/
+
+# Datos de participantes: informacion personal (cedula, etc.), no debe ir al repo
+graphic_interface/data/*.json
+!graphic_interface/data/.gitkeep
+
+# Registros de emociones por participante (datos sensibles del experimento)
+graphic_interface/data/emotion_logs/
