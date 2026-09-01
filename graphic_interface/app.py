@@ -1,7 +1,9 @@
 """GUI principal: lanzador de juegos + gestion de participantes."""
 
 import threading
+import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
+from collections import Counter
 from pathlib import Path
 from tkinter import ttk
 
@@ -12,15 +14,19 @@ from comprehension_questions import get_questions
 from game_launcher import (
     PROJECT_ROOT,
     discover_games,
+    import_heart_rate,
     open_in_vscode,
     play_game,
+    read_combined_session_data,
     repair_environment,
     start_emotion_tracker,
 )
-from participant_store import ParticipantStore
+from participant_store import ParticipantStore, participant_file_stub
+from session_store import SessionStore
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DATA_FILE = DATA_DIR / "participants.json"
+SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -56,8 +62,17 @@ class App(ctk.CTk):
         self.configure(fg_color=BG_APP)
 
         self.store = ParticipantStore(DATA_FILE)
+        self.session_store = SessionStore(SESSIONS_FILE)
         self.emotion_process = None
         self.emotion_participant_id = None
+        self.active_session = None
+        self.selected_session = None
+
+        # Si la app se cerro con una sesion sin terminar, la recuperamos para
+        # poder cerrarla bien (no se relanza la camara automaticamente).
+        active_participant = self.store.get_active()
+        if active_participant is not None:
+            self.active_session = self.session_store.get_open_session(active_participant["id"])
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -76,13 +91,18 @@ class App(ctk.CTk):
         self.tab_prompts = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_questions = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_participants = ctk.CTkFrame(self.content, fg_color=BG_APP)
-        for frame in (self.tab_games, self.tab_prompts, self.tab_questions, self.tab_participants):
+        self.tab_session = ctk.CTkFrame(self.content, fg_color=BG_APP)
+        for frame in (
+            self.tab_games, self.tab_prompts, self.tab_questions,
+            self.tab_participants, self.tab_session,
+        ):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self._build_games_tab()
         self._build_prompts_tab()
         self._build_questions_tab()
         self._build_participants_tab()
+        self._build_session_tab()
         self._select_nav("games")
 
     # ---------------- Sidebar / navegacion ----------------
@@ -108,6 +128,7 @@ class App(ctk.CTk):
         self._nav_buttons["prompts"] = self._nav_button(nav, "🧠  Prompts IA", "prompts")
         self._nav_buttons["questions"] = self._nav_button(nav, "❓  Preguntas de comprensión", "questions")
         self._nav_buttons["participants"] = self._nav_button(nav, "🧑‍🤝‍🧑  Participantes", "participants")
+        self._nav_buttons["session"] = self._nav_button(nav, "⏱️  Sesión", "session")
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
@@ -155,6 +176,7 @@ class App(ctk.CTk):
             "prompts": self.tab_prompts,
             "questions": self.tab_questions,
             "participants": self.tab_participants,
+            "session": self.tab_session,
         }
         for name, btn in self._nav_buttons.items():
             active = name == key
@@ -696,7 +718,7 @@ class App(ctk.CTk):
         try:
             self.store.add_participant(nombre, apellido, cedula)
         except ValueError as exc:
-            messagebox.showerror("Cedula duplicada", str(exc))
+            messagebox.showerror("Participante duplicado", str(exc))
             return
         self.entry_nombre.delete(0, "end")
         self.entry_apellido.delete(0, "end")
@@ -714,6 +736,7 @@ class App(ctk.CTk):
             return
         self.store.set_active(pid)
         self._refresh_participants()
+        self._refresh_session_tab()
 
     def _delete_selected(self):
         pid = self._selected_id()
@@ -723,6 +746,304 @@ class App(ctk.CTk):
         if messagebox.askyesno("Confirmar", "Eliminar este participante?"):
             self.store.delete_participant(pid)
             self._refresh_participants()
+
+    # ---------------- Sesion ----------------
+    def _build_session_tab(self):
+        wrapper = ctk.CTkFrame(self.tab_session, fg_color="transparent")
+        wrapper.pack(fill="both", expand=True, padx=26, pady=(24, 20))
+
+        ctk.CTkLabel(
+            wrapper, text="Sesión", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            wrapper,
+            text="Inicia/termina la sesión del participante activo, importa el BPM del reloj "
+                 "y revisa emociones y frecuencia cardíaca juntos.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+        ).pack(anchor="w", pady=(2, 14))
+
+        control_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        control_card.pack(fill="x", pady=(0, 14))
+
+        self.session_active_label = ctk.CTkLabel(
+            control_card, text=self._active_label_text(),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
+        )
+        self.session_active_label.pack(anchor="w", padx=18, pady=(16, 4))
+
+        self.session_status_label = ctk.CTkLabel(
+            control_card, text="Sin sesión activa.", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            text_color=TEXT_MUTED,
+        )
+        self.session_status_label.pack(anchor="w", padx=18, pady=(0, 12))
+
+        buttons_row = ctk.CTkFrame(control_card, fg_color="transparent")
+        buttons_row.pack(anchor="w", padx=18, pady=(0, 18))
+
+        self.start_session_button = ctk.CTkButton(
+            buttons_row, text="▶  Iniciar sesión", height=36, width=160, corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
+            command=self._open_start_session_modal,
+        )
+        self.start_session_button.pack(side="left", padx=(0, 8))
+
+        self.end_session_button = ctk.CTkButton(
+            buttons_row, text="⏹  Terminar sesión", height=36, width=160, corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            fg_color="transparent", hover_color=DANGER, border_width=1, border_color=DANGER,
+            text_color=DANGER, state="disabled",
+            command=self._end_session,
+        )
+        self.end_session_button.pack(side="left", padx=(0, 8))
+
+        self.import_hr_button = ctk.CTkButton(
+            buttons_row, text="📥  Importar datos del reloj", height=36, width=210, corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
+            command=self._import_heart_rate,
+        )
+        self.import_hr_button.pack(side="left")
+
+        table_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        table_card.pack(fill="both", expand=True)
+        table_card.grid_rowconfigure(2, weight=1)
+        table_card.grid_columnconfigure(0, weight=1)
+
+        selector_row = ctk.CTkFrame(table_card, fg_color="transparent")
+        selector_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(16, 8))
+        ctk.CTkLabel(
+            selector_row, text="Sesión a mostrar:", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            text_color=TEXT_MUTED,
+        ).pack(side="left", padx=(0, 8))
+        self.session_selector = ctk.CTkOptionMenu(
+            selector_row, values=["(sin sesiones)"], width=340, height=30,
+            fg_color=BG_CARD_ALT, button_color=BORDER, button_hover_color=ACCENT,
+            command=self._on_session_selected,
+        )
+        self.session_selector.pack(side="left", padx=(0, 14))
+        self.session_participant_label = ctk.CTkLabel(
+            selector_row, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            text_color="#c9cdd9",
+        )
+        self.session_participant_label.pack(side="left")
+
+        self.session_stats_label = ctk.CTkLabel(
+            table_card, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            fg_color=BG_CARD_ALT, corner_radius=8, anchor="w", justify="left",
+        )
+        self.session_stats_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 10), ipady=8)
+
+        columns = ("hora", "tipo", "valor")
+        self.session_tree = ttk.Treeview(table_card, columns=columns, show="headings", selectmode="browse")
+        for col, label, width in (("hora", "Hora", 160), ("tipo", "Tipo", 100), ("valor", "Valor", 160)):
+            self.session_tree.heading(col, text=label, anchor="center")
+            self.session_tree.column(col, width=width, anchor="center")
+        self.session_tree.grid(row=2, column=0, sticky="nsew", padx=(16, 0), pady=(0, 16))
+
+        session_scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.session_tree.yview)
+        self.session_tree.configure(yscrollcommand=session_scrollbar.set)
+        session_scrollbar.grid(row=2, column=1, sticky="ns", padx=(0, 16), pady=(0, 16))
+
+        self._refresh_session_tab()
+
+    def _open_start_session_modal(self):
+        active = self.store.get_active()
+        if active is None:
+            messagebox.showinfo(
+                "Sin participante activo",
+                "Selecciona un participante activo en la pestaña Participantes primero.",
+            )
+            return
+        if self.active_session is not None:
+            messagebox.showinfo("Sesión en curso", "Ya hay una sesión activa. Termínala antes de iniciar otra.")
+            return
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Activar reloj")
+        modal.geometry("400x240")
+        modal.configure(fg_color=BG_APP)
+        modal.transient(self)
+        modal.resizable(False, False)
+        # grab_set() debe esperar a que la ventana ya este dibujada en pantalla,
+        # si no lanza "grab failed: window not viewable".
+        modal.wait_visibility()
+        modal.grab_set()
+
+        ctk.CTkLabel(
+            modal, text="⌚  Activar reloj",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=18, weight="bold"),
+        ).pack(pady=(26, 10))
+        ctk.CTkLabel(
+            modal,
+            text=(
+                "Inicia ahora el ejercicio en el reloj\n"
+                "(Samsung Health → Ejercicio → tipo sin GPS).\n\n"
+                "Cuando el reloj ya esté midiendo,\n"
+                "presiona Aceptar para marcar el inicio\n"
+                "exacto de la sesión."
+            ),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED, justify="center",
+        ).pack(padx=24, pady=(0, 20))
+
+        def on_accept():
+            session = self.session_store.start_session(active["id"], label="sesion")
+            self.active_session = session
+            self._ensure_emotion_tracker(active, session_label="sesion")
+            self._refresh_session_tab()
+            modal.destroy()
+
+        ctk.CTkButton(
+            modal, text="Aceptar", height=38, width=160, corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
+            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
+            command=on_accept,
+        ).pack()
+
+    def _end_session(self):
+        if self.active_session is None:
+            return
+        self.session_store.end_session(self.active_session["id"])
+        self._stop_emotion_tracker()
+        self.active_session = None
+        self._refresh_session_tab()
+        messagebox.showinfo("Sesión terminada", "La sesión se guardó. Ya puedes importar los datos del reloj.")
+
+    def _import_heart_rate(self):
+        active = self.store.get_active()
+        if active is None:
+            messagebox.showinfo("Sin participante activo", "Selecciona un participante activo primero.")
+            return
+        if self.selected_session is None:
+            messagebox.showinfo("Sin sesión seleccionada", "Selecciona una sesión terminada en el desplegable.")
+            return
+        if self.selected_session.get("end_time") is None:
+            messagebox.showinfo("Sesión en curso", "Termina la sesión antes de importar sus datos.")
+            return
+
+        default_dir = Path.home() / "Escritorio" / "Datos_Biometricos"
+        export_dir = filedialog.askdirectory(
+            title="Entra a la carpeta del export (ej. JESUS_SALAS) y selecciónala",
+            initialdir=str(default_dir) if default_dir.exists() else str(Path.home()),
+        )
+        if not export_dir:
+            return
+
+        expected_stub = participant_file_stub(active)
+        folder_name = Path(export_dir).name.strip().upper()
+        if folder_name != expected_stub:
+            messagebox.showerror(
+                "La carpeta no coincide con el participante",
+                f"El participante activo es {active['nombre']} {active['apellido']}, así que la "
+                f"carpeta del export debe llamarse exactamente \"{expected_stub}\".\n\n"
+                f"Seleccionaste \"{Path(export_dir).name}\", que no coincide. Renombra la carpeta "
+                "exportada o verifica que sea la del participante correcto antes de importar.",
+            )
+            return
+
+        try:
+            log_file, count = import_heart_rate(active, self.selected_session, Path(export_dir))
+        except FileNotFoundError as exc:
+            messagebox.showerror("No se pudo importar", str(exc))
+            return
+
+        if count == 0:
+            messagebox.showwarning(
+                "Sin lecturas en esa ventana",
+                "No se encontraron muestras BPM dentro del rango de tiempo de la sesión seleccionada. "
+                "Verifica que el ejercicio en el reloj haya coincidido con la sesión.",
+            )
+        else:
+            messagebox.showinfo("Datos importados", f"{count} lecturas de BPM guardadas en:\n{log_file}")
+
+        self._refresh_session_view()
+
+    def _on_session_selected(self, label: str):
+        active = self.store.get_active()
+        if not active:
+            return
+        for s in self.session_store.list_sessions(active["id"]):
+            if self._session_label(s) == label:
+                self.selected_session = s
+                break
+        self._refresh_session_view()
+
+    @staticmethod
+    def _session_label(session: dict) -> str:
+        end = session.get("end_time") or "en curso"
+        return f"{session['start_time']} → {end}"
+
+    def _refresh_session_tab(self):
+        active = self.store.get_active()
+        self.session_active_label.configure(text=self._active_label_text())
+
+        if self.active_session is not None:
+            self.session_status_label.configure(
+                text=f"🟢 Sesión en curso, iniciada a las {self.active_session['start_time']}",
+                text_color="#4ade80",
+            )
+            self.start_session_button.configure(state="disabled")
+            self.end_session_button.configure(state="normal")
+        else:
+            self.session_status_label.configure(text="Sin sesión activa.", text_color=TEXT_MUTED)
+            self.start_session_button.configure(state="normal" if active else "disabled")
+            self.end_session_button.configure(state="disabled")
+
+        sessions = self.session_store.list_sessions(active["id"]) if active else []
+        if sessions:
+            labels = [self._session_label(s) for s in sessions]
+            self.session_selector.configure(values=labels)
+            completed = [s for s in sessions if s.get("end_time")]
+            self.selected_session = completed[-1] if completed else sessions[-1]
+            self.session_selector.set(self._session_label(self.selected_session))
+        else:
+            self.session_selector.configure(values=["(sin sesiones)"])
+            self.session_selector.set("(sin sesiones)")
+            self.selected_session = None
+
+        self.session_participant_label.configure(
+            text=f"— {active['nombre']} {active['apellido']}" if active else ""
+        )
+
+        self._refresh_session_view()
+
+    def _refresh_session_view(self):
+        self.session_tree.delete(*self.session_tree.get_children())
+        active = self.store.get_active()
+        if not active or not self.selected_session:
+            self.session_stats_label.configure(text="📊  Sin datos para mostrar todavía.")
+            return
+
+        combined = read_combined_session_data(active, self.selected_session)
+        for row in combined:
+            self.session_tree.insert(
+                "", "end",
+                values=(row["timestamp"].strftime("%H:%M:%S"), row["tipo"], row["valor"]),
+            )
+
+        self.session_stats_label.configure(text=self._build_stats_text(combined))
+
+    @staticmethod
+    def _build_stats_text(rows: list[dict]) -> str:
+        emotions = [r["valor"] for r in rows if r["tipo"] == "Emoción"]
+        bpms = []
+        for r in rows:
+            if r["tipo"] != "BPM":
+                continue
+            try:
+                bpms.append(float(r["valor"]))
+            except ValueError:
+                continue
+
+        if emotions:
+            emotion, freq = Counter(emotions).most_common(1)[0]
+            emotion_text = f"{emotion} ({freq}/{len(emotions)} lecturas)"
+        else:
+            emotion_text = "sin datos"
+
+        bpm_text = f"{sum(bpms) / len(bpms):.1f} BPM  (min {min(bpms):.0f} · max {max(bpms):.0f})" if bpms else "sin datos"
+
+        return f"📊  Emoción más recurrente: {emotion_text}      ·      Promedio BPM: {bpm_text}"
 
 
 def main():

@@ -7,12 +7,28 @@ romper los registros ya guardados.
 """
 
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
 SCHEMA_VERSION = 1
+
+
+def participant_file_stub(participant: dict) -> str:
+    """Identificador "NOMBRE_APELLIDO" (nombre y apellido ya vienen en
+    mayusculas) usado para nombrar los archivos de datos de este participante
+    (log de emociones, log de frecuencia cardiaca), asi se sabe a simple
+    vista a quien pertenece cada archivo.
+
+    Nota: si dos participantes comparten nombre y apellido exactos, sus
+    archivos de datos colisionarian (la cedula sigue siendo la clave unica
+    real dentro de participants.json).
+    """
+    stub = f"{participant['nombre']}_{participant['apellido']}".strip("_")
+    stub = stub.replace(" ", "_")
+    return re.sub(r"[^A-Z0-9_]", "", stub) or participant["id"]
 
 
 class ParticipantStore:
@@ -46,12 +62,26 @@ class ParticipantStore:
 
     def add_participant(self, nombre: str, apellido: str, cedula: str, **extra_attributes: Any) -> dict:
         cedula = cedula.strip()
+        nombre_norm = nombre.strip().upper()
+        apellido_norm = apellido.strip().upper()
+
         if any(p["cedula"] == cedula for p in self._data["participants"]):
             raise ValueError(f"Ya existe un participante con la cedula {cedula}")
+        if any(
+            p["nombre"] == nombre_norm and p["apellido"] == apellido_norm
+            for p in self._data["participants"]
+        ):
+            # Mismo nombre+apellido pisaria el archivo de datos del otro participante
+            # (emotion_logs/heart_rate_logs se nombran "NOMBRE_APELLIDO").
+            raise ValueError(
+                f"Ya existe un participante registrado como {nombre_norm} {apellido_norm}. "
+                "Usa un nombre/apellido distinto o revisa si ya esta registrado."
+            )
+
         participant = {
             "id": str(uuid.uuid4()),
-            "nombre": nombre.strip().upper(),
-            "apellido": apellido.strip().upper(),
+            "nombre": nombre_norm,
+            "apellido": apellido_norm,
             "cedula": cedula,
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "attributes": dict(extra_attributes),
