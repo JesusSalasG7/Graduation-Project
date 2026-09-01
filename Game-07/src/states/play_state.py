@@ -1,10 +1,17 @@
 """
-The only state this prototype needs: builds a fresh procedurally
-generated Level on enter (and again on "regenerate"), each frame feeds
-player input against it -- including reacting to the goal and to
-obstacle hazards via Player.update's on_enter_cell hook -- and delegates
-grid/entity drawing to GridRenderer, adding only the small HUD overlay on
-top.
+PlayState: the main puzzle screen. The player spends a cell budget
+placing live cells on the grid, then runs Conway's Game of Life
+(B3/S23) hoping the resulting pattern satisfies the level's victory
+condition (reach the target zone, or wipe out an enemy pattern).
+
+Controls:
+    Mouse click  -- place/remove a cell (only before the simulation
+                    has taken its first step).
+    SPACE        -- toggle pause/play of the automatic simulation.
+    S            -- advance exactly one generation.
+    R            -- clear every player-placed cell (pre-simulation only).
+    ENTER        -- restart the level from scratch.
+    ESC          -- back to the level menu.
 """
 from typing import Any, Dict, Tuple
 
@@ -14,83 +21,133 @@ from gale.input_handler import InputData
 from gale.state import BaseState
 
 import settings
-from src.entities.player import DOWN, LEFT, RIGHT, UP, Player
-from src.rendering.grid_renderer import GridRenderer
-from src.world.level import generate_playable_level
-
-_DIRECTIONS = {
-    "move_up": UP,
-    "move_down": DOWN,
-    "move_left": LEFT,
-    "move_right": RIGHT,
-}
+from src.board import Board
+from src.levels import LEVELS
+from src.rendering.board_renderer import BoardRenderer
+from src.rendering.hud_renderer import render_hud
 
 
 class PlayState(BaseState):
-    def enter(self, *args: Tuple[Any], **kwargs: Dict[str, Any]) -> None:
-        self.renderer = GridRenderer()
-        self._new_level()
+    def __init__(self, state_machine, game) -> None:
+        super().__init__(state_machine)
+        self.game = game
+        self.renderer = BoardRenderer()
 
-    def _new_level(self) -> None:
-        self.level = generate_playable_level(
+    def enter(self, *args: Tuple[Any], level_index: int = 0, **kwargs: Dict[str, Any]) -> None:
+        self.level_index = level_index
+        self._load_level()
+
+    def _load_level(self) -> None:
+        level = LEVELS[self.level_index]
+        self.level = level
+        self.board = Board(
             settings.GRID_COLUMNS,
             settings.GRID_ROWS,
-            settings.CA_WALL_PROBABILITY,
-            settings.CA_ITERATIONS,
-            settings.CA_BIRTH_LIMIT,
-            settings.CA_SURVIVE_MIN,
-            settings.CA_SURVIVE_MAX,
-            settings.CA_MIN_OPEN_CELLS,
-            settings.CA_MIN_GOAL_DISTANCE,
-            settings.OBSTACLE_DENSITY,
-            settings.OBSTACLE_SAFE_RADIUS,
-            settings.CA_MAX_GENERATION_ATTEMPTS,
+            level.walls,
+            level.target_zone,
+            level.enemy_cells,
+            level.budget,
         )
-        self.player = Player(
-            self.level.spawn_col, self.level.spawn_row, settings.PLAYER_SPEED_CELLS_PER_SECOND
-        )
-        self._attempts = 0
-        self._won = False
+        self._set_running(False)
+        self.time_since_step = 0.0
+        self.hover_cell = None
+
+    def _set_running(self, running: bool) -> None:
+        """
+        Flip the simulation on/off and keep the background music in sync
+        with it: playing (looped) exactly while the simulation runs,
+        stopped the instant it doesn't -- whether that's the player
+        pausing it, stepping once, or a level's win condition ending it.
+        """
+        self.running_sim = running
+        if running:
+            if not pygame.mixer.music.get_busy():
+                pygame.mixer.music.load(settings.BACKGROUND_MUSIC_PATH)
+                pygame.mixer.music.play(loops=-1)
+        else:
+            pygame.mixer.music.stop()
 
     def on_input(self, input_id: str, input_data: InputData) -> None:
-        if not input_data.pressed:
+        if input_id == "back":
+            if input_data.pressed:
+                self.state_machine.change("start")
             return
 
-        if input_id == "regenerate":
-            self._new_level()
-        elif not self._won and input_id in _DIRECTIONS:
-            self.player.try_move(_DIRECTIONS[input_id])
+        if input_id == "confirm":
+            if input_data.pressed:
+                self._load_level()
+            return
 
-    def _on_enter_cell(self, row: int, col: int) -> bool:
-        if self.level.is_goal(row, col):
-            self._won = True
-            return True
+        if input_id == "toggle_pause":
+            if input_data.pressed:
+                self._set_running(not self.running_sim)
+            return
 
-        if self.level.is_obstacle(row, col):
-            self._attempts += 1
-            self.player.warp_to(self.level.spawn_col, self.level.spawn_row)
-            return True
+        if input_id == "step_once":
+            if input_data.pressed:
+                self._set_running(False)
+                self._step()
+            return
 
-        return False
+        if input_id == "clear_cells":
+            if input_data.pressed and self.board.generation == 0:
+                self.board.clear_player_cells()
+            return
+
+        if input_id == "mouse_move":
+            self.hover_cell = self.renderer.cell_at_pixel(*input_data.position)
+            return
+
+        if input_id == "place_cell":
+            if input_data.pressed and self.board.generation == 0:
+                col, row = self.renderer.cell_at_pixel(*input_data.position)
+                if self.board.toggle_cell(col, row):
+                    self.game.achievements.on_cell_placed(len(self.board.player_cells))
+            return
 
     def update(self, dt: float) -> None:
-        if self._won:
-            return
-        self.player.update(dt, self.level.is_wall, self._on_enter_cell)
+        if self.running_sim:
+            self.time_since_step += dt
+            while self.time_since_step >= settings.GENERATION_INTERVAL:
+                self.time_since_step -= settings.GENERATION_INTERVAL
+                self._step()
+                if not self.running_sim:
+                    break
+
+        self.game.achievements.update(dt)
+
+    def _step(self) -> None:
+        births = self.board.step()
+        self.game.achievements.on_generation(births)
+
+        if self._victory_reached():
+            self._set_running(False)
+            self.game.achievements.on_victory(
+                self.board.budget_total, self.board.budget_remaining
+            )
+            self.game.show_victory(
+                self.level_index,
+                generation=self.board.generation,
+                budget_used=self.board.budget_total - self.board.budget_remaining,
+                budget_total=self.board.budget_total,
+            )
+
+    def _victory_reached(self) -> bool:
+        if self.level.win_type == "target":
+            return self.board.reached_target()
+        return self.board.enemies_eliminated()
 
     def render(self, surface: pygame.Surface) -> None:
-        self.renderer.render(surface, self.level, self.player)
-        self._render_hud(surface)
-
-    def _render_hud(self, surface: pygame.Surface) -> None:
-        hud_text = settings.FONTS["hud"].render(
-            f"Intentos: {self._attempts}    R: nuevo laberinto", True, settings.HUD_TEXT_COLOR
+        hover = self.hover_cell if self.board.generation == 0 else None
+        self.renderer.render(surface, self.board, hover_cell=hover)
+        render_hud(
+            surface,
+            self.level_index,
+            len(LEVELS),
+            self.level.name,
+            self.board.generation,
+            self.board.budget_remaining,
+            self.board.budget_total,
+            self.running_sim,
         )
-        surface.blit(hud_text, (4, 4))
-
-        if self._won:
-            banner = settings.FONTS["banner"].render(
-                "META ALCANZADA -- presiona R", True, settings.WIN_BANNER_COLOR
-            )
-            rect = banner.get_rect(center=(settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2))
-            surface.blit(banner, rect)
+        self.game.achievements.render(surface)

@@ -1,11 +1,12 @@
 """
-Entry point for the procedural-maze slider prototype.
+Entry point for Conway's Puzzle: a puzzle game built on Conway's Game
+of Life (rule B3/S23), using the Gale engine on top of Pygame.
 """
 import settings
-from src.maze_slider_game import MazeSliderGame
+from src.game import ConwayGame
 
 if __name__ == "__main__":
-    game = MazeSliderGame(
+    game = ConwayGame(
         settings.TITLE,
         settings.WINDOW_WIDTH,
         settings.WINDOW_HEIGHT,
