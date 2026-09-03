@@ -11,5 +11,18 @@ tensorflow==2.21.0
 tf-keras==2.21.0
 pandas==2.2.2
 
+# Dependencias para tools/eye_tracker.py
+# mediapipe>=0.10.16 elimino la API "solutions" (mp.solutions.face_mesh)
+# en favor de la nueva Tasks API, por eso se fija 0.10.14: es la ultima
+# version con soporte py3.12 que aun trae Face Mesh con iris landmarks
+# via la API clasica. matplotlib/attrs/sounddevice son dependencias
+# directas de mediapipe.solutions; usa el opencv-python ya instalado
+# arriba (no requiere opencv-contrib-python ni jax/jaxlib/sentencepiece
+# para Face Mesh).
+mediapipe==0.10.14
+matplotlib==3.11.1
+attrs==26.1.0
+sounddevice==0.5.6
+
 # tools/smartwatch/procesar_export.py no requiere dependencias externas
 # (solo librería estándar: csv, json, argparse, datetime, pathlib).
