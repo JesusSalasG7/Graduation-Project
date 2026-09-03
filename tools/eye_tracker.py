@@ -1,13 +1,24 @@
 """
 Eye Tracker - Estimacion de direccion de mirada del desarrollador.
 
-Captura video en tiempo real desde la webcam y usa MediaPipe Face Mesh
-(con landmarks de iris) para localizar ambos ojos y estimar hacia donde
-esta mirando el participante (izquierda/centro/derecha,
+Captura video en tiempo real desde la webcam y usa el Face Landmarker de
+MediaPipe (Tasks API, con landmarks de iris) para localizar ambos ojos y
+estimar hacia donde esta mirando el participante (izquierda/centro/derecha,
 arriba/centro/abajo). Es una estimacion heuristica sin calibracion por
 usuario: dibuja el contorno de los ojos y el centro del iris sobre el
 video, e informa por terminal y opcionalmente por CSV la direccion
 detectada cada N fotogramas.
+
+La primera ejecucion descarga automaticamente el modelo
+"face_landmarker.task" (~3.7 MB) de Google y lo guarda en
+tools/models/, para no tener que commitear un binario al repositorio.
+
+IMPORTANTE: este script vive en un entorno virtual separado
+(tools/.venv-eyetracker, ver tools/requirements-eyetracker.txt) porque
+mediapipe requiere opencv-contrib-python, que no puede convivir con
+opencv-python (dependencia de deepface, usado por emotion_tracker.py) en
+el mismo entorno: ambos paquetes instalan archivos en el mismo directorio
+cv2/ y se pisan entre si, dejando cv2 roto.
 
 Controles:
     q  -> salir
@@ -19,12 +30,15 @@ Uso:
 import argparse
 import csv
 import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import cv2
 import mediapipe as mp
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python.core.base_options import BaseOptions
 
 DEFAULT_LOG_INTERVAL = 10  # registrar 1 de cada N fotogramas analizados
 CSV_FIELDNAMES = [
@@ -32,8 +46,12 @@ CSV_FIELDNAMES = [
     "gaze_x", "gaze_y", "gaze_direction",
 ]
 
-# Indices de landmarks de MediaPipe Face Mesh (con refine_landmarks=True,
-# 478 puntos totales: 468 del rostro + 10 de iris).
+MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+MODEL_PATH = Path(__file__).parent / "models" / "face_landmarker.task"
+
+# Indices de landmarks del Face Landmarker de MediaPipe (478 puntos: 468
+# del rostro + 10 de iris; misma topologia que el antiguo Face Mesh con
+# refine_landmarks=True).
 RIGHT_IRIS = [469, 470, 471, 472]
 LEFT_IRIS = [474, 475, 476, 477]
 RIGHT_EYE_CORNERS = (33, 133)   # esquina externa / interna del ojo derecho
@@ -44,6 +62,15 @@ LEFT_EYE_TOP_BOTTOM = (386, 374)   # parpado superior / inferior, ojo izquierdo
 # Umbrales heuristicos sobre la posicion relativa del iris dentro del ojo.
 HORIZONTAL_LOW, HORIZONTAL_HIGH = 0.42, 0.58
 VERTICAL_LOW, VERTICAL_HIGH = 0.35, 0.65
+
+
+def _ensure_model(path: Path) -> Path:
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Descargando modelo de Face Landmarker en {path} ...")
+        urllib.request.urlretrieve(MODEL_URL, path)
+        print("Descarga completa.")
+    return path
 
 
 def _clamp01(value: float) -> float:
@@ -95,7 +122,7 @@ def _classify_direction(gaze_x: float, gaze_y: float) -> str:
 
 
 class GazeEstimator:
-    """Estima la direccion de mirada a partir de los landmarks de Face Mesh."""
+    """Estima la direccion de mirada a partir de los landmarks del Face Landmarker."""
 
     def __init__(
         self,
@@ -173,6 +200,10 @@ def main():
         "--log-file", default=None,
         help="Ruta de un CSV donde ademas se registra cada lectura (opcional)",
     )
+    parser.add_argument(
+        "--model-path", default=None,
+        help=f"Ruta al modelo face_landmarker.task (default: {MODEL_PATH})",
+    )
     args = parser.parse_args()
 
     estimator = GazeEstimator(
@@ -182,12 +213,12 @@ def main():
         session_label=args.session_label,
     )
 
-    face_mesh = mp.solutions.face_mesh.FaceMesh(
-        static_image_mode=False,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
+    model_path = _ensure_model(Path(args.model_path) if args.model_path else MODEL_PATH)
+    landmarker = vision.FaceLandmarker.create_from_options(
+        vision.FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(model_path)),
+            running_mode=vision.RunningMode.VIDEO,
+        )
     )
 
     cap = cv2.VideoCapture(args.camera)
@@ -201,6 +232,7 @@ def main():
 
     frame_count = 0
     window_name = "Eye Tracker - Vibe Coding"
+    start_time = time.monotonic()
 
     try:
         while True:
@@ -216,10 +248,12 @@ def main():
             height, width = frame.shape[:2]
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = face_mesh.process(rgb_frame)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            timestamp_ms = int((time.monotonic() - start_time) * 1000)
+            result = landmarker.detect_for_video(mp_image, timestamp_ms)
 
-            if results.multi_face_landmarks:
-                landmarks = results.multi_face_landmarks[0].landmark
+            if result.face_landmarks:
+                landmarks = result.face_landmarks[0]
                 gaze_x, gaze_y, direction, right_iris, left_iris = estimator.estimate(landmarks, width, height)
                 _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris)
 
@@ -234,7 +268,7 @@ def main():
             if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
                 break
     finally:
-        face_mesh.close()
+        landmarker.close()
         cap.release()
         cv2.destroyAllWindows()
         print("Eye Tracker detenido.")
