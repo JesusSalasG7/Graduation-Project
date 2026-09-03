@@ -5,12 +5,16 @@ de la raiz del proyecto, y con cwd en la carpeta del juego (todos
 usan imports relativos tipo `import settings` / `from src...`).
 """
 
+import csv
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
+
+from participant_store import participant_file_stub
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VENV_DIR = PROJECT_ROOT / ".venv"
@@ -20,6 +24,13 @@ TOOLS_DIR = PROJECT_ROOT / "tools"
 EMOTION_TRACKER_SCRIPT = TOOLS_DIR / "emotion_tracker.py"
 TOOLS_REQUIREMENTS = TOOLS_DIR / "requirements.txt"
 EMOTION_LOG_DIR = Path(__file__).resolve().parent / "data" / "emotion_logs"
+HEART_RATE_LOG_DIR = Path(__file__).resolve().parent / "data" / "heart_rate_logs"
+
+SMARTWATCH_DIR = TOOLS_DIR / "smartwatch"
+sys.path.insert(0, str(SMARTWATCH_DIR))
+from procesar_export import extract_samples_in_window  # noqa: E402
+
+HEART_RATE_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
 # Titulo declarado como `TITLE = "..."` en settings.py
 _TITLE_IN_SETTINGS = re.compile(r'^\s*TITLE\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
@@ -97,8 +108,8 @@ def start_emotion_tracker(participant: Optional[dict], session_label: str) -> su
     """Lanza tools/emotion_tracker.py en segundo plano con el .venv unificado.
 
     Si hay un participante activo, sus lecturas se registran ademas en un
-    CSV propio (graphic_interface/data/emotion_logs/<participant_id>.csv)
-    para poder correlacionarlas despues con la sesion de juego.
+    CSV propio (graphic_interface/data/emotion_logs/<NOMBRE_APELLIDO>.csv)
+    para poder correlacionarlas despues con la sesion.
     """
     if not EMOTION_TRACKER_SCRIPT.exists():
         raise FileNotFoundError("No se encontro tools/emotion_tracker.py")
@@ -107,7 +118,7 @@ def start_emotion_tracker(participant: Optional[dict], session_label: str) -> su
 
     if participant:
         EMOTION_LOG_DIR.mkdir(parents=True, exist_ok=True)
-        log_file = EMOTION_LOG_DIR / f"{participant['id']}.csv"
+        log_file = EMOTION_LOG_DIR / f"{participant_file_stub(participant)}.csv"
         args += [
             "--participant-id", participant["id"],
             "--participant-name", f"{participant['nombre']} {participant['apellido']}",
@@ -115,6 +126,70 @@ def start_emotion_tracker(participant: Optional[dict], session_label: str) -> su
         ]
 
     return subprocess.Popen(args, cwd=str(TOOLS_DIR))
+
+
+def import_heart_rate(participant: dict, session: dict, export_dir: Path) -> tuple[Path, int]:
+    """Filtra, del export de Samsung Health en `export_dir`, las muestras BPM
+    dentro de la ventana [session.start_time, session.end_time] y las agrega
+    (sin duplicar cabecera) al CSV de frecuencia cardiaca del participante.
+
+    Devuelve (ruta_del_csv, cantidad_de_muestras_agregadas).
+    """
+    start_dt = datetime.strptime(session["start_time"], HEART_RATE_TIMESTAMP_FMT)
+    end_time = session.get("end_time") or datetime.now().strftime(HEART_RATE_TIMESTAMP_FMT)
+    end_dt = datetime.strptime(end_time, HEART_RATE_TIMESTAMP_FMT)
+
+    samples = extract_samples_in_window(export_dir, start_dt, end_dt)
+
+    HEART_RATE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = HEART_RATE_LOG_DIR / f"{participant_file_stub(participant)}.csv"
+    is_new_file = not log_file.exists() or log_file.stat().st_size == 0
+
+    with log_file.open("a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if is_new_file:
+            writer.writerow(["timestamp", "bpm", "session_id"])
+        for sample in samples:
+            writer.writerow([sample["timestamp"].strftime(HEART_RATE_TIMESTAMP_FMT), sample["bpm"], session["id"]])
+
+    return log_file, len(samples)
+
+
+def read_combined_session_data(participant: dict, session: dict) -> list[dict]:
+    """Junta, ordenadas por tiempo, las lecturas de emocion y de BPM del
+    participante que caen dentro de la ventana de la sesion dada."""
+    stub = participant_file_stub(participant)
+    start_dt = datetime.strptime(session["start_time"], HEART_RATE_TIMESTAMP_FMT)
+    end_time = session.get("end_time") or datetime.now().strftime(HEART_RATE_TIMESTAMP_FMT)
+    end_dt = datetime.strptime(end_time, HEART_RATE_TIMESTAMP_FMT)
+
+    rows: list[dict] = []
+
+    emotion_file = EMOTION_LOG_DIR / f"{stub}.csv"
+    if emotion_file.exists():
+        with emotion_file.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                try:
+                    ts = datetime.strptime(r["timestamp"], HEART_RATE_TIMESTAMP_FMT)
+                except (ValueError, KeyError):
+                    continue
+                if start_dt <= ts <= end_dt:
+                    rows.append({"timestamp": ts, "tipo": "Emoción", "valor": r["emotion"]})
+
+    heart_rate_file = HEART_RATE_LOG_DIR / f"{stub}.csv"
+    if heart_rate_file.exists():
+        with heart_rate_file.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                if r.get("session_id") != session["id"]:
+                    continue
+                try:
+                    ts = datetime.strptime(r["timestamp"], HEART_RATE_TIMESTAMP_FMT)
+                except (ValueError, KeyError):
+                    continue
+                rows.append({"timestamp": ts, "tipo": "BPM", "valor": r["bpm"]})
+
+    rows.sort(key=lambda r: r["timestamp"])
+    return rows
 
 
 def consolidated_requirements(root: Path = PROJECT_ROOT) -> list[str]:
