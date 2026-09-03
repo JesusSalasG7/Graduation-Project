@@ -10,3 +10,6 @@ deepface==0.0.93
 tensorflow==2.21.0
 tf-keras==2.21.0
 pandas==2.2.2
+
+# tools/smartwatch/procesar_export.py no requiere dependencias externas
+# (solo librería estándar: csv, json, argparse, datetime, pathlib).
