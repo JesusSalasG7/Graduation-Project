@@ -11,5 +11,13 @@ tensorflow==2.21.0
 tf-keras==2.21.0
 pandas==2.2.2
 
+# tools/eye_tracker.py NO va aqui: usa mediapipe, que depende de
+# opencv-contrib-python. Ese paquete no puede convivir en el mismo
+# entorno con opencv-python (dependencia de deepface, arriba): ambos
+# instalan archivos en el mismo directorio cv2/ y se pisan entre si,
+# dejando cv2 roto (ej. las haarcascades quedan vacias). Ver
+# tools/requirements-eyetracker.txt e instalarlo en un venv separado
+# (tools/.venv-eyetracker).
+
 # tools/smartwatch/procesar_export.py no requiere dependencias externas
 # (solo librería estándar: csv, json, argparse, datetime, pathlib).

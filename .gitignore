@@ -151,10 +151,14 @@ activemq-data/
 .env
 .envrc
 .venv
+tools/.venv-eyetracker
 env/
 venv/
 ENV/
 env.bak/
+
+# Modelos descargados en runtime (ver tools/eye_tracker.py)
+tools/models/
 venv.bak/
 
 # Spyder project settings

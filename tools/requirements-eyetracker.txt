@@ -1,0 +1,24 @@
+# Dependencias para tools/eye_tracker.py
+# Estimacion de direccion de mirada - modulo de tesis "Vibe Coding"
+#
+# Instalar en un venv SEPARADO de tools/.venv (el de emotion_tracker.py):
+#
+#   python3 -m venv tools/.venv-eyetracker
+#   tools/.venv-eyetracker/bin/pip install -r tools/requirements-eyetracker.txt
+#   tools/.venv-eyetracker/bin/python tools/eye_tracker.py
+#
+# Motivo de separarlo: mediapipe requiere opencv-contrib-python, mientras
+# que deepface (tools/requirements.txt) requiere opencv-python. Ambos
+# paquetes instalan archivos en el mismo directorio cv2/ del venv y se
+# pisan entre si si conviven, dejando cv2 roto (ej. las haarcascades de
+# emotion_tracker.py quedan vacias). No hay conflicto real de version,
+# solo de nombre de paquete, por eso la unica solucion limpia es no
+# mezclarlos en el mismo entorno.
+#
+# mediapipe==1.0.1 usa la nueva Tasks API (FaceLandmarker); la API legacy
+# "solutions" (mp.solutions.face_mesh) fue eliminada a partir de 1.0.0.
+# El modelo face_landmarker.task se descarga automaticamente la primera
+# vez que se ejecuta eye_tracker.py (ver tools/models/, ignorado por git).
+
+opencv-contrib-python==5.0.0.93
+mediapipe==1.0.1
