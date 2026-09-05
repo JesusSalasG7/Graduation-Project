@@ -1,23 +1,67 @@
-# Dependencias para tools/emotion_tracker.py
-# Recoleccion de datos emocionales - modulo de tesis "Vibe Coding"
+# Dependencias de tools/ - modulo de tesis "Vibe Coding"
+#
+# Este archivo cubre DOS herramientas que deben instalarse en DOS venvs
+# SEPARADOS. No es posible unificarlas en un solo entorno: mediapipe
+# (usado por eye_tracker.py) depende de opencv-contrib-python, mientras
+# que deepface (usado por emotion_tracker.py) depende de opencv-python.
+# Ambos paquetes instalan archivos en el mismo directorio cv2/ del venv y
+# se pisan entre si si conviven -- confirmado de nuevo al escribir esto:
+# con los dos instalados juntos, cv2/data/ queda con 2 archivos en vez de
+# los ~20 haarcascades que trae normalmente, y
+# haarcascade_frontalface_default.xml (el que usa emotion_tracker.py)
+# directamente desaparece. No hay conflicto real de version, solo de
+# nombre de paquete, por eso la unica solucion es no mezclarlos.
+#
+# IMPORTANTE: por eso mismo, NO instalar con "pip install -r
+# tools/requirements.txt" a secas -- eso instalaria las DOS secciones
+# juntas en el mismo venv y rompe cv2. Extraer solo la seccion que
+# corresponde con sed, como se indica en cada seccion abajo.
+#
+# tools/smartwatch/procesar_export.py no necesita nada de este archivo
+# (solo usa la libreria estandar: csv, json, argparse, datetime, pathlib).
+
+
+# ============================================================
+# 1) tools/emotion_tracker.py - recoleccion de datos emocionales
+# ============================================================
+#
+# Este NO usa un venv propio de tools/: se instala en el venv unificado
+# de la raiz del repo (Graduation-Project/.venv), el mismo que usan
+# scipy/librosa (Game-06) y demas dependencias generales del proyecto.
+# Parado en la raiz del repo (no en tools/):
+#
+#   sed -n '/# --EMOTION-START--/,/# --EMOTION-END--/p' tools/requirements.txt \
+#     | .venv/bin/pip install -r /dev/stdin
+#   .venv/bin/python tools/emotion_tracker.py
 #
 # tensorflow>=2.19 y sin fijar numpy: las versiones anteriores de TF exigen
 # numpy<2.0, lo cual choca con scipy/librosa (Game-06) que ya viven en el
 # mismo .venv unificado y requieren numpy>=2.0.
 
+# --EMOTION-START--
 opencv-python==4.10.0.84
 deepface==0.0.93
 tensorflow==2.21.0
 tf-keras==2.21.0
 pandas==2.2.2
+# --EMOTION-END--
 
-# tools/eye_tracker.py NO va aqui: usa mediapipe, que depende de
-# opencv-contrib-python. Ese paquete no puede convivir en el mismo
-# entorno con opencv-python (dependencia de deepface, arriba): ambos
-# instalan archivos en el mismo directorio cv2/ y se pisan entre si,
-# dejando cv2 roto (ej. las haarcascades quedan vacias). Ver
-# tools/requirements-eyetracker.txt e instalarlo en un venv separado
-# (tools/.venv-eyetracker).
 
-# tools/smartwatch/procesar_export.py no requiere dependencias externas
-# (solo librería estándar: csv, json, argparse, datetime, pathlib).
+# ============================================================
+# 2) tools/eye_tracker.py - estimacion de direccion de mirada
+# ============================================================
+#
+#   python3 -m venv tools/.venv-eyetracker
+#   sed -n '/# --EYETRACKER-START--/,/# --EYETRACKER-END--/p' tools/requirements.txt \
+#     | tools/.venv-eyetracker/bin/pip install -r /dev/stdin
+#   tools/.venv-eyetracker/bin/python tools/eye_tracker.py
+#
+# mediapipe==1.0.1 usa la nueva Tasks API (FaceLandmarker); la API legacy
+# "solutions" (mp.solutions.face_mesh) fue eliminada a partir de 1.0.0.
+# El modelo face_landmarker.task se descarga automaticamente la primera
+# vez que se ejecuta eye_tracker.py (ver tools/models/, ignorado por git).
+
+# --EYETRACKER-START--
+opencv-contrib-python==5.0.0.93
+mediapipe==1.0.1
+# --EYETRACKER-END--
