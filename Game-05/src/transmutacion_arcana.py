@@ -1,5 +1,5 @@
 """
-This file contains the class TransmutacionArcana, the gale.game.Game
+This file contains the class ArcaneTransmutationGame, the gale.game.Game
 specialization that owns the top-level state machine (menu, match-3
 play).
 """
@@ -14,7 +14,7 @@ import settings
 from src import states
 
 
-class TransmutacionArcana(Game):
+class ArcaneTransmutationGame(Game):
     def init(self) -> None:
         settings.play_background_music()
 

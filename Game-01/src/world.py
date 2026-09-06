@@ -297,6 +297,8 @@ class World:
         return self.filter_min <= value <= self.filter_max
 
     def count_apples_in_range(self) -> int:
+        
+        #TODO: Mi solucion
         count = 0
         
         for apple in self.food_field.apples:

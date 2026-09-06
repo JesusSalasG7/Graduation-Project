@@ -45,57 +45,57 @@ class EffectResult:
 # una funcion que recibe el multiplicador de combo ya resuelto y
 # devuelve el EffectResult. Los porcentajes de probabilidad (aturdir,
 # critico) se tiran aca mismo con random.random().
-ELEMENTOS = {
-    TileKind.FUEGO: {
-        "nombre": "Fuego",
+ELEMENTS = {
+    TileKind.FIRE: {
+        "name": "Fuego",
         "color": (235, 90, 40),
-        "resolver": lambda mult: EffectResult(damage=round(18 * mult)),
+        "resolve": lambda mult: EffectResult(damage=round(18 * mult)),
     },
-    TileKind.AGUA: {
-        "nombre": "Agua",
+    TileKind.WATER: {
+        "name": "Agua",
         "color": (70, 140, 235),
-        "resolver": lambda mult: EffectResult(heal=round(15 * mult)),
+        "resolve": lambda mult: EffectResult(heal=round(15 * mult)),
     },
-    TileKind.TIERRA: {
-        "nombre": "Tierra",
+    TileKind.EARTH: {
+        "name": "Tierra",
         "color": (150, 105, 60),
-        "resolver": lambda mult: EffectResult(
+        "resolve": lambda mult: EffectResult(
             damage=round(12 * mult), weaken_opponent_next_attack=True
         ),
     },
-    TileKind.AIRE: {
-        "nombre": "Aire",
+    TileKind.AIR: {
+        "name": "Aire",
         "color": (190, 200, 210),
-        "resolver": lambda mult: EffectResult(damage=round(10 * mult)),
+        "resolve": lambda mult: EffectResult(damage=round(10 * mult)),
     },
-    TileKind.ELECTRICIDAD: {
-        "nombre": "Electricidad",
+    TileKind.ELECTRICITY: {
+        "name": "Electricidad",
         "color": (230, 200, 40),
-        "resolver": lambda mult: EffectResult(
+        "resolve": lambda mult: EffectResult(
             damage=round(12 * mult), stun_opponent=random.random() < 0.3
         ),
     },
-    TileKind.HIELO: {
-        "nombre": "Hielo",
+    TileKind.ICE: {
+        "name": "Hielo",
         "color": (110, 210, 220),
-        "resolver": lambda mult: EffectResult(
+        "resolve": lambda mult: EffectResult(
             damage=round(8 * mult), weaken_opponent_next_attack=True
         ),
     },
-    TileKind.MAGIA: {
-        "nombre": "Magia",
+    TileKind.MAGIC: {
+        "name": "Magia",
         "color": (170, 90, 220),
-        "resolver": lambda mult: _resolver_magia(mult),
+        "resolve": lambda mult: _resolve_magic(mult),
     },
-    TileKind.OSCURIDAD: {
-        "nombre": "Oscuridad",
+    TileKind.DARKNESS: {
+        "name": "Oscuridad",
         "color": (80, 60, 90),
-        "resolver": lambda mult: EffectResult(damage=round(16 * mult), ignore_defense=True),
+        "resolve": lambda mult: EffectResult(damage=round(16 * mult), ignore_defense=True),
     },
 }
 
 
-def _resolver_magia(mult: float) -> EffectResult:
+def _resolve_magic(mult: float) -> EffectResult:
     base = random.uniform(8, 24)
     is_crit = random.random() < 0.2
     if is_crit:
@@ -110,4 +110,4 @@ def compute_effect(kind: TileKind, count: int) -> EffectResult:
     aplicado en el resultado.
     """
     mult = _multiplier_for(count)
-    return ELEMENTOS[kind]["resolver"](mult)
+    return ELEMENTS[kind]["resolve"](mult)

@@ -50,7 +50,7 @@ def _catalysis_row_board(row_kinds) -> Board:
     board = Board.__new__(Board)
     board.x, board.y = 0, 0
     board.tiles = [
-        [Tile(i, j, TileKind.AGUA) for j in range(6)] for i in range(6)
+        [Tile(i, j, TileKind.WATER) for j in range(6)] for i in range(6)
     ]
     for j, kind in enumerate(row_kinds):
         board.tiles[0][j].kind = kind
@@ -63,9 +63,9 @@ def test_board_integration() -> None:
     # Fila con Match-4 de Fuego + dos elementos distintos mas, cada uno
     # una sola vez -> ningun elemento se repite (resonancia = 0).
     board = _catalysis_row_board(
-        [TileKind.FUEGO, TileKind.FUEGO, TileKind.FUEGO, TileKind.FUEGO, TileKind.TIERRA, TileKind.HIELO]
+        [TileKind.FIRE, TileKind.FIRE, TileKind.FIRE, TileKind.FIRE, TileKind.EARTH, TileKind.ICE]
     )
-    run = MatchRun(TileKind.FUEGO, [board.tiles[0][j] for j in range(4)], "h", 0)
+    run = MatchRun(TileKind.FIRE, [board.tiles[0][j] for j in range(4)], "h", 0)
     _, catalysis, cleared, resonance = board.resolve_runs([run])
     _check("Catalisis mixta -> se dispara", catalysis, True)
     _check("Catalisis mixta -> fichas limpiadas (fila completa)", cleared, 6)
@@ -74,22 +74,22 @@ def test_board_integration() -> None:
     # Fila con dos pares que se repiten (Fuego x4, Agua x2) -> 2
     # elementos que resuenan en la misma linea.
     board = _catalysis_row_board(
-        [TileKind.FUEGO, TileKind.FUEGO, TileKind.FUEGO, TileKind.FUEGO, TileKind.AGUA, TileKind.AGUA]
+        [TileKind.FIRE, TileKind.FIRE, TileKind.FIRE, TileKind.FIRE, TileKind.WATER, TileKind.WATER]
     )
-    run = MatchRun(TileKind.FUEGO, [board.tiles[0][j] for j in range(4)], "h", 0)
+    run = MatchRun(TileKind.FIRE, [board.tiles[0][j] for j in range(4)], "h", 0)
     _, catalysis, cleared, resonance = board.resolve_runs([run])
     _check("Catalisis con dos pares -> resonancia", resonance, 2)
 
     # Fila homogenea (Match-4 de Agua, resto tambien Agua) -> un solo
     # elemento, y se repite -> resonancia 1.
-    board = _catalysis_row_board([TileKind.AGUA] * 6)
-    run = MatchRun(TileKind.AGUA, [board.tiles[0][j] for j in range(4)], "h", 0)
+    board = _catalysis_row_board([TileKind.WATER] * 6)
+    run = MatchRun(TileKind.WATER, [board.tiles[0][j] for j in range(4)], "h", 0)
     _, catalysis, cleared, resonance = board.resolve_runs([run])
     _check("Catalisis homogenea -> resonancia", resonance, 1)
 
     # Match-3 comun (sin Catalisis) -> no hay bonus de resonancia.
-    board = _catalysis_row_board([TileKind.AGUA] * 6)
-    run = MatchRun(TileKind.AGUA, [board.tiles[0][j] for j in range(3)], "h", 0)
+    board = _catalysis_row_board([TileKind.WATER] * 6)
+    run = MatchRun(TileKind.WATER, [board.tiles[0][j] for j in range(3)], "h", 0)
     _, catalysis, cleared, resonance = board.resolve_runs([run])
     _check("Match-3 sin Catalisis -> no dispara", catalysis, False)
     _check("Match-3 sin Catalisis -> resonancia en 0", resonance, 0)

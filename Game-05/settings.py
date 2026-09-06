@@ -108,8 +108,8 @@ CATALYSIS_BONUS = 50
 RESONANCE_BONUS_PER_KIND = 15
 
 # --- Tile kinds -------------------------------------------------------
-# Matches src.board.tile.TileKind ordering: FUEGO, AGUA, TIERRA, AIRE,
-# ELECTRICIDAD, HIELO, MAGIA, OSCURIDAD. tiles.png is an 8-column x
+# Matches src.board.tile.TileKind ordering: FIRE, WATER, EARTH, AIR,
+# ELECTRICITY, ICE, MAGIC, DARKNESS. tiles.png is an 8-column x
 # 8-row icon sheet whose rows happen to already match that exact
 # element order, so each TileKind is drawn from column 0 of the row
 # with the same index.
@@ -178,19 +178,19 @@ TILE_SPRITES = _load_tile_sprites()
 # One cue per TileKind, played by CombatManager the moment a match of
 # that element triggers its combat effect (src/combat/combat_manager.py).
 # Keyed by the same plain ints as TILE_SPRITE_ROW/TileKind's values
-# (FUEGO=0, AGUA=1, TIERRA=2, AIRE=3, ELECTRICIDAD=4, HIELO=5, MAGIA=6,
-# OSCURIDAD=7) rather than importing TileKind, since src.board.tile
+# (FIRE=0, WATER=1, EARTH=2, AIR=3, ELECTRICITY=4, ICE=5, MAGIC=6,
+# DARKNESS=7) rather than importing TileKind, since src.board.tile
 # already imports this module.
 AUDIO_DIR = BASE_DIR / "assets" / "audio"
 ELEMENT_SOUND_FILES = {
-    0: AUDIO_DIR / "Fire.mp3",  # FUEGO
-    1: AUDIO_DIR / "Water.mp3",  # AGUA
-    2: AUDIO_DIR / "Earth.mp3",  # TIERRA
-    3: AUDIO_DIR / "Air.mp3",  # AIRE
-    4: AUDIO_DIR / "Electric.mp3",  # ELECTRICIDAD
-    5: AUDIO_DIR / "Ice.mp3",  # HIELO
-    6: AUDIO_DIR / "Magic.mp3",  # MAGIA
-    7: AUDIO_DIR / "Darkness.mp3",  # OSCURIDAD
+    0: AUDIO_DIR / "Fire.mp3",  # FIRE
+    1: AUDIO_DIR / "Water.mp3",  # WATER
+    2: AUDIO_DIR / "Earth.mp3",  # EARTH
+    3: AUDIO_DIR / "Air.mp3",  # AIR
+    4: AUDIO_DIR / "Electric.mp3",  # ELECTRICITY
+    5: AUDIO_DIR / "Ice.mp3",  # ICE
+    6: AUDIO_DIR / "Magic.mp3",  # MAGIC
+    7: AUDIO_DIR / "Darkness.mp3",  # DARKNESS
 }
 
 
@@ -203,7 +203,7 @@ ELEMENT_SOUNDS = _load_element_sounds()
 
 # --- Background music ---------------------------------------------------
 # Un solo tema (Bucle_Music.mp3) suena de punta a punta del juego --
-# arranca una vez desde TransmutacionArcana.init() (src/transmutacion_arcana.py)
+# arranca una vez desde ArcaneTransmutationGame.init() (src/transmutacion_arcana.py)
 # y sigue de fondo sin importar el estado (start/play) o cuantas
 # partidas se reinicien. Se reproduce con pygame.mixer.music (pensado
 # para streaming de un solo tema largo) en vez de mixer.Sound como

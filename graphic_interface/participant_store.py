@@ -1,34 +1,33 @@
 """Persistencia de participantes en JSON con esquema extensible.
 
-El esquema guarda los campos fijos (nombre, apellido, cedula) mas una
-bolsa "attributes" de clave-valor libre, para poder agregar atributos
-nuevos (edad, carrera, grupo experimental, etc.) en el futuro sin
+Los participantes se registran de forma anonima: no se guarda nombre,
+apellido ni cedula, solo un numero secuencial ("Participante 1",
+"Participante 2", ...) que nunca se reutiliza aunque se borren
+participantes, mas una bolsa "attributes" de clave-valor libre para
+poder agregar atributos futuros (edad, grupo experimental, etc.) sin
 romper los registros ya guardados.
 """
 
 import json
-import re
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+
+def participant_label(participant: dict) -> str:
+    """Nombre visible del participante, ej. "Participante 3"."""
+    return f"Participante {participant['number']}"
 
 
 def participant_file_stub(participant: dict) -> str:
-    """Identificador "NOMBRE_APELLIDO" (nombre y apellido ya vienen en
-    mayusculas) usado para nombrar los archivos de datos de este participante
-    (log de emociones, log de frecuencia cardiaca), asi se sabe a simple
-    vista a quien pertenece cada archivo.
-
-    Nota: si dos participantes comparten nombre y apellido exactos, sus
-    archivos de datos colisionarian (la cedula sigue siendo la clave unica
-    real dentro de participants.json).
+    """Identificador "PARTICIPANTE_N" usado para nombrar los archivos de
+    datos de este participante (log de emociones, log de frecuencia
+    cardiaca) y la carpeta que debe traer el export del reloj.
     """
-    stub = f"{participant['nombre']}_{participant['apellido']}".strip("_")
-    stub = stub.replace(" ", "_")
-    return re.sub(r"[^A-Z0-9_]", "", stub) or participant["id"]
+    return f"PARTICIPANTE_{participant['number']}"
 
 
 class ParticipantStore:
@@ -39,7 +38,12 @@ class ParticipantStore:
 
     def _load(self) -> dict:
         if not self.data_path.exists():
-            data = {"schema_version": SCHEMA_VERSION, "active_participant_id": None, "participants": []}
+            data = {
+                "schema_version": SCHEMA_VERSION,
+                "active_participant_id": None,
+                "next_number": 1,
+                "participants": [],
+            }
             self._data = data
             self._save()
             return data
@@ -51,6 +55,7 @@ class ParticipantStore:
         data.setdefault("schema_version", SCHEMA_VERSION)
         data.setdefault("active_participant_id", None)
         data.setdefault("participants", [])
+        data.setdefault("next_number", len(data["participants"]) + 1)
         return data
 
     def _save(self) -> None:
@@ -60,33 +65,16 @@ class ParticipantStore:
     def list_participants(self) -> list[dict]:
         return list(self._data["participants"])
 
-    def add_participant(self, nombre: str, apellido: str, cedula: str, **extra_attributes: Any) -> dict:
-        cedula = cedula.strip()
-        nombre_norm = nombre.strip().upper()
-        apellido_norm = apellido.strip().upper()
-
-        if any(p["cedula"] == cedula for p in self._data["participants"]):
-            raise ValueError(f"Ya existe un participante con la cedula {cedula}")
-        if any(
-            p["nombre"] == nombre_norm and p["apellido"] == apellido_norm
-            for p in self._data["participants"]
-        ):
-            # Mismo nombre+apellido pisaria el archivo de datos del otro participante
-            # (emotion_logs/heart_rate_logs se nombran "NOMBRE_APELLIDO").
-            raise ValueError(
-                f"Ya existe un participante registrado como {nombre_norm} {apellido_norm}. "
-                "Usa un nombre/apellido distinto o revisa si ya esta registrado."
-            )
-
+    def add_participant(self, **extra_attributes: Any) -> dict:
+        number = self._data["next_number"]
         participant = {
             "id": str(uuid.uuid4()),
-            "nombre": nombre_norm,
-            "apellido": apellido_norm,
-            "cedula": cedula,
+            "number": number,
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "attributes": dict(extra_attributes),
         }
         self._data["participants"].append(participant)
+        self._data["next_number"] = number + 1
         self._save()
         return participant
 

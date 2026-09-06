@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from participant_store import participant_file_stub
+from participant_store import participant_file_stub, participant_label
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VENV_DIR = PROJECT_ROOT / ".venv"
@@ -121,7 +121,7 @@ def start_emotion_tracker(participant: Optional[dict], session_label: str) -> su
         log_file = EMOTION_LOG_DIR / f"{participant_file_stub(participant)}.csv"
         args += [
             "--participant-id", participant["id"],
-            "--participant-name", f"{participant['nombre']} {participant['apellido']}",
+            "--participant-name", participant_label(participant),
             "--log-file", str(log_file),
         ]
 

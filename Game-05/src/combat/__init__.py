@@ -1,5 +1,5 @@
 from src.combat.character import Character
 from src.combat.combat_manager import CombatManager
-from src.combat.elements import ELEMENTOS
+from src.combat.elements import ELEMENTS
 
-(Character, CombatManager, ELEMENTOS)
+(Character, CombatManager, ELEMENTS)
