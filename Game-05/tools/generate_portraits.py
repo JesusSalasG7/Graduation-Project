@@ -65,7 +65,7 @@ class Canvas:
         print(f"saved {path}")
 
 
-def alquimista() -> None:
+def alchemist() -> None:
     c = Canvas()
     P = {
         "h": (46, 54, 92),
@@ -97,10 +97,10 @@ def alquimista() -> None:
     c.px(14, 12, P["s"])
     c.rect(13, 9, 14, 10, (204, 224, 232))
     c.px(13, 9, (232, 70, 70))
-    c.save("alquimista.png")
+    c.save("alchemist.png")
 
 
-def homunculo_de_hierro() -> None:
+def iron_homunculus() -> None:
     c = Canvas()
     P = {
         "p": (150, 152, 160),
@@ -124,7 +124,7 @@ def homunculo_de_hierro() -> None:
     c.save("homunculo_hierro.png")
 
 
-def espectro_alquimico() -> None:
+def alchemic_specter() -> None:
     c = Canvas()
     P = {
         "g": (150, 96, 200),
@@ -141,10 +141,10 @@ def espectro_alquimico() -> None:
     c.row(13, "..gGdGg.", P, mirror=False)
     c.row(14, ".gGd.dGg", P, mirror=False)
     c.row(15, "gGd...dG", P, mirror=False)
-    c.save("espectro_alquimico.png")
+    c.save("alchemic_specter.png")
 
 
-def guardian_de_cristal() -> None:
+def crystal_guardian() -> None:
     c = Canvas()
     P = {
         "c": (72, 156, 208),
@@ -168,7 +168,7 @@ def guardian_de_cristal() -> None:
     c.save("guardian_cristal.png")
 
 
-def dragon_de_mercurio() -> None:
+def mercury_dragon() -> None:
     c = Canvas()
     P = {
         "b": (196, 90, 62),
@@ -201,8 +201,8 @@ def dragon_de_mercurio() -> None:
 
 
 if __name__ == "__main__":
-    alquimista()
-    homunculo_de_hierro()
-    espectro_alquimico()
-    guardian_de_cristal()
-    dragon_de_mercurio()
+    alchemist()
+    iron_homunculus()
+    alchemic_specter()
+    crystal_guardian()
+    mercury_dragon()

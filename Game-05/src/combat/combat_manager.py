@@ -53,17 +53,17 @@ ENEMY_MAX_MATCH = 5
 # ENEMY_LOW_HP_RATIO de vida ese peso se dispara para que el enemigo se
 # cure activamente en vez de seguir atacando a ciegas.
 ENEMY_ELEMENT_WEIGHTS = {
-    TileKind.FUEGO: 3,
-    TileKind.OSCURIDAD: 3,
-    TileKind.ELECTRICIDAD: 2,
-    TileKind.TIERRA: 2,
-    TileKind.MAGIA: 2,
-    TileKind.HIELO: 1,
-    TileKind.AIRE: 1,
-    TileKind.AGUA: 1,
+    TileKind.FIRE: 3,
+    TileKind.DARKNESS: 3,
+    TileKind.ELECTRICITY: 2,
+    TileKind.EARTH: 2,
+    TileKind.MAGIC: 2,
+    TileKind.ICE: 1,
+    TileKind.AIR: 1,
+    TileKind.WATER: 1,
 }
 ENEMY_LOW_HP_RATIO = 0.35
-ENEMY_LOW_HP_AGUA_WEIGHT = 6
+ENEMY_LOW_HP_WATER_WEIGHT = 6
 
 # Cada entrada recibe (atacante, objetivo) y arma el efecto visual con
 # los anchors que le correspondan -- la mayoria vuela atacante->objetivo,
@@ -71,14 +71,14 @@ ENEMY_LOW_HP_AGUA_WEIGHT = 6
 # Oscuridad son puntos fijos sobre el objetivo (ver cada clase en
 # src.combat.effects para el porque).
 _EFFECT_FACTORIES = {
-    TileKind.FUEGO: lambda a, d: Fireball(a.anchor, d.anchor),
-    TileKind.AGUA: lambda a, d: WaterSplash(d.anchor, a.anchor),
-    TileKind.TIERRA: lambda a, d: RockSpikes(d.anchor),
-    TileKind.AIRE: lambda a, d: WindSlash(a.anchor, d.anchor),
-    TileKind.ELECTRICIDAD: lambda a, d: LightningBolt(d.anchor),
-    TileKind.HIELO: lambda a, d: IceShard(a.anchor, d.anchor),
-    TileKind.MAGIA: lambda a, d: ArcaneOrb(a.anchor, d.anchor),
-    TileKind.OSCURIDAD: lambda a, d: VoidPortal(d.anchor),
+    TileKind.FIRE: lambda a, d: Fireball(a.anchor, d.anchor),
+    TileKind.WATER: lambda a, d: WaterSplash(d.anchor, a.anchor),
+    TileKind.EARTH: lambda a, d: RockSpikes(d.anchor),
+    TileKind.AIR: lambda a, d: WindSlash(a.anchor, d.anchor),
+    TileKind.ELECTRICITY: lambda a, d: LightningBolt(d.anchor),
+    TileKind.ICE: lambda a, d: IceShard(a.anchor, d.anchor),
+    TileKind.MAGIC: lambda a, d: ArcaneOrb(a.anchor, d.anchor),
+    TileKind.DARKNESS: lambda a, d: VoidPortal(d.anchor),
 }
 
 
@@ -139,7 +139,7 @@ class CombatManager:
         """
         weights = dict(ENEMY_ELEMENT_WEIGHTS)
         if self.enemy.hp / self.enemy.max_hp < ENEMY_LOW_HP_RATIO:
-            weights[TileKind.AGUA] = ENEMY_LOW_HP_AGUA_WEIGHT
+            weights[TileKind.WATER] = ENEMY_LOW_HP_WATER_WEIGHT
 
         kinds = list(weights.keys())
         return random.choices(kinds, weights=[weights[k] for k in kinds], k=1)[0]

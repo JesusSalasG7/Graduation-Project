@@ -17,14 +17,14 @@ import settings
 
 
 class TileKind(IntEnum):
-    FUEGO = 0
-    AGUA = 1
-    TIERRA = 2
-    AIRE = 3
-    ELECTRICIDAD = 4
-    HIELO = 5
-    MAGIA = 6
-    OSCURIDAD = 7
+    FIRE = 0
+    WATER = 1
+    EARTH = 2
+    AIR = 3
+    ELECTRICITY = 4
+    ICE = 5
+    MAGIC = 6
+    DARKNESS = 7
 
 
 class Tile:

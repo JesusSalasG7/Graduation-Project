@@ -24,29 +24,29 @@ from gale.input_handler import (
     KEY_ESCAPE,
 )
 
-from states import PortadaState, PlayState, GameOverState
+from states import CoverState, PlayState, GameOverState
 
 
-class Juego2048(Game):
+class Game2048(Game):
     """Juego contenedor: delega toda la lógica en la StateMachine de Gale."""
 
     def init(self) -> None:
         # Flechas de dirección -> acciones de movimiento del tablero.
-        InputHandler.set_keyboard_action(KEY_UP, "mover_arriba")
-        InputHandler.set_keyboard_action(KEY_DOWN, "mover_abajo")
-        InputHandler.set_keyboard_action(KEY_LEFT, "mover_izquierda")
-        InputHandler.set_keyboard_action(KEY_RIGHT, "mover_derecha")
-        InputHandler.set_keyboard_action(KEY_r, "reiniciar")
+        InputHandler.set_keyboard_action(KEY_UP, "move_up")
+        InputHandler.set_keyboard_action(KEY_DOWN, "move_down")
+        InputHandler.set_keyboard_action(KEY_LEFT, "move_left")
+        InputHandler.set_keyboard_action(KEY_RIGHT, "move_right")
+        InputHandler.set_keyboard_action(KEY_r, "restart")
         InputHandler.set_keyboard_action(KEY_ESCAPE, "quit")
 
         # ENTER (principal o del teclado numérico) confirma en la portada.
-        InputHandler.set_keyboard_action(KEY_RETURN, "confirmar")
-        InputHandler.set_keyboard_action(KEY_KP_ENTER, "confirmar")
+        InputHandler.set_keyboard_action(KEY_RETURN, "confirm")
+        InputHandler.set_keyboard_action(KEY_KP_ENTER, "confirm")
 
         self.state_machine = StateMachine(
-            {"portada": PortadaState, "jugar": PlayState, "gameover": GameOverState}
+            {"cover": CoverState, "play": PlayState, "gameover": GameOverState}
         )
-        self.state_machine.change("portada")
+        self.state_machine.change("cover")
 
     def on_input(self, input_id: str, input_data) -> None:
         if input_id == "quit" and getattr(input_data, "pressed", False):
@@ -62,4 +62,4 @@ class Juego2048(Game):
 
 
 if __name__ == "__main__":
-    Juego2048().exec()
+    Game2048().exec()

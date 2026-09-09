@@ -7,14 +7,16 @@ estimar hacia donde esta mirando el participante (izquierda/centro/derecha,
 arriba/centro/abajo). Es una estimacion heuristica sin calibracion por
 usuario: dibuja el contorno de los ojos y el centro del iris sobre el
 video, e informa por terminal y opcionalmente por CSV la direccion
-detectada cada N fotogramas.
+detectada cada N fotogramas. Ademas abre una segunda ventana dividida en
+2 mitades (izquierda/derecha) y, al salir con 'q', imprime cuanto tiempo
+se paso mirando cada una.
 
 La primera ejecucion descarga automaticamente el modelo
 "face_landmarker.task" (~3.7 MB) de Google y lo guarda en
 tools/models/, para no tener que commitear un binario al repositorio.
 
 IMPORTANTE: este script vive en un entorno virtual separado
-(tools/.venv-eyetracker, ver tools/requirements-eyetracker.txt) porque
+(tools/.venv-eyetracker, ver la seccion 2 de tools/requirements.txt) porque
 mediapipe requiere opencv-contrib-python, que no puede convivir con
 opencv-python (dependencia de deepface, usado por emotion_tracker.py) en
 el mismo entorno: ambos paquetes instalan archivos en el mismo directorio
@@ -37,6 +39,7 @@ from typing import Optional
 
 import cv2
 import mediapipe as mp
+import numpy as np
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
@@ -170,6 +173,80 @@ class GazeEstimator:
                 })
 
 
+def _detect_screen_size(default=(1280, 720)):
+    """Intenta obtener la resolucion de la pantalla via tkinter (stdlib)."""
+    try:
+        import tkinter
+
+        root = tkinter.Tk()
+        root.withdraw()
+        size = (root.winfo_screenwidth(), root.winfo_screenheight())
+        root.destroy()
+        return size
+    except Exception:
+        return default
+
+
+SIDE_NAMES = ["izquierda", "derecha"]
+SIDE_DEBOUNCE_FRAMES = 3  # frames seguidos del otro lado antes de aceptar el cambio
+
+
+class SideTracker:
+    """Decide izquierda/derecha a partir de gaze_x, con un debounce chico
+    para no alternar por ruido de un solo frame justo en el medio."""
+
+    def __init__(self, debounce_frames: int = SIDE_DEBOUNCE_FRAMES):
+        self.debounce_frames = debounce_frames
+        self.side = None
+        self._pending = None
+        self._pending_count = 0
+
+    def update(self, gaze_x: float) -> str:
+        # gaze_x bajo = derecha, alto = izquierda (ver _classify_direction).
+        candidate = "derecha" if gaze_x < 0.5 else "izquierda"
+
+        if self.side is None:
+            self.side = candidate
+        elif candidate == self.side:
+            self._pending, self._pending_count = None, 0
+        elif self._pending == candidate:
+            self._pending_count += 1
+            if self._pending_count >= self.debounce_frames:
+                self.side = candidate
+                self._pending, self._pending_count = None, 0
+        else:
+            self._pending, self._pending_count = candidate, 1
+
+        return self.side
+
+
+def _side_rect(name: str, screen_width: int, screen_height: int):
+    half_w = screen_width // 2
+    if name == "izquierda":
+        return 0, 0, half_w, screen_height
+    return half_w, 0, screen_width, screen_height
+
+
+def _draw_side_window(screen_width, screen_height, active_side: str, direction: str):
+    canvas = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
+
+    x1, y1, x2, y2 = _side_rect(active_side, screen_width, screen_height)
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (60, 60, 0), -1)
+    cv2.addWeighted(overlay, 0.35, canvas, 0.65, 0, canvas)
+    cv2.line(canvas, (screen_width // 2, 0), (screen_width // 2, screen_height), (90, 90, 90), 2)
+
+    cv2.putText(
+        canvas, active_side, (screen_width // 2 - 80, screen_height // 2),
+        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2,
+    )
+    cv2.putText(
+        canvas, f"direccion detallada: {direction}", (20, screen_height - 20),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1,
+    )
+    return canvas
+
+
 def _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris):
     for idx in RIGHT_EYE_CORNERS + RIGHT_EYE_TOP_BOTTOM + LEFT_EYE_CORNERS + LEFT_EYE_TOP_BOTTOM:
         px = int(landmarks[idx].x * width)
@@ -232,6 +309,14 @@ def main():
 
     frame_count = 0
     window_name = "Eye Tracker - Vibe Coding"
+    side_window_name = "Mirada: izquierda o derecha"
+    screen_width, screen_height = _detect_screen_size()
+
+    cv2.namedWindow(side_window_name, cv2.WINDOW_NORMAL)
+
+    side_tracker = SideTracker()
+    side_times = {name: 0.0 for name in SIDE_NAMES}
+    last_tick = time.monotonic()
     start_time = time.monotonic()
 
     try:
@@ -241,12 +326,18 @@ def main():
                 print("Error: no se pudo leer el frame de la camara.")
                 break
 
-            if args.mirror:
-                frame = cv2.flip(frame, 1)
+            now = time.monotonic()
+            dt = now - last_tick
+            last_tick = now
 
             frame_count += 1
             height, width = frame.shape[:2]
 
+            # La deteccion siempre corre sobre el frame "crudo" (sin
+            # espejo): si se voltea antes, izquierda/derecha quedan
+            # invertidas respecto a la mirada real. El volteo (--mirror)
+            # se aplica solo al final, unicamente para la ventana de
+            # video, despues de dibujar el overlay sobre el frame crudo.
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             timestamp_ms = int((time.monotonic() - start_time) * 1000)
@@ -257,9 +348,16 @@ def main():
                 gaze_x, gaze_y, direction, right_iris, left_iris = estimator.estimate(landmarks, width, height)
                 _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris)
 
+                side = side_tracker.update(gaze_x)
+                side_times[side] += dt
+                side_canvas = _draw_side_window(screen_width, screen_height, side, direction)
+                cv2.imshow(side_window_name, side_canvas)
+
                 if frame_count % args.interval == 0:
                     estimator.report(gaze_x, gaze_y, direction)
 
+            if args.mirror:
+                frame = cv2.flip(frame, 1)
             cv2.imshow(window_name, frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -271,6 +369,15 @@ def main():
         landmarker.close()
         cap.release()
         cv2.destroyAllWindows()
+
+        total_time = sum(side_times.values())
+        print("\nTiempo de mirada por lado:")
+        for name in SIDE_NAMES:
+            t = side_times[name]
+            pct = (t / total_time * 100) if total_time > 0 else 0.0
+            print(f"  {name}: {t:.2f} s ({pct:.1f}%)")
+        print(f"  total registrado: {total_time:.2f} s")
+
         print("Eye Tracker detenido.")
 
 

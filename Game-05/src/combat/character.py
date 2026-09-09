@@ -56,8 +56,8 @@ class Character:
         frames = _load_frames(is_player)
         self._sprites = {
             "idle": [frames["idle_a"], frames["idle_b"]],
-            "atacando": [frames["attack_a"], frames["attack_b"]],
-            "danado": frames["hurt"],
+            "attacking": [frames["attack_a"], frames["attack_b"]],
+            "hurt": frames["hurt"],
         }
         self._idle_frame = 0
         self.sprite = self._sprites["idle"][0]
@@ -71,11 +71,11 @@ class Character:
             self.sprite = self._sprites["idle"][self._idle_frame]
 
     def play_attack(self, on_finish: Optional[Callable[[], None]] = None) -> None:
-        self.state = "atacando"
-        self.sprite = self._sprites["atacando"][0]  # impulso
+        self.state = "attacking"
+        self.sprite = self._sprites["attacking"][0]  # impulso
 
         def _impact():
-            self.sprite = self._sprites["atacando"][1]  # golpe
+            self.sprite = self._sprites["attacking"][1]  # golpe
             if on_finish:
                 on_finish()
 
@@ -87,8 +87,8 @@ class Character:
         Timer.after(0.35, _recover)
 
     def play_hurt(self) -> None:
-        self.state = "danado"
-        self.sprite = self._sprites["danado"]
+        self.state = "hurt"
+        self.sprite = self._sprites["hurt"]
 
         def _toggle():
             self.hurt_flash = not self.hurt_flash
