@@ -12,9 +12,33 @@ para no mezclar datos personales con los datos anonimos de la sesion
 
 import csv
 from pathlib import Path
+from typing import Optional
 
 PERSONAL_RECORDS_DIR = Path.home() / "Escritorio" / "Participantes"
 PERSONAL_RECORDS_FILE = PERSONAL_RECORDS_DIR / "participantes.csv"
+
+
+def load_personal_record(number: int) -> Optional[tuple[str, str]]:
+    """Busca (nombre, apellido) para `number` en el CSV del Escritorio.
+
+    Devuelve None si el archivo no existe o el numero no esta registrado.
+    Se usa solo para mostrar el nombre en pantalla (p.ej. saludo de
+    bienvenida); nunca se persiste junto a los datos anonimos de sesion.
+    """
+    if not PERSONAL_RECORDS_FILE.exists():
+        return None
+
+    with PERSONAL_RECORDS_FILE.open("r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                row_number = int(row["numero_participante"])
+            except (KeyError, ValueError):
+                continue
+            if row_number == number:
+                return row["nombre"], row["apellido"]
+
+    return None
 
 
 def save_personal_record(number: int, nombre: str, apellido: str) -> Path:

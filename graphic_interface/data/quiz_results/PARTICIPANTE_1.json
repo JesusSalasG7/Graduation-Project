@@ -1,0 +1,545 @@
+{
+  "participant_number": 1,
+  "records": [
+    {
+      "game": "Game-01",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Qué representa exactamente el valor que debe devolver count_apples_in_range()?",
+          "options": [
+            "La suma de los valores de las manzanas dentro del rango",
+            "La cantidad de manzanas cuyo valor está dentro del rango activo (límites inclusive)",
+            "La cantidad total de manzanas en el tablero, sin importar el filtro",
+            "El valor máximo entre las manzanas que pasan el filtro"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Según el enunciado, los límites del rango [filter_min, filter_max] son...",
+          "options": [
+            "Exclusivos (no cuentan los extremos)",
+            "Solo el mínimo es inclusivo",
+            "Inclusive en ambos extremos",
+            "Solo el máximo es inclusivo"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método ya existente debe reutilizarse para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "count_apples_in_range()",
+            "_apple_passes_filter(value)",
+            "food_field.apples()",
+            "_update_range_bonus()"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Con valores = [-5, +5, +15, +5, -5, +15], ¿cuál es el resultado esperado para el rango [-5, 5]?",
+          "options": [
+            "2",
+            "4",
+            "6",
+            "0"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué complejidad temporal se pide para la solución?",
+          "options": [
+            "O(n²), comparando cada manzana con todas las demás",
+            "O(log n), usando búsqueda binaria",
+            "O(n), con una sola pasada sobre la lista",
+            "O(1), sin importar la cantidad de manzanas"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si self.food_field.apples está vacía, ¿qué debe devolver la función?",
+          "options": [
+            "None",
+            "Una excepción (ValueError)",
+            "0",
+            "-1"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué partes del juego consumen el resultado de count_apples_in_range(), según el enunciado?",
+          "options": [
+            "Solo el sistema de puntuación final",
+            "El HUD \"En rango: N/Total\" y el bono periódico de puntos del modo Desafío",
+            "La generación aleatoria de nuevas manzanas",
+            "El sistema de colisiones de la serpiente"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Qué representa exactamente el valor que debe devolver count_apples_in_range()?",
+          "options": [
+            "La suma de los valores de las manzanas dentro del rango",
+            "La cantidad de manzanas cuyo valor está dentro del rango activo (límites inclusive)",
+            "La cantidad total de manzanas en el tablero, sin importar el filtro",
+            "El valor máximo entre las manzanas que pasan el filtro"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Según el enunciado, los límites del rango [filter_min, filter_max] son...",
+          "options": [
+            "Exclusivos (no cuentan los extremos)",
+            "Solo el mínimo es inclusivo",
+            "Inclusive en ambos extremos",
+            "Solo el máximo es inclusivo"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método ya existente debe reutilizarse para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "count_apples_in_range()",
+            "_apple_passes_filter(value)",
+            "food_field.apples()",
+            "_update_range_bonus()"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Con valores = [-5, +5, +15, +5, -5, +15], ¿cuál es el resultado esperado para el rango [-5, 5]?",
+          "options": [
+            "2",
+            "4",
+            "6",
+            "0"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué complejidad temporal se pide para la solución?",
+          "options": [
+            "O(n²), comparando cada manzana con todas las demás",
+            "O(log n), usando búsqueda binaria",
+            "O(n), con una sola pasada sobre la lista",
+            "O(1), sin importar la cantidad de manzanas"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si self.food_field.apples está vacía, ¿qué debe devolver la función?",
+          "options": [
+            "None",
+            "Una excepción (ValueError)",
+            "0",
+            "-1"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué partes del juego consumen el resultado de count_apples_in_range(), según el enunciado?",
+          "options": [
+            "Solo el sistema de puntuación final",
+            "El HUD \"En rango: N/Total\" y el bono periódico de puntos del modo Desafío",
+            "La generación aleatoria de nuevas manzanas",
+            "El sistema de colisiones de la serpiente"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué tipo de dato retorna el método count_apples_in_range()?",
+          "options": [
+            "int",
+            "float",
+            "bool",
+            "List[int]"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Sobre qué colección itera el método para contar las manzanas?",
+          "options": [
+            "self.food_field.apples",
+            "self.apples",
+            "self.food_field.values",
+            "self.board.apples"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué atributo de cada manzana se pasa a _apple_passes_filter?",
+          "options": [
+            "apple.id",
+            "apple.value",
+            "apple.position",
+            "apple.color"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si self.food_field.apples está vacía, ¿qué devuelve count_apples_in_range()?",
+          "options": [
+            "0",
+            "None",
+            "Lanza una excepción",
+            "-1"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si todas las manzanas en el tablero pasan el filtro, ¿qué devuelve el método?",
+          "options": [
+            "0",
+            "El número total de manzanas en el tablero",
+            "True",
+            "La lista de manzanas"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿El método count_apples_in_range() modifica la lista self.food_field.apples?",
+          "options": [
+            "Sí, elimina las manzanas que no pasan el filtro",
+            "Sí, reordena las manzanas según su valor",
+            "No, solo cuenta cuántas manzanas pasan el filtro",
+            "Sí, actualiza el valor de cada manzana"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método se reutiliza dentro de count_apples_in_range() para evaluar cada manzana individualmente?",
+          "options": [
+            "World._apple_passes_filter",
+            "World.count_apples_in_range",
+            "food_field.filter",
+            "apple.passes_filter"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué devuelve el método `count_apples_in_range()`?",
+          "options": [
+            "El número de manzanas cuyo valor está dentro del rango de filtro activo",
+            "El valor promedio de las manzanas en rango",
+            "La lista de manzanas que pasan el filtro",
+            "El valor total sumado de todas las manzanas en rango"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si `self.food_field.apples` está vacío, ¿qué devuelve `count_apples_in_range()`?",
+          "options": [
+            "0",
+            "None",
+            "Lanza una excepción",
+            "-1"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué atributo de cada manzana se utiliza para evaluar si pasa el filtro?",
+          "options": [
+            ".value",
+            ".position",
+            ".color",
+            ".id"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿El método `count_apples_in_range()` modifica la lista `self.food_field.apples`?",
+          "options": [
+            "No, solo la recorre para contar",
+            "Sí, elimina las manzanas que no pasan el filtro",
+            "Sí, ordena las manzanas por valor",
+            "Sí, agrega nuevas manzanas al rango"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si ninguna manzana del tablero pasa el filtro, ¿qué valor devuelve el método?",
+          "options": [
+            "0",
+            "None",
+            "Una lista vacía",
+            "Lanza un error de índice"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método se reutiliza dentro de `count_apples_in_range()` para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "self._apple_passes_filter(apple.value)",
+            "self.food_field.filter(apple)",
+            "self.count_apples_in_range(apple)",
+            "apple.passes_filter()"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Cuál es el tipo de dato que retorna `count_apples_in_range()` según su anotación?",
+          "options": [
+            "int",
+            "bool",
+            "list",
+            "float"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Qué representa exactamente el valor que debe devolver count_apples_in_range()?",
+          "options": [
+            "La suma de los valores de las manzanas dentro del rango",
+            "La cantidad de manzanas cuyo valor está dentro del rango activo (límites inclusive)",
+            "La cantidad total de manzanas en el tablero, sin importar el filtro",
+            "El valor máximo entre las manzanas que pasan el filtro"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Según el enunciado, los límites del rango [filter_min, filter_max] son...",
+          "options": [
+            "Exclusivos (no cuentan los extremos)",
+            "Solo el mínimo es inclusivo",
+            "Inclusive en ambos extremos",
+            "Solo el máximo es inclusivo"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método ya existente debe reutilizarse para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "count_apples_in_range()",
+            "_apple_passes_filter(value)",
+            "food_field.apples()",
+            "_update_range_bonus()"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Con valores = [-5, +5, +15, +5, -5, +15], ¿cuál es el resultado esperado para el rango [-5, 5]?",
+          "options": [
+            "2",
+            "4",
+            "6",
+            "0"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué complejidad temporal se pide para la solución?",
+          "options": [
+            "O(n²), comparando cada manzana con todas las demás",
+            "O(log n), usando búsqueda binaria",
+            "O(n), con una sola pasada sobre la lista",
+            "O(1), sin importar la cantidad de manzanas"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si self.food_field.apples está vacía, ¿qué debe devolver la función?",
+          "options": [
+            "None",
+            "Una excepción (ValueError)",
+            "0",
+            "-1"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué partes del juego consumen el resultado de count_apples_in_range(), según el enunciado?",
+          "options": [
+            "Solo el sistema de puntuación final",
+            "El HUD \"En rango: N/Total\" y el bono periódico de puntos del modo Desafío",
+            "La generación aleatoria de nuevas manzanas",
+            "El sistema de colisiones de la serpiente"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué devuelve el método `count_apples_in_range()`?",
+          "options": [
+            "El número de manzanas cuyo valor pasa el filtro activo",
+            "La lista de manzanas que pasan el filtro",
+            "El valor promedio de las manzanas en el tablero",
+            "El valor máximo entre las manzanas dentro del rango"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Sobre qué colección itera el método para realizar el conteo?",
+          "options": [
+            "self.filter_min y self.filter_max",
+            "self.food_field.apples",
+            "self.apples_total",
+            "self.food_field.values"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué atributo de cada manzana se pasa como argumento a `_apple_passes_filter`?",
+          "options": [
+            "apple.position",
+            "apple.id",
+            "apple.value",
+            "apple.color"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si `self.food_field.apples` está vacío, ¿qué devuelve `count_apples_in_range()`?",
+          "options": [
+            "None",
+            "0",
+            "Lanza una excepción",
+            "-1"
+          ],
+          "correct_index": 1,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué método existente reutiliza `count_apples_in_range()` para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "food_field.filter_apples",
+            "self._range_check",
+            "self._apple_passes_filter",
+            "self.count_apples_in_range"
+          ],
+          "correct_index": 2,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "Si ninguna manzana del tablero pasa el filtro activo, ¿qué valor retorna el método?",
+          "options": [
+            "0",
+            "None",
+            "Un valor negativo",
+            "Lanza un error"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué tipo de dato retorna `count_apples_in_range()`?",
+          "options": [
+            "Un float",
+            "Una lista de enteros",
+            "Un booleano",
+            "Un entero (int)"
+          ],
+          "correct_index": 3,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    }
+  ]
+}

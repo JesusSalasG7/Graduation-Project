@@ -1,2 +1,6 @@
 # Dependencia de la GUI (tkinter y json son de la libreria estandar)
 customtkinter==5.2.2
+
+# El prompt aislado de la Etapa 2 (ver isolated_prompt.py) usa el CLI
+# `claude` ya requerido por el resto del proyecto -- no necesita paquetes
+# de Python adicionales ni una ANTHROPIC_API_KEY propia.

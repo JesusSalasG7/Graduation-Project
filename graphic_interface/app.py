@@ -32,10 +32,9 @@ DATA_FILE = DATA_DIR / "participants.json"
 SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 EXPERIENCE_LEVELS = [
-    "Graduado",
-    "De sexto a decimo semestre",
-    "De tercero a quinto semestre",
-    "De primero a segundo semestre",
+    "Avanzado",
+    "Intermedio",
+    "Principiante",
 ]
 
 ctk.set_appearance_mode("dark")
@@ -47,7 +46,8 @@ BG_SIDEBAR = "#101217"
 BG_CARD = "#1e212a"
 BG_CARD_ALT = "#252834"
 BORDER = "#2c303c"
-TEXT_MUTED = "#8b8fa3"
+TEXT_MUTED = "#9ea3ba"  # mas claro que el original (#8b8fa3): ese no llegaba a
+                        # contraste 4.5:1 (WCAG AA) sobre BG_CARD_ALT
 
 ACCENT = "#5865f2"
 ACCENT_HOVER = "#4752c4"
@@ -106,6 +106,9 @@ class App(ctk.CTk):
         self.minsize(920, 580)
         self.configure(fg_color=BG_APP)
         _enable_linux_wheel_scroll(self)
+        # La app arranca ya maximizada (pedido explicito) en vez del tamano
+        # fijo de arriba, que queda solo como base/minsize.
+        self.after(0, self._maximize)
 
         self.store = ParticipantStore(DATA_FILE)
         self.session_store = SessionStore(SESSIONS_FILE)
@@ -169,12 +172,31 @@ class App(ctk.CTk):
                 "Selecciona un participante activo en la pestaña Participantes primero.",
             )
             return
+        # La app entera arranca maximizada (ver __init__); esto solo
+        # cubre el caso de que el usuario la haya desmaximizado a mano.
+        self._maximize()
         self.session_wizard_frame.tkraise()
         self.session_wizard.start()
 
     def exit_session_wizard(self):
         self.session_wizard_frame.lower()
         self._select_nav("session")
+        # No se restaura ningun tamano "chico": la ventana siempre vive
+        # maximizada, asi que simplemente se deja como esta (evita el bug
+        # de que forzar state("normal") + geometry la dejaba minimizada).
+
+    def _maximize(self):
+        try:
+            self.state("zoomed")
+            return
+        except Exception:
+            pass
+        try:
+            self.attributes("-zoomed", True)
+            return
+        except Exception:
+            pass
+        self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
 
     # ---------------- Sidebar / navegacion ----------------
     def _build_sidebar(self):

@@ -96,3 +96,18 @@ class ParticipantStore:
             if p["id"] == active_id:
                 return p
         return None
+
+    def set_attribute(self, participant_id: str, key: str, value: Any) -> None:
+        for p in self._data["participants"]:
+            if p["id"] == participant_id:
+                p.setdefault("attributes", {})[key] = value
+                self._save()
+                return
+
+    def clear_attribute(self, participant_id: str, key: str) -> None:
+        for p in self._data["participants"]:
+            if p["id"] == participant_id:
+                if key in p.get("attributes", {}):
+                    del p["attributes"][key]
+                    self._save()
+                return
