@@ -66,9 +66,9 @@ _GAME_OVER_OPTIONS = ("restart", "cover")
 _WIN_OPTIONS = ("same_track", "change_track", "cover")
 
 _INSTRUCTIONS = (
-    "Las palabras pueden aparecer en espanol o en ingles.",
-    "Escribe cada letra justo cuando cruce la linea de impacto.",
-    "Entre mas preciso, mejor puntaje y mas rapido sube la velocidad.",
+    "Las palabras pueden aparecer en español o en inglés.",
+    "Escribe cada letra justo cuando cruce la línea de impacto.",
+    "Entre más preciso, mejor puntaje y más rápido sube la velocidad.",
     f"{settings.STARTING_LIVES} fallos y se acaba la partida. Presiona ENTER para jugar.",
 )
 
@@ -707,7 +707,7 @@ class PlayState(BaseState):
 
         render_text(
             surface,
-            "¿A que ritmo quieres ir?",
+            "¿A qué ritmo quieres ir?",
             settings.FONTS["menu"],
             center_x,
             center_y - 60,
@@ -777,7 +777,7 @@ class PlayState(BaseState):
 
         render_text(
             surface,
-            "Como jugar",
+            "Cómo jugar",
             settings.FONTS["menu"],
             center_x,
             center_y - 60,
@@ -887,7 +887,7 @@ class PlayState(BaseState):
 
         render_text(
             surface,
-            "Entraste a los records! Escribe tu nombre:",
+            "¡Entraste a los récords! Escribe tu nombre:",
             settings.FONTS["hud"],
             center_x,
             center_y,
@@ -909,7 +909,7 @@ class PlayState(BaseState):
     def _render_overwrite_confirm(self, surface: pygame.Surface, center_x: int, center_y: int) -> None:
         render_text(
             surface,
-            f"Ya existe el nombre '{self._pending_record_name}' en los records",
+            f"Ya existe el nombre '{self._pending_record_name}' en los récords",
             settings.FONTS["hud"],
             center_x,
             center_y,

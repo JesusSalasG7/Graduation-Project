@@ -152,6 +152,7 @@ activemq-data/
 .envrc
 .venv
 tools/.venv-eyetracker
+tools/.venv-tracker
 env/
 venv/
 ENV/
@@ -233,3 +234,7 @@ graphic_interface/data/*.json
 
 # Registros de emociones por participante (datos sensibles del experimento)
 graphic_interface/data/emotion_logs/
+
+# Dataset consolidado de la sesion guiada (datos biometricos de
+# participantes, no debe ir al repo -- se regenera con data/build_dataset.py)
+/data/*.csv

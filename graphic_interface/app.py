@@ -1,35 +1,57 @@
 """GUI principal: lanzador de juegos + gestion de participantes."""
 
+import sys
 import threading
-import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
-from collections import Counter
 from pathlib import Path
 from tkinter import ttk
+from typing import Optional
 
 import customtkinter as ctk
+import pandas as pd
 
+from challenge_solver import GUIDED_SESSION_GAME_ORDER
 from challenges import get_challenge
 from difficulty import get_difficulty
 from game_launcher import (
     PROJECT_ROOT,
     discover_games,
-    import_heart_rate,
     open_in_vscode,
     play_game,
-    read_combined_session_data,
     repair_environment,
-    start_emotion_tracker,
 )
+from isolated_prompt import claude_cli_available
+
+# data/build_dataset.py vive fuera de graphic_interface (es parte del
+# dataset consolidado de TODO el proyecto, no solo de esta app) -- se
+# agrega al path para poder llamarlo desde la pestaña Sesion (ver
+# App._generate_dataset) sin duplicar esa logica aca. Nombre distinto de
+# DATA_DIR (mas abajo, graphic_interface/data/ -- participants.json, etc.)
+# a proposito, para no pisarla.
+DATASET_MODULE_DIR = PROJECT_ROOT / "data"
+if str(DATASET_MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(DATASET_MODULE_DIR))
+from build_dataset import save_dataset  # noqa: E402
 from participant_store import ParticipantStore, participant_file_stub, participant_label
 from personal_records import save_personal_record
-from session_store import SessionStore
 from session_wizard import SessionWizard
+from stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_readonly, summarize_stage
 from statement_view import render_statement
+
+# tkinterdnd2 habilita arrastrar-y-soltar el CSV de frecuencia cardiaca del
+# reloj (ver heart_rate_import.py) -- es una dependencia opcional: si no
+# esta instalada (o el .venv todavia no se reparo, ver repair_environment),
+# la app sigue andando normal, solo sin esa pantalla pudiendo recibir un
+# arrastre real (queda el boton "Seleccionar archivo").
+try:
+    from tkinterdnd2 import TkinterDnD
+    _DND_MIXIN = (TkinterDnD.DnDWrapper,)
+except ImportError:
+    TkinterDnD = None
+    _DND_MIXIN = ()
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DATA_FILE = DATA_DIR / "participants.json"
-SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 EXPERIENCE_LEVELS = [
     "Avanzado",
@@ -61,6 +83,23 @@ WARNING = "#f2994a"
 WARNING_HOVER = "#d97f34"
 
 FONT_FAMILY = "Segoe UI"
+
+# Toda la tipografia del panel principal se agranda un 50% (pedido explicito).
+FONT_SCALE = 1.5
+
+
+def scaled(size: int) -> int:
+    return round(size * FONT_SCALE)
+
+
+# Los anchos de wrapeo y las dimensiones de ventanas/modales crecen mas
+# suave que la letra (60% del aumento) -- si crecieran al mismo ritmo que
+# la fuente, ocuparian mucha mas pantalla de la necesaria.
+WRAP_SCALE = 1 + (FONT_SCALE - 1) * 0.6
+
+
+def wrap(px: int) -> int:
+    return round(px * WRAP_SCALE)
 
 
 def _enable_linux_wheel_scroll(root: ctk.CTk) -> None:
@@ -98,31 +137,33 @@ def _enable_linux_wheel_scroll(root: ctk.CTk) -> None:
     root.bind_all("<Button-5>", lambda e: _on_wheel(e, 1))
 
 
-class App(ctk.CTk):
+class App(ctk.CTk, *_DND_MIXIN):
     def __init__(self):
         super().__init__()
         self.title("Panel de Experimento")
-        self.geometry("1080x680")
-        self.minsize(920, 580)
+        self.geometry(f"{wrap(1080)}x{wrap(680)}")
+        self.minsize(wrap(920), wrap(580))
         self.configure(fg_color=BG_APP)
         _enable_linux_wheel_scroll(self)
+
+        # Registra el soporte de arrastrar-y-soltar en esta ventana raiz
+        # (ver heart_rate_import.register_drop_target) -- sin esto ningun
+        # widget de la app puede recibir un drop, aunque tkinterdnd2 este
+        # instalado. Si falla (Tcl del sistema sin el paquete tkdnd, etc.)
+        # la app sigue funcionando, solo sin arrastrar-y-soltar real.
+        self.dnd_available = False
+        if TkinterDnD is not None:
+            try:
+                self.TkdndVersion = TkinterDnD._require(self)
+                self.dnd_available = True
+            except Exception:
+                pass
         # La app arranca ya maximizada (pedido explicito) en vez del tamano
         # fijo de arriba, que queda solo como base/minsize.
         self.after(0, self._maximize)
 
         self.store = ParticipantStore(DATA_FILE)
-        self.session_store = SessionStore(SESSIONS_FILE)
-        self.emotion_process = None
-        self.emotion_participant_id = None
-        self.active_session = None
-        self.selected_session = None
         self.sort_games_by_difficulty = False
-
-        # Si la app se cerro con una sesion sin terminar, la recuperamos para
-        # poder cerrarla bien (no se relanza la camara automaticamente).
-        active_participant = self.store.get_active()
-        if active_participant is not None:
-            self.active_session = self.session_store.get_open_session(active_participant["id"])
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -172,18 +213,124 @@ class App(ctk.CTk):
                 "Selecciona un participante activo en la pestaña Participantes primero.",
             )
             return
+        if not claude_cli_available():
+            continue_anyway = messagebox.askyesno(
+                "No se detectó Claude Code",
+                "No se encontró el CLI 'claude' instalado en este equipo.\n\n"
+                "Las Etapas 3, 4 y 5 de la sesión guiada dependen de él para "
+                "generar la respuesta de la IA y los cuestionarios -- sin "
+                "Claude Code, esas etapas van a mostrar un error en vez de "
+                "funcionar. El resto de la sesión (juegos, sensores, "
+                "Etapa 2) funciona igual.\n\n"
+                "¿Continuar de todas formas?",
+            )
+            if not continue_anyway:
+                return
+        self._ask_session_devices(self._begin_session_wizard)
+
+    def _begin_session_wizard(self, enabled_devices):
+        if enabled_devices is None:
+            return  # se cancelo el modal de dispositivos -- no se entra a la sesion
         # La app entera arranca maximizada (ver __init__); esto solo
         # cubre el caso de que el usuario la haya desmaximizado a mano.
         self._maximize()
+        # Pantalla completa de verdad (sin barra de titulo ni barra de
+        # tareas) durante toda la sesion guiada -- pedido explicito, para
+        # que el participante solo tenga a la vista el propio asistente y
+        # no se distraiga con el resto del escritorio.
+        self._set_fullscreen(True)
         self.session_wizard_frame.tkraise()
-        self.session_wizard.start()
+        self.session_wizard.start(enabled_devices)
+
+    def _ask_session_devices(self, on_done):
+        """Modal previo a entrar a la sesion guiada: que dispositivos se
+        van a usar esta vez -- todos tildados por defecto. Si se destilda
+        alguno, la sesion guiada sigue funcionando igual, solo sin pedir
+        ni procesar los datos de ese dispositivo (ver SessionWizard.
+        _enabled_devices / _show_next_setup_screen). `on_done` recibe el
+        set de dispositivos elegidos, o None si se cancelo."""
+        modal = ctk.CTkToplevel(self)
+        modal.title("Dispositivos de esta sesión")
+        modal.geometry(f"{wrap(440)}x{wrap(360)}")
+        modal.configure(fg_color=BG_CARD)
+        modal.transient(self)
+        modal.resizable(False, False)
+        modal.wait_visibility()
+        modal.attributes("-topmost", True)
+        modal.lift()
+        modal.focus_force()
+
+        def finish(devices):
+            try:
+                modal.grab_release()
+            except Exception:
+                pass
+            modal.destroy()
+            on_done(devices)
+
+        modal.protocol("WM_DELETE_WINDOW", lambda: finish(None))
+        modal.grab_set()
+
+        ctk.CTkLabel(
+            modal, text="⚙️  ¿Qué dispositivos vas a usar en esta sesión?",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(15), weight="bold"),
+            wraplength=wrap(380), justify="left",
+        ).pack(pady=(24, 6), padx=24)
+        ctk.CTkLabel(
+            modal,
+            text="Destilda los que no vayas a usar -- la sesión va a seguir "
+                 "funcionando igual, solo sin pedir ni procesar los datos de "
+                 "esos dispositivos.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(380), justify="left",
+        ).pack(pady=(0, 18), padx=24)
+
+        device_vars = {
+            "heart_rate": ctk.BooleanVar(value=True),
+            "neurosky": ctk.BooleanVar(value=True),
+            "camera": ctk.BooleanVar(value=True),
+        }
+        device_labels = {
+            "heart_rate": "⌚  Reloj (frecuencia cardíaca)",
+            "neurosky": "🧠  NeuroSky",
+            "camera": "📷  Cámara (Emotion + Eye Tracker)",
+        }
+        for device in ("heart_rate", "neurosky", "camera"):
+            ctk.CTkCheckBox(
+                modal, text=device_labels[device], variable=device_vars[device],
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13)),
+                fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            ).pack(anchor="w", padx=44, pady=7)
+
+        buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
+        buttons_row.pack(pady=(22, 0))
+        ctk.CTkButton(
+            buttons_row, text="Cancelar", width=scaled(110), height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color="transparent", hover_color=NAV_HOVER, border_width=1, border_color=BORDER,
+            command=lambda: finish(None),
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            buttons_row, text="Continuar  ▶", width=scaled(150), height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            command=lambda: finish({device for device, var in device_vars.items() if var.get()}),
+        ).pack(side="left")
 
     def exit_session_wizard(self):
+        self._set_fullscreen(False)
         self.session_wizard_frame.lower()
         self._select_nav("session")
         # No se restaura ningun tamano "chico": la ventana siempre vive
         # maximizada, asi que simplemente se deja como esta (evita el bug
         # de que forzar state("normal") + geometry la dejaba minimizada).
+        self._maximize()
+
+    def _set_fullscreen(self, value: bool):
+        try:
+            self.attributes("-fullscreen", value)
+        except Exception:
+            pass
 
     def _maximize(self):
         try:
@@ -200,17 +347,17 @@ class App(ctk.CTk):
 
     # ---------------- Sidebar / navegacion ----------------
     def _build_sidebar(self):
-        sidebar = ctk.CTkFrame(self, width=230, corner_radius=0, fg_color=BG_SIDEBAR)
+        sidebar = ctk.CTkFrame(self, width=scaled(230), corner_radius=0, fg_color=BG_SIDEBAR)
         sidebar.grid(row=0, column=0, sticky="nsw")
         sidebar.grid_propagate(False)
 
         brand = ctk.CTkFrame(sidebar, fg_color="transparent")
         brand.pack(fill="x", padx=20, pady=(26, 30))
         ctk.CTkLabel(
-            brand, text="🎮 Vibe Coding", font=ctk.CTkFont(family=FONT_FAMILY, size=19, weight="bold")
+            brand, text="🎮 Vibe Coding", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(19), weight="bold")
         ).pack(anchor="w")
         ctk.CTkLabel(
-            brand, text="Panel de experimento", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            brand, text="Panel de experimento", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 0))
 
@@ -224,25 +371,9 @@ class App(ctk.CTk):
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
 
-        self.tracker_card = ctk.CTkFrame(footer, fg_color=BG_CARD, corner_radius=8)
-        self.tracker_card.pack(fill="x", pady=(0, 12))
-        self.tracker_status_label = ctk.CTkLabel(
-            self.tracker_card, text="🎥  Seguimiento: inactivo", font=ctk.CTkFont(family=FONT_FAMILY, size=11),
-            text_color=TEXT_MUTED, anchor="w", justify="left", wraplength=180,
-        )
-        self.tracker_status_label.pack(anchor="w", padx=10, pady=(10, 4))
-        self.tracker_stop_button = ctk.CTkButton(
-            self.tracker_card, text="Detener", height=26, width=90, corner_radius=6,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=11),
-            fg_color="transparent", hover_color=DANGER, border_width=1, border_color=DANGER,
-            text_color=DANGER, state="disabled",
-            command=self._stop_emotion_tracker,
-        )
-        self.tracker_stop_button.pack(anchor="w", padx=10, pady=(0, 10))
-
         ctk.CTkLabel(
-            footer, text=f"Proyecto: {PROJECT_ROOT.name}", font=ctk.CTkFont(family=FONT_FAMILY, size=10),
-            text_color=TEXT_MUTED, wraplength=190, justify="left",
+            footer, text=f"Proyecto: {PROJECT_ROOT.name}", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(10)),
+            text_color=TEXT_MUTED, wraplength=wrap(190), justify="left",
         ).pack(anchor="w")
 
     def _nav_button(self, parent, text, key):
@@ -251,8 +382,8 @@ class App(ctk.CTk):
             text=text,
             anchor="w",
             corner_radius=8,
-            height=42,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13),
+            height=scaled(42),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13)),
             fg_color="transparent",
             hover_color=NAV_HOVER,
             text_color="#c9cdd9",
@@ -275,6 +406,11 @@ class App(ctk.CTk):
                 hover_color=ACCENT_HOVER if active else NAV_HOVER,
             )
         frames[key].tkraise()
+        if key == "session":
+            # Recalcula la matriz de "Datos guardados" al entrar a la
+            # pestaña -- lee de disco, asi que refleja lo que se haya
+            # exportado desde la ultima vez que se miro esta vista.
+            self._refresh_session_data_matrix()
 
     # ---------------- Juegos ----------------
     def _build_games_tab(self):
@@ -284,10 +420,10 @@ class App(ctk.CTk):
         title_box = ctk.CTkFrame(header, fg_color="transparent")
         title_box.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(
-            title_box, text="Juegos", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+            title_box, text="Juegos", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(22), weight="bold")
         ).pack(anchor="w")
         self.active_label = ctk.CTkLabel(
-            title_box, text=self._active_label_text(), font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            title_box, text=self._active_label_text(), font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             text_color=TEXT_MUTED,
         )
         self.active_label.pack(anchor="w", pady=(2, 0))
@@ -296,24 +432,24 @@ class App(ctk.CTk):
         actions.pack(side="right")
 
         self.repair_button = ctk.CTkButton(
-            actions, text="🛠️  Reparar entorno", width=160, height=34, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            actions, text="🛠️  Reparar entorno", width=scaled(160), height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=WARNING, hover_color=WARNING_HOVER, text_color="#1a1a1a",
             command=self._repair_environment,
         )
         self.repair_button.pack(side="left", padx=(0, 8))
 
         self.difficulty_button = ctk.CTkButton(
-            actions, text="📊  Ver juegos en dificultad", width=210, height=34, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            actions, text="📊  Ver juegos en dificultad", width=scaled(210), height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
             command=self._toggle_difficulty_view,
         )
         self.difficulty_button.pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
-            actions, text="🔄  Actualizar", width=130, height=34, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            actions, text="🔄  Actualizar", width=scaled(130), height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
             command=self._refresh_games,
         ).pack(side="left")
@@ -375,12 +511,12 @@ class App(ctk.CTk):
             else:
                 main_text, sub_text = game.name, game.display_name
             ctk.CTkLabel(
-                title_row, text=f"🎲  {main_text}", font=ctk.CTkFont(family=FONT_FAMILY, size=15, weight="bold")
+                title_row, text=f"🎲  {main_text}", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(15), weight="bold")
             ).pack(side="left")
             if sub_text and sub_text != main_text:
                 ctk.CTkLabel(
                     title_row, text=f"   ·   {sub_text}",
-                    font=ctk.CTkFont(family=FONT_FAMILY, size=13), text_color=TEXT_MUTED,
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13)), text_color=TEXT_MUTED,
                 ).pack(side="left")
 
             pills_row = ctk.CTkFrame(info, fg_color="transparent")
@@ -391,7 +527,7 @@ class App(ctk.CTk):
             else:
                 pill_text, pill_bg, pill_fg = "● Sin main.py", "#332a1c", "#c9a15a"
             ctk.CTkLabel(
-                pills_row, text=pill_text, font=ctk.CTkFont(family=FONT_FAMILY, size=11, weight="bold"),
+                pills_row, text=pill_text, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
                 fg_color=pill_bg, text_color=pill_fg, corner_radius=10, padx=10, pady=2,
             ).pack(side="left")
 
@@ -400,7 +536,7 @@ class App(ctk.CTk):
                 diff_bg, diff_fg = self._difficulty_colors(difficulty.tier)
                 ctk.CTkLabel(
                     pills_row, text=f"🎯 {difficulty.rank}/7 · {difficulty.tier}",
-                    font=ctk.CTkFont(family=FONT_FAMILY, size=11, weight="bold"),
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
                     fg_color=diff_bg, text_color=diff_fg, corner_radius=10, padx=10, pady=2,
                 ).pack(side="left", padx=(8, 0))
 
@@ -408,15 +544,15 @@ class App(ctk.CTk):
             buttons.grid(row=0, column=1, sticky="e", padx=18, pady=14)
 
             ctk.CTkButton(
-                buttons, text="📝  VS Code", width=130, height=34, corner_radius=8,
-                font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+                buttons, text="📝  VS Code", width=scaled(130), height=scaled(34), corner_radius=8,
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
                 fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
                 command=lambda g=game: self._open_vscode(g),
             ).pack(side="left", padx=(0, 8))
 
             statement_btn = ctk.CTkButton(
-                buttons, text="📄  Ver enunciado del desafío", width=210, height=34, corner_radius=8,
-                font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+                buttons, text="📄  Ver enunciado del desafío", width=scaled(210), height=scaled(34), corner_radius=8,
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
                 fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
                 command=lambda g=game: self._show_statement_modal(g),
             )
@@ -425,8 +561,8 @@ class App(ctk.CTk):
                 statement_btn.configure(state="disabled", text_color=TEXT_MUTED)
 
             play_btn = ctk.CTkButton(
-                buttons, text="▶  Jugar", width=110, height=34, corner_radius=8,
-                font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+                buttons, text="▶  Jugar", width=scaled(110), height=scaled(34), corner_radius=8,
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
                 fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
                 command=lambda g=game: self._play(g),
             )
@@ -445,7 +581,7 @@ class App(ctk.CTk):
 
         modal = ctk.CTkToplevel(self)
         modal.title(f"Enunciado — {challenge.title}")
-        modal.geometry("760x680")
+        modal.geometry(f"{wrap(760)}x{wrap(680)}")
         modal.configure(fg_color=BG_APP)
         modal.transient(self)
         modal.wait_visibility()
@@ -455,12 +591,12 @@ class App(ctk.CTk):
         header.pack(fill="x", padx=26, pady=(20, 6))
         ctk.CTkLabel(
             header, text=challenge.title,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=18, weight="bold"),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(18), weight="bold"),
         ).pack(anchor="w")
         ctk.CTkLabel(
             header,
             text="Esto es exactamente lo que va a ver el participante en la Etapa 1 de la sesión guiada.",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)), text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 0))
 
         scroll = ctk.CTkScrollableFrame(modal, fg_color="transparent")
@@ -473,11 +609,12 @@ class App(ctk.CTk):
                 "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT,
                 "BORDER": BORDER, "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING,
             },
-            wraplength=680,
+            wraplength=wrap(680),
+            font_scale=FONT_SCALE,
         )
 
         ctk.CTkButton(
-            modal, text="Cerrar", height=36, width=120, corner_radius=8,
+            modal, text="Cerrar", height=scaled(36), width=scaled(120), corner_radius=8,
             fg_color=BG_CARD_ALT, hover_color=BORDER, command=modal.destroy,
         ).pack(pady=(0, 18))
 
@@ -487,46 +624,16 @@ class App(ctk.CTk):
         except FileNotFoundError:
             messagebox.showerror(
                 "VS Code no encontrado",
-                "No se encontro el comando 'code' en el PATH. Instala el CLI de VS Code e intenta de nuevo.",
+                "No se encontró el comando 'code' en el PATH. Instala el CLI de VS Code e intenta de nuevo.",
             )
             return
 
-        active = self.store.get_active()
-        if active is not None:
-            self._ensure_emotion_tracker(active, session_label=game.display_name)
-
-    def _ensure_emotion_tracker(self, participant, session_label):
-        # Ya hay un tracker corriendo para este mismo participante: no duplicar proceso de camara.
-        if self.emotion_process is not None and self.emotion_process.poll() is None:
-            if self.emotion_participant_id == participant["id"]:
-                return
-            self._stop_emotion_tracker()
-
-        try:
-            self.emotion_process = start_emotion_tracker(participant, session_label)
-        except FileNotFoundError as exc:
-            messagebox.showerror("No se pudo iniciar el seguimiento emocional", str(exc))
-            return
-
-        self.emotion_participant_id = participant["id"]
-        self._update_tracker_status(
-            f"🎥  Seguimiento: activo\n{participant_label(participant)} · {session_label}",
-            active=True,
-        )
-
-    def _stop_emotion_tracker(self):
-        if self.emotion_process is not None and self.emotion_process.poll() is None:
-            self.emotion_process.terminate()
-        self.emotion_process = None
-        self.emotion_participant_id = None
-        self._update_tracker_status("🎥  Seguimiento: inactivo", active=False)
-
-    def _update_tracker_status(self, text, active: bool):
-        self.tracker_status_label.configure(text=text, text_color="#4ade80" if active else TEXT_MUTED)
-        self.tracker_stop_button.configure(state="normal" if active else "disabled")
-
     def _on_close(self):
-        self._stop_emotion_tracker()
+        # Si la app se cierra de golpe con una sesion guiada de Neurosky
+        # todavia activa, la da por incompleta: para el proceso, borra los
+        # datos capturados y trata de desvincular el dispositivo antes de
+        # que la ventana desaparezca (ver SessionWizard.cleanup_incomplete_session).
+        self.session_wizard.cleanup_incomplete_session()
         self.destroy()
 
     def _repair_environment(self):
@@ -534,23 +641,23 @@ class App(ctk.CTk):
 
         log_win = ctk.CTkToplevel(self)
         log_win.title("Reparando entorno (.venv)")
-        log_win.geometry("620x400")
+        log_win.geometry(f"{wrap(620)}x{wrap(400)}")
         log_win.configure(fg_color=BG_APP)
         log_win.transient(self)
 
         ctk.CTkLabel(
             log_win, text="🛠️  Reinstalando dependencias en el .venv unificado",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
         ).pack(anchor="w", padx=14, pady=(14, 6))
 
         textbox = ctk.CTkTextbox(
-            log_win, wrap="word", font=ctk.CTkFont(family="monospace", size=11),
+            log_win, wrap="word", font=ctk.CTkFont(family="monospace", size=scaled(11)),
             fg_color=BG_CARD, corner_radius=10,
         )
         textbox.pack(fill="both", expand=True, padx=14, pady=(0, 8))
 
         close_btn = ctk.CTkButton(
-            log_win, text="Cerrar", state="disabled", width=120, corner_radius=8,
+            log_win, text="Cerrar", state="disabled", width=scaled(120), corner_radius=8,
             fg_color=BG_CARD_ALT, hover_color=BORDER, command=log_win.destroy,
         )
         close_btn.pack(pady=(0, 14))
@@ -574,7 +681,7 @@ class App(ctk.CTk):
                         "Las dependencias de todos los juegos y de la GUI se reinstalaron en el .venv.",
                     )
                 else:
-                    append_line("\n>> Ocurrio un error reparando el entorno. Revisa el log.")
+                    append_line("\n>> Ocurrió un error reparando el entorno. Revisa el log.")
                     messagebox.showerror(
                         "Error al reparar",
                         "No se pudo reinstalar alguna dependencia. Revisa la ventana de log para mas detalles.",
@@ -590,7 +697,7 @@ class App(ctk.CTk):
         if active is None:
             proceed = messagebox.askyesno(
                 "Sin participante activo",
-                "No hay un participante activo seleccionado. Deseas iniciar el juego de todas formas?",
+                "No hay un participante activo seleccionado. ¿Deseas iniciar el juego de todas formas?",
             )
             if not proceed:
                 return
@@ -618,17 +725,17 @@ class App(ctk.CTk):
         title_row = ctk.CTkFrame(wrapper, fg_color="transparent")
         title_row.pack(fill="x")
         ctk.CTkLabel(
-            title_row, text="Participantes", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+            title_row, text="Participantes", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(22), weight="bold")
         ).pack(side="left")
         self.participant_count_label = ctk.CTkLabel(
             title_row, text=self._participant_count_text(),
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=BG_CARD_ALT, corner_radius=10, text_color="#c9cdd9", padx=12, pady=4,
         )
         self.participant_count_label.pack(side="right")
         ctk.CTkLabel(
-            wrapper, text="Registra sujetos de prueba y selecciona el participante activo de la sesion.",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+            wrapper, text="Registra sujetos de prueba. Haz clic en una fila de la tabla para marcarlo como activo.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)), text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 14))
 
         container = ctk.CTkFrame(wrapper, fg_color="transparent")
@@ -640,30 +747,24 @@ class App(ctk.CTk):
         form.grid(row=0, column=0, sticky="nsw", padx=(0, 14))
 
         ctk.CTkLabel(
-            form, text="➕  Nuevo participante", font=ctk.CTkFont(family=FONT_FAMILY, size=15, weight="bold")
+            form, text="➕  Nuevo participante", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(15), weight="bold")
         ).pack(anchor="w", padx=18, pady=(18, 8))
         ctk.CTkLabel(
             form,
             text="Dentro de la app cada participante es anónimo\n(Participante 1, Participante 2, ...). El nombre y\napellido que pidas al agregarlo se guardan aparte,\nen tu Escritorio, no en los datos de la sesión.",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=11), text_color=TEXT_MUTED,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
             justify="left",
         ).pack(anchor="w", padx=18, pady=(0, 16))
 
         ctk.CTkButton(
-            form, text="💾  Agregar participante", height=36, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            form, text="💾  Agregar participante", height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             command=self._open_add_participant_modal,
         ).pack(fill="x", padx=18, pady=(8, 8))
         ctk.CTkButton(
-            form, text="✅  Marcar como activo", height=36, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
-            command=self._mark_selected_active,
-        ).pack(fill="x", padx=18, pady=(0, 8))
-        ctk.CTkButton(
-            form, text="🗑️  Eliminar seleccionado", height=36, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            form, text="🗑️  Eliminar seleccionado", height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             fg_color="transparent", hover_color=DANGER, border_width=1, border_color=DANGER,
             text_color=DANGER,
             command=self._delete_selected,
@@ -675,7 +776,7 @@ class App(ctk.CTk):
         table_frame.grid_columnconfigure(0, weight=1)
 
         self.participants_active_label = ctk.CTkLabel(
-            table_frame, text=self._active_label_text(), font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            table_frame, text=self._active_label_text(), font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=BG_CARD_ALT, corner_radius=8, anchor="w",
         )
         self.participants_active_label.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(16, 10), ipady=6)
@@ -685,13 +786,14 @@ class App(ctk.CTk):
         columns = ("participante", "nivel", "fecha")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for col, label, width in (
-            ("participante", "Participante", 160),
-            ("nivel", "Nivel de experiencia", 220),
-            ("fecha", "Registrado", 180),
+            ("participante", "Participante", scaled(160)),
+            ("nivel", "Nivel de experiencia", scaled(220)),
+            ("fecha", "Registrado", scaled(180)),
         ):
             self.tree.heading(col, text=label, anchor="center")
             self.tree.column(col, width=width, anchor="center")
         self.tree.grid(row=1, column=0, sticky="nsew", padx=(16, 0), pady=(0, 16))
+        self.tree.bind("<<TreeviewSelect>>", self._on_participant_selected)
 
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -709,8 +811,8 @@ class App(ctk.CTk):
             fieldbackground=BG_CARD_ALT,
             bordercolor=BG_CARD,
             borderwidth=0,
-            rowheight=30,
-            font=(FONT_FAMILY, 11),
+            rowheight=scaled(30),
+            font=(FONT_FAMILY, scaled(11)),
         )
         style.map("Treeview", background=[("selected", ACCENT)], foreground=[("selected", "white")])
         style.configure(
@@ -719,7 +821,7 @@ class App(ctk.CTk):
             foreground=TEXT_MUTED,
             borderwidth=0,
             relief="flat",
-            font=(FONT_FAMILY, 11, "bold"),
+            font=(FONT_FAMILY, scaled(11), "bold"),
         )
         style.map("Treeview.Heading", background=[("active", BG_CARD)])
         style.configure("Vertical.TScrollbar", background=BG_CARD_ALT, troughcolor=BG_CARD, bordercolor=BG_CARD)
@@ -729,6 +831,9 @@ class App(ctk.CTk):
         for p in self.store.list_participants():
             nivel = p.get("attributes", {}).get("nivel_experiencia", "—")
             self.tree.insert("", "end", iid=p["id"], values=(participant_label(p), nivel, p["created_at"]))
+        active = self.store.get_active()
+        if active is not None:
+            self.tree.selection_set(active["id"])
         self.active_label.configure(text=self._active_label_text())
         self.participants_active_label.configure(text=self._active_label_text())
         self.participant_count_label.configure(text=self._participant_count_text())
@@ -738,7 +843,7 @@ class App(ctk.CTk):
     def _open_add_participant_modal(self):
         modal = ctk.CTkToplevel(self)
         modal.title("Nuevo participante")
-        modal.geometry("400x420")
+        modal.geometry(f"{wrap(400)}x{wrap(420)}")
         modal.configure(fg_color=BG_APP)
         modal.transient(self)
         modal.resizable(False, False)
@@ -749,7 +854,7 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             modal, text="➕  Nuevo participante",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=18, weight="bold"),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(18), weight="bold"),
         ).pack(pady=(26, 8))
         ctk.CTkLabel(
             modal,
@@ -760,27 +865,27 @@ class App(ctk.CTk):
                 "que dentro de la app siguen identificando a esta persona\n"
                 "únicamente como su número de participante."
             ),
-            font=ctk.CTkFont(family=FONT_FAMILY, size=11), text_color=TEXT_MUTED, justify="center",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED, justify="center",
         ).pack(padx=24, pady=(0, 16))
 
         entry_nombre = ctk.CTkEntry(
-            modal, width=260, height=34, corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
+            modal, width=scaled(260), height=scaled(34), corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
             placeholder_text="Nombre",
         )
         entry_nombre.pack(pady=(0, 10))
         entry_apellido = ctk.CTkEntry(
-            modal, width=260, height=34, corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
+            modal, width=scaled(260), height=scaled(34), corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
             placeholder_text="Apellido",
         )
         entry_apellido.pack(pady=(0, 14))
         entry_nombre.focus_set()
 
         ctk.CTkLabel(
-            modal, text="Nivel de experiencia", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            modal, text="Nivel de experiencia", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             text_color=TEXT_MUTED,
         ).pack(anchor="center")
         experience_menu = ctk.CTkOptionMenu(
-            modal, width=260, height=34, corner_radius=8,
+            modal, width=scaled(260), height=scaled(34), corner_radius=8,
             values=EXPERIENCE_LEVELS,
             fg_color=BG_CARD_ALT, button_color=BORDER, button_hover_color=ACCENT,
         )
@@ -820,14 +925,14 @@ class App(ctk.CTk):
         buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
         buttons_row.pack()
         ctk.CTkButton(
-            buttons_row, text="Cancelar", width=110, height=36, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            buttons_row, text="Cancelar", width=scaled(110), height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             fg_color="transparent", hover_color=BORDER, border_width=1, border_color=BORDER,
             command=modal.destroy,
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            buttons_row, text="Guardar", width=110, height=36, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            buttons_row, text="Guardar", width=scaled(110), height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             command=on_accept,
         ).pack(side="left")
@@ -836,345 +941,357 @@ class App(ctk.CTk):
         selection = self.tree.selection()
         return selection[0] if selection else None
 
-    def _mark_selected_active(self):
+    def _on_participant_selected(self, event=None):
         pid = self._selected_id()
         if not pid:
-            messagebox.showinfo("Sin seleccion", "Selecciona un participante de la tabla primero.")
+            return
+        active = self.store.get_active()
+        if active is not None and active["id"] == pid:
             return
         self.store.set_active(pid)
         self._refresh_participants()
         self._refresh_session_tab()
+        self._refresh_session_data_matrix()
 
     def _delete_selected(self):
         pid = self._selected_id()
         if not pid:
-            messagebox.showinfo("Sin seleccion", "Selecciona un participante de la tabla primero.")
+            messagebox.showinfo("Sin selección", "Selecciona un participante de la tabla primero.")
             return
-        if messagebox.askyesno("Confirmar", "Eliminar este participante?"):
+        if messagebox.askyesno("Confirmar", "¿Eliminar este participante?"):
             self.store.delete_participant(pid)
             self._refresh_participants()
 
     # ---------------- Sesion ----------------
     def _build_session_tab(self):
-        wrapper = ctk.CTkFrame(self.tab_session, fg_color="transparent")
+        # Scrollable: con la tarjeta de "Dataset consolidado" agregada abajo
+        # de "Datos guardados" ya no entran ambas expandiendose en la altura
+        # fija de la pestaña -- con esto la pestaña entera se puede
+        # desplazar en vez de aplastar una tarjeta contra la otra.
+        wrapper = ctk.CTkScrollableFrame(self.tab_session, fg_color="transparent")
         wrapper.pack(fill="both", expand=True, padx=26, pady=(24, 20))
 
         ctk.CTkLabel(
-            wrapper, text="Sesión", font=ctk.CTkFont(family=FONT_FAMILY, size=22, weight="bold")
+            wrapper, text="Sesión", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(22), weight="bold")
         ).pack(anchor="w")
         ctk.CTkLabel(
             wrapper,
-            text="Inicia/termina la sesión del participante activo, importa el BPM del reloj "
-                 "y revisa emociones y frecuencia cardíaca juntos.",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
+            text="Comienza la sesión guiada de desafíos para el participante activo.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)), text_color=TEXT_MUTED,
         ).pack(anchor="w", pady=(2, 14))
-
-        control_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
-        control_card.pack(fill="x", pady=(0, 14))
-
-        self.session_active_label = ctk.CTkLabel(
-            control_card, text=self._active_label_text(),
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
-        )
-        self.session_active_label.pack(anchor="w", padx=18, pady=(16, 4))
-
-        self.session_status_label = ctk.CTkLabel(
-            control_card, text="Sin sesión activa.", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-            text_color=TEXT_MUTED,
-        )
-        self.session_status_label.pack(anchor="w", padx=18, pady=(0, 12))
-
-        buttons_row = ctk.CTkFrame(control_card, fg_color="transparent")
-        buttons_row.pack(anchor="w", padx=18, pady=(0, 18))
-
-        self.start_session_button = ctk.CTkButton(
-            buttons_row, text="▶  Iniciar sesión", height=36, width=160, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
-            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
-            command=self._open_start_session_modal,
-        )
-        self.start_session_button.pack(side="left", padx=(0, 8))
-
-        self.end_session_button = ctk.CTkButton(
-            buttons_row, text="⏹  Terminar sesión", height=36, width=160, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
-            fg_color="transparent", hover_color=DANGER, border_width=1, border_color=DANGER,
-            text_color=DANGER, state="disabled",
-            command=self._end_session,
-        )
-        self.end_session_button.pack(side="left", padx=(0, 8))
-
-        self.import_hr_button = ctk.CTkButton(
-            buttons_row, text="📥  Importar datos del reloj", height=36, width=210, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12),
-            fg_color=BG_CARD_ALT, hover_color=BORDER, text_color="white",
-            command=self._import_heart_rate,
-        )
-        self.import_hr_button.pack(side="left")
 
         guided_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
         guided_card.pack(fill="x", pady=(0, 14))
         ctk.CTkLabel(
             guided_card, text="🚀  Sesión guiada de desafíos",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
         ).pack(anchor="w", padx=18, pady=(16, 4))
-        ctk.CTkLabel(
-            guided_card,
-            text="Reemplaza toda la interfaz por un asistente de 3 etapas para el "
-                 "participante activo: enunciado del problema, prompt del participante "
-                 "y resultado de Claude Code, empezando por el desafío más fácil.",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED,
-            wraplength=760, justify="left",
-        ).pack(anchor="w", padx=18, pady=(0, 12))
         self.guided_session_button = ctk.CTkButton(
-            guided_card, text="🚀  Comenzar sesión guiada", height=36, width=220, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+            guided_card, text=self._guided_session_button_text(), height=scaled(36), width=scaled(280),
+            corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             command=self.enter_session_wizard,
         )
-        self.guided_session_button.pack(anchor="w", padx=18, pady=(0, 18))
+        self.guided_session_button.pack(anchor="w", padx=18, pady=(4, 18))
 
-        table_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
-        table_card.pack(fill="both", expand=True)
-        table_card.grid_rowconfigure(2, weight=1)
-        table_card.grid_columnconfigure(0, weight=1)
+        # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
+        # Matriz de lo que ya se exporto para el participante activo, leyendo
+        # directo de Sesiones_participantes/<Nombre_Apellido_N>/Desafio_N/
+        # Etapa_N/ (ver stage_capture.py) -- las Etapas 1 y 6 no capturan
+        # datos (ver GUIDED_SESSION_STAGE_ORDER), asi que no se listan.
+        data_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        data_card.pack(fill="x", pady=(0, 14))
 
-        selector_row = ctk.CTkFrame(table_card, fg_color="transparent")
-        selector_row.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(16, 8))
         ctk.CTkLabel(
-            selector_row, text="Sesión a mostrar:", font=ctk.CTkFont(family=FONT_FAMILY, size=12),
+            data_card, text="📊  Datos guardados",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+
+        selector_row = ctk.CTkFrame(data_card, fg_color="transparent")
+        selector_row.pack(fill="x", padx=18, pady=(0, 10))
+        ctk.CTkLabel(
+            selector_row, text="Desafío", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             text_color=TEXT_MUTED,
         ).pack(side="left", padx=(0, 8))
-        self.session_selector = ctk.CTkOptionMenu(
-            selector_row, values=["(sin sesiones)"], width=340, height=30,
-            fg_color=BG_CARD_ALT, button_color=BORDER, button_hover_color=ACCENT,
-            command=self._on_session_selected,
+        self.session_data_challenge_menu = ctk.CTkOptionMenu(
+            selector_row, values=[str(n) for n in range(1, len(GUIDED_SESSION_GAME_ORDER) + 1)],
+            width=scaled(80), fg_color=BG_CARD_ALT, button_color=BORDER, button_hover_color=ACCENT,
+            command=lambda _value: self._refresh_session_data_matrix(),
         )
-        self.session_selector.pack(side="left", padx=(0, 14))
-        self.session_participant_label = ctk.CTkLabel(
-            selector_row, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
-            text_color="#c9cdd9",
+        self.session_data_challenge_menu.pack(side="left")
+
+        tree_frame = ctk.CTkFrame(data_card, fg_color="transparent")
+        tree_frame.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
+        columns = ("etapa", "neurosky", "emotion", "eye", "heart_rate", "cuestionario", "enunciado", "escrito")
+        self.session_data_tree = ttk.Treeview(
+            tree_frame, columns=columns, show="headings", height=4, selectmode="none",
         )
-        self.session_participant_label.pack(side="left")
+        for col, label, width in (
+            ("etapa", "Etapa", scaled(70)),
+            ("neurosky", "NeuroSky", scaled(100)),
+            ("emotion", "Emotion", scaled(100)),
+            ("eye", "Mirada (izq/der)", scaled(170)),
+            ("heart_rate", "Frecuencia cardíaca", scaled(190)),
+            ("cuestionario", "Cuestionario", scaled(120)),
+            ("enunciado", "Enunciado (aperturas)", scaled(170)),
+            ("escrito", "Escrito Etapa 3", scaled(110)),
+        ):
+            self.session_data_tree.heading(col, text=label, anchor="center")
+            self.session_data_tree.column(col, width=width, anchor="center")
+        self.session_data_tree.grid(row=0, column=0, sticky="nsew")
 
-        self.session_stats_label = ctk.CTkLabel(
-            table_card, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
-            fg_color=BG_CARD_ALT, corner_radius=8, anchor="w", justify="left",
-        )
-        self.session_stats_label.grid(row=1, column=0, columnspan=2, sticky="ew", padx=16, pady=(0, 10), ipady=8)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.session_data_tree.xview)
+        self.session_data_tree.configure(xscrollcommand=h_scrollbar.set)
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
 
-        columns = ("hora", "tipo", "valor")
-        self.session_tree = ttk.Treeview(table_card, columns=columns, show="headings", selectmode="browse")
-        for col, label, width in (("hora", "Hora", 160), ("tipo", "Tipo", 100), ("valor", "Valor", 160)):
-            self.session_tree.heading(col, text=label, anchor="center")
-            self.session_tree.column(col, width=width, anchor="center")
-        self.session_tree.grid(row=2, column=0, sticky="nsew", padx=(16, 0), pady=(0, 16))
-
-        session_scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.session_tree.yview)
-        self.session_tree.configure(yscrollcommand=session_scrollbar.set)
-        session_scrollbar.grid(row=2, column=1, sticky="ns", padx=(0, 16), pady=(0, 16))
-
-        self._refresh_session_tab()
-
-    def _open_start_session_modal(self):
-        active = self.store.get_active()
-        if active is None:
-            messagebox.showinfo(
-                "Sin participante activo",
-                "Selecciona un participante activo en la pestaña Participantes primero.",
-            )
-            return
-        if self.active_session is not None:
-            messagebox.showinfo("Sesión en curso", "Ya hay una sesión activa. Termínala antes de iniciar otra.")
-            return
-
-        modal = ctk.CTkToplevel(self)
-        modal.title("Activar reloj")
-        modal.geometry("400x240")
-        modal.configure(fg_color=BG_APP)
-        modal.transient(self)
-        modal.resizable(False, False)
-        # grab_set() debe esperar a que la ventana ya este dibujada en pantalla,
-        # si no lanza "grab failed: window not viewable".
-        modal.wait_visibility()
-        modal.grab_set()
+        # ---------------- Dataset consolidado (ver data/build_dataset.py) ----------------
+        # A diferencia de "Datos guardados" (un desafio, un participante),
+        # esto junta en un solo CSV los datos crudos de TODOS los
+        # participantes/desafios/etapas ya exportados -- se genera bajo
+        # demanda (recorre el Escritorio entero) y se previsualiza aca antes
+        # de usarlo para el analisis.
+        dataset_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        dataset_card.pack(fill="x")
 
         ctk.CTkLabel(
-            modal, text="⌚  Activar reloj",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=18, weight="bold"),
-        ).pack(pady=(26, 10))
+            dataset_card, text="🧬  Dataset consolidado",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
         ctk.CTkLabel(
-            modal,
-            text=(
-                "Inicia ahora el ejercicio en el reloj\n"
-                "(Samsung Health → Ejercicio → tipo sin GPS).\n\n"
-                "Cuando el reloj ya esté midiendo,\n"
-                "presiona Aceptar para marcar el inicio\n"
-                "exacto de la sesión."
-            ),
-            font=ctk.CTkFont(family=FONT_FAMILY, size=12), text_color=TEXT_MUTED, justify="center",
-        ).pack(padx=24, pady=(0, 20))
+            dataset_card,
+            text="Une en un solo CSV los datos crudos de TODOS los participantes y desafíos ya "
+                 "exportados: NeuroSky (bandas EEG), Emotion Tracker (emoción dominante + el "
+                 "porcentaje de cada categoría), Eye Tracker (mirada + izq/der agregado), "
+                 "frecuencia cardíaca del reloj y resultado de los cuestionarios -- una fila por "
+                 "etapa de cada desafío.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
 
-        def on_accept():
-            session = self.session_store.start_session(active["id"], label="sesion")
-            self.active_session = session
-            self._ensure_emotion_tracker(active, session_label="sesion")
-            self._refresh_session_tab()
-            modal.destroy()
+        controls_row = ctk.CTkFrame(dataset_card, fg_color="transparent")
+        controls_row.pack(fill="x", padx=18, pady=(0, 18))
+        self.dataset_generate_button = ctk.CTkButton(
+            controls_row, text="🔄  Generar / actualizar dataset", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self._generate_dataset,
+        )
+        self.dataset_generate_button.pack(side="left")
+        # Deshabilitado hasta la primera generacion exitosa de esta sesion de
+        # la app -- la tabla completa se ve en una ventana aparte a pantalla
+        # completa (ver _open_dataset_window), no incrustada aca: con
+        # decenas de columnas (listas de lecturas crudas, etc.) una vista
+        # incrustada quedaba demasiado chica para detallar nada.
+        self.dataset_view_button = ctk.CTkButton(
+            controls_row, text="🖥️  Ver dataset completo", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            state="disabled", command=self._open_dataset_window,
+        )
+        self.dataset_view_button.pack(side="left", padx=(8, 0))
+        self._last_dataset_df: Optional[pd.DataFrame] = None
+        self._last_dataset_path: Optional[Path] = None
+        self._dataset_window: Optional[ctk.CTkToplevel] = None
+        self._dataset_tree: Optional[ttk.Treeview] = None
 
-        ctk.CTkButton(
-            modal, text="Aceptar", height=38, width=160, corner_radius=8,
-            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),
-            fg_color=SUCCESS, hover_color=SUCCESS_HOVER,
-            command=on_accept,
-        ).pack()
+        self.dataset_status_label = ctk.CTkLabel(
+            dataset_card, text="Todavía no se generó en esta sesión de la app.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        )
+        self.dataset_status_label.pack(anchor="w", padx=18, pady=(0, 18))
 
-    def _end_session(self):
-        if self.active_session is None:
-            return
-        self.session_store.end_session(self.active_session["id"])
-        self._stop_emotion_tracker()
-        self.active_session = None
         self._refresh_session_tab()
-        messagebox.showinfo("Sesión terminada", "La sesión se guardó. Ya puedes importar los datos del reloj.")
+        self._refresh_session_data_matrix()
 
-    def _import_heart_rate(self):
+    def _guided_session_button_text(self) -> str:
         active = self.store.get_active()
         if active is None:
-            messagebox.showinfo("Sin participante activo", "Selecciona un participante activo primero.")
-            return
-        if self.selected_session is None:
-            messagebox.showinfo("Sin sesión seleccionada", "Selecciona una sesión terminada en el desplegable.")
-            return
-        if self.selected_session.get("end_time") is None:
-            messagebox.showinfo("Sesión en curso", "Termina la sesión antes de importar sus datos.")
-            return
+            return "🚀  Iniciar sesión guiada"
+        return f"🚀  Iniciar sesión guiada con el {participant_label(active)}"
 
-        default_dir = Path.home() / "Escritorio" / "Datos_Biometricos"
-        export_dir = filedialog.askdirectory(
-            title="Entra a la carpeta del export (ej. PARTICIPANTE_1) y selecciónala",
-            initialdir=str(default_dir) if default_dir.exists() else str(Path.home()),
-        )
-        if not export_dir:
+    def _refresh_session_data_matrix(self):
+        """Recalcula la matriz de "Datos guardados" del desafío elegido,
+        para el participante activo -- lee siempre de disco (nunca de
+        estado en memoria de la sesion guiada), asi que sirve igual si la
+        app se reinicio o si el participante viene de otra sesion. Nunca
+        rompe la interfaz: si falta la carpeta, un archivo, o el CSV esta
+        corrupto, la celda correspondiente queda en "—" (ver
+        stage_capture.summarize_stage)."""
+        tree = getattr(self, "session_data_tree", None)
+        if tree is None:
             return
+        tree.delete(*tree.get_children())
 
-        expected_stub = participant_file_stub(active)
-        folder_name = Path(export_dir).name.strip().upper()
-        if folder_name != expected_stub:
-            messagebox.showerror(
-                "La carpeta no coincide con el participante",
-                f"El participante activo es {participant_label(active)}, así que la "
-                f"carpeta del export debe llamarse exactamente \"{expected_stub}\".\n\n"
-                f"Seleccionaste \"{Path(export_dir).name}\", que no coincide. Renombra la carpeta "
-                "exportada o verifica que sea la del participante correcto antes de importar.",
-            )
+        placeholder = ("—",) * 7
+        participant = self.store.get_active()
+        if participant is None:
+            for stage in GUIDED_SESSION_STAGE_ORDER:
+                tree.insert("", "end", values=(f"Etapa {stage}", *placeholder))
             return
 
         try:
-            log_file, count = import_heart_rate(active, self.selected_session, Path(export_dir))
-        except FileNotFoundError as exc:
-            messagebox.showerror("No se pudo importar", str(exc))
-            return
+            challenge_number = int(self.session_data_challenge_menu.get())
+        except (ValueError, AttributeError):
+            challenge_number = 1
+        folder = challenge_dir_readonly(participant, challenge_number)
 
-        if count == 0:
-            messagebox.showwarning(
-                "Sin lecturas en esa ventana",
-                "No se encontraron muestras BPM dentro del rango de tiempo de la sesión seleccionada. "
-                "Verifica que el ejercicio en el reloj haya coincidido con la sesión.",
+        for stage in GUIDED_SESSION_STAGE_ORDER:
+            try:
+                summary = summarize_stage(folder, stage)
+            except Exception:
+                summary = {}
+            tree.insert(
+                "", "end",
+                values=(
+                    f"Etapa {stage}",
+                    summary.get("neurosky", "—"), summary.get("emotion", "—"), summary.get("eye", "—"),
+                    summary.get("heart_rate", "—"), summary.get("cuestionario", "—"),
+                    summary.get("enunciado", "—"), summary.get("escrito", "—"),
+                ),
             )
-        else:
-            messagebox.showinfo("Datos importados", f"{count} lecturas de BPM guardadas en:\n{log_file}")
-
-        self._refresh_session_view()
-
-    def _on_session_selected(self, label: str):
-        active = self.store.get_active()
-        if not active:
-            return
-        for s in self.session_store.list_sessions(active["id"]):
-            if self._session_label(s) == label:
-                self.selected_session = s
-                break
-        self._refresh_session_view()
-
-    @staticmethod
-    def _session_label(session: dict) -> str:
-        end = session.get("end_time") or "en curso"
-        return f"{session['start_time']} → {end}"
 
     def _refresh_session_tab(self):
         active = self.store.get_active()
-        self.session_active_label.configure(text=self._active_label_text())
-
-        if self.active_session is not None:
-            self.session_status_label.configure(
-                text=f"🟢 Sesión en curso, iniciada a las {self.active_session['start_time']}",
-                text_color="#4ade80",
-            )
-            self.start_session_button.configure(state="disabled")
-            self.end_session_button.configure(state="normal")
-        else:
-            self.session_status_label.configure(text="Sin sesión activa.", text_color=TEXT_MUTED)
-            self.start_session_button.configure(state="normal" if active else "disabled")
-            self.end_session_button.configure(state="disabled")
-
-        self.guided_session_button.configure(state="normal" if active else "disabled")
-
-        sessions = self.session_store.list_sessions(active["id"]) if active else []
-        if sessions:
-            labels = [self._session_label(s) for s in sessions]
-            self.session_selector.configure(values=labels)
-            completed = [s for s in sessions if s.get("end_time")]
-            self.selected_session = completed[-1] if completed else sessions[-1]
-            self.session_selector.set(self._session_label(self.selected_session))
-        else:
-            self.session_selector.configure(values=["(sin sesiones)"])
-            self.session_selector.set("(sin sesiones)")
-            self.selected_session = None
-
-        self.session_participant_label.configure(
-            text=f"— {participant_label(active)}" if active else ""
+        self.guided_session_button.configure(
+            text=self._guided_session_button_text(), state="normal" if active else "disabled",
         )
 
-        self._refresh_session_view()
+    # ---------------- Dataset consolidado ----------------
+    def _generate_dataset(self):
+        """Dispara build_dataset.save_dataset() en un hilo aparte -- recorre
+        TODO ~/Escritorio/Sesiones_participantes/, asi que con muchas
+        sesiones puede tardar unos segundos y no debe congelar la UI."""
+        self.dataset_generate_button.configure(state="disabled", text="Generando...")
+        self.dataset_status_label.configure(
+            text="Generando dataset (leyendo todas las sesiones exportadas)...", text_color=TEXT_MUTED,
+        )
+        threading.Thread(target=self._run_dataset_generation, daemon=True).start()
 
-    def _refresh_session_view(self):
-        self.session_tree.delete(*self.session_tree.get_children())
-        active = self.store.get_active()
-        if not active or not self.selected_session:
-            self.session_stats_label.configure(text="📊  Sin datos para mostrar todavía.")
+    def _run_dataset_generation(self):
+        try:
+            df, path = save_dataset()
+            error = ""
+        except Exception as exc:
+            df, path, error = None, None, str(exc)
+        self.after(0, lambda: self._on_dataset_generated(df, path, error))
+
+    def _on_dataset_generated(self, df, path, error: str):
+        self.dataset_generate_button.configure(state="normal", text="🔄  Generar / actualizar dataset")
+        if error:
+            self.dataset_status_label.configure(text=f"⚠️  No se pudo generar: {error}", text_color=WARNING)
+            self.dataset_view_button.configure(state="disabled")
             return
 
-        combined = read_combined_session_data(active, self.selected_session)
-        for row in combined:
-            self.session_tree.insert(
-                "", "end",
-                values=(row["timestamp"].strftime("%H:%M:%S"), row["tipo"], row["valor"]),
+        self._last_dataset_df, self._last_dataset_path = df, path
+        if df.empty:
+            self.dataset_status_label.configure(
+                text="No se encontraron sesiones guiadas exportadas todavía en "
+                     "Escritorio/Sesiones_participantes.",
+                text_color=TEXT_MUTED,
             )
+            self.dataset_view_button.configure(state="disabled")
+            return
 
-        self.session_stats_label.configure(text=self._build_stats_text(combined))
+        self.dataset_status_label.configure(
+            text=f"✅  {len(df)} filas · {len(df.columns)} columnas · guardado en {path}",
+            text_color=TEXT_MUTED,
+        )
+        self.dataset_view_button.configure(state="normal")
+        if self._dataset_window is not None:
+            self._fill_dataset_tree(self._dataset_tree, df)  # ventana ya abierta -- refrescarla en el momento
+
+    def _open_dataset_window(self):
+        """Ventana aparte, maximizada a pantalla completa, con el dataset
+        entero (todas las filas, todas las columnas) -- la vista incrustada
+        en la tarjeta se quedaba corta para un dataset de decenas de
+        columnas (listas de lecturas crudas, el prompt de la Etapa 3,
+        etc.). Si ya está abierta, la trae al frente en vez de duplicarla."""
+        if self._last_dataset_df is None or self._last_dataset_df.empty:
+            return
+        if self._dataset_window is not None:
+            try:
+                self._dataset_window.deiconify()
+                self._dataset_window.lift()
+                self._dataset_window.focus_force()
+                return
+            except Exception:
+                self._dataset_window = None
+
+        window = ctk.CTkToplevel(self)
+        window.title(f"Dataset consolidado -- {self._last_dataset_path}")
+        # Geometry al tamaño de pantalla como base (siempre funciona) +
+        # "maximizado" nativo del sistema operativo si está disponible --
+        # "-zoomed" no existe en todos los window managers de Linux, así
+        # que no debe romper la ventana si el intento falla.
+        window.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+        try:
+            if sys.platform.startswith("win"):
+                window.state("zoomed")
+            else:
+                window.attributes("-zoomed", True)
+        except Exception:
+            pass
+        window.configure(fg_color=BG_APP)
+
+        header = ctk.CTkFrame(window, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 8))
+        ctk.CTkLabel(
+            header, text=f"🧬  Dataset consolidado · {len(self._last_dataset_df)} filas · "
+                         f"{len(self._last_dataset_df.columns)} columnas",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(16), weight="bold"),
+        ).pack(side="left")
+        ctk.CTkButton(
+            header, text="Cerrar", width=scaled(100), height=scaled(32), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=window.destroy,
+        ).pack(side="right")
+
+        tree_frame = ctk.CTkFrame(window, fg_color="transparent")
+        tree_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
+        tree = ttk.Treeview(tree_frame, show="headings", selectmode="none")
+        tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=v_scrollbar.set)
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+        tree.configure(xscrollcommand=h_scrollbar.set)
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+
+        self._fill_dataset_tree(tree, self._last_dataset_df)
+
+        def on_close():
+            self._dataset_window = None
+            self._dataset_tree = None
+            window.destroy()
+
+        window.protocol("WM_DELETE_WINDOW", on_close)
+        self._dataset_window = window
+        self._dataset_tree = tree
 
     @staticmethod
-    def _build_stats_text(rows: list[dict]) -> str:
-        emotions = [r["valor"] for r in rows if r["tipo"] == "Emoción"]
-        bpms = []
-        for r in rows:
-            if r["tipo"] != "BPM":
-                continue
-            try:
-                bpms.append(float(r["valor"]))
-            except ValueError:
-                continue
-
-        if emotions:
-            emotion, freq = Counter(emotions).most_common(1)[0]
-            emotion_text = f"{emotion} ({freq}/{len(emotions)} lecturas)"
-        else:
-            emotion_text = "sin datos"
-
-        bpm_text = f"{sum(bpms) / len(bpms):.1f} BPM  (min {min(bpms):.0f} · max {max(bpms):.0f})" if bpms else "sin datos"
-
-        return f"📊  Emoción más recurrente: {emotion_text}      ·      Promedio BPM: {bpm_text}"
+    def _fill_dataset_tree(tree: ttk.Treeview, df):
+        """Todas las filas y columnas del dataset -- a diferencia de la
+        vieja vista incrustada, acá no hace falta truncar ni limitar
+        filas: la ventana tiene todo el ancho/alto de la pantalla para
+        detallar los datos."""
+        tree.delete(*tree.get_children())
+        columns = list(df.columns)
+        tree["columns"] = columns
+        for col in columns:
+            tree.heading(col, text=col, anchor="center")
+            tree.column(col, width=scaled(180), anchor="center", stretch=False)
+        for _, row in df.iterrows():
+            values = ["" if pd.isna(row[col]) else str(row[col]) for col in columns]
+            tree.insert("", "end", values=values)
 
 
 def main():

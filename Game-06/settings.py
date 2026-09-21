@@ -84,9 +84,9 @@ LANE_MAX_SAME_LANE_STREAK = 2
 # travel_time: seconds a note spends falling from FALL_START_Y to
 # HIT_ZONE_Y -- the main "how much reaction time do I get" knob.
 DIFFICULTIES = {
-    "facil": {"label": "Facil", "travel_time": 3.1},
+    "facil": {"label": "Fácil", "travel_time": 3.1},
     "normal": {"label": "Normal", "travel_time": 2.3},
-    "dificil": {"label": "Dificil", "travel_time": 1.6},
+    "dificil": {"label": "Difícil", "travel_time": 1.6},
 }
 DEFAULT_DIFFICULTY = "normal"
 

@@ -6,8 +6,9 @@ system prompt restrictivo -- ver ahi mismo por que NO tiene temperature
 baja) vive en isolated_prompt.py. Este archivo solo orquesta: le pasa el
 prompt del participante a esa llamada aislada y, con la respuesta que
 vuelva, genera los dos bancos de preguntas de opcion multiple (comprension
-para la Etapa 3, razonamiento para la Etapa 4) que sí pueden usar el
-enunciado del ejercicio como contexto -- son herramienta de evaluacion del
+para la Etapa 3, razonamiento para la Etapa 4) y el texto de explicacion
+de razonamiento de la Etapa 4 -- todo esto sí puede usar el enunciado del
+ejercicio como contexto, porque es herramienta de evaluacion armada por el
 investigador, no la respuesta que ve la IA del participante.
 """
 
@@ -21,7 +22,12 @@ from isolated_prompt import ask_isolated_prompt
 from quiz import QuizQuestion
 
 CLAUDE_BIN = "claude"
-QUIZ_TIMEOUT_SECONDS = 90
+# 14 preguntas de opcion multiple + una explicacion de razonamiento de 2-4
+# parrafos, generadas en una sola llamada JSON-schema al CLI `claude`: en la
+# practica esto puede superar 90s (visto en sesiones reales, ver
+# generate_isolated_response), lo que hacia fallar en silencio Etapas 4 Y 5
+# a la vez (ambas salen de esta misma llamada) sin ningun mensaje util.
+QUIZ_TIMEOUT_SECONDS = 180
 CLAUDE_MODEL = "sonnet"
 
 _QUESTION_JSON_SCHEMA = {
@@ -43,8 +49,9 @@ RESPONSE_QUIZ_JSON_SCHEMA = {
         "reasoning_questions": {
             "type": "array", "minItems": 7, "maxItems": 7, "items": _QUESTION_JSON_SCHEMA,
         },
+        "reasoning_explanation": {"type": "string"},
     },
-    "required": ["comprehension_questions", "reasoning_questions"],
+    "required": ["comprehension_questions", "reasoning_questions", "reasoning_explanation"],
 }
 
 # Orden de "siguiente desafio" del modulo de sesion guiada: los 7 juegos,
@@ -62,6 +69,8 @@ class ChallengeSolveResult:
     elapsed_seconds: float = 0.0
     comprehension_questions: list[QuizQuestion] = field(default_factory=list)  # Etapa 3
     reasoning_questions: list[QuizQuestion] = field(default_factory=list)  # Etapa 4
+    reasoning_explanation: str = ""  # Etapa 4 -- por que la IA aislada llego a esa respuesta
+    quiz_generation_error: str = ""  # por que comprehension/reasoning quedaron vacios (si aplica)
 
 
 def _question_from_payload(payload: dict) -> QuizQuestion:
@@ -74,12 +83,14 @@ def _question_from_payload(payload: dict) -> QuizQuestion:
 
 def generate_response_quiz(
     challenge: Challenge, response_text: str,
-) -> tuple[list[QuizQuestion], list[QuizQuestion]]:
+) -> tuple[list[QuizQuestion], list[QuizQuestion], str, str]:
     """Genera, a partir de la respuesta AISLADA que le llego al participante
     (puede ser codigo, texto explicativo, o la IA diciendo que le falta
-    contexto), dos bancos de 7 preguntas de opcion multiple: uno sobre que
+    contexto), dos bancos de 7 preguntas de opcion multiple -- uno sobre que
     dice/hace esa respuesta (Etapa 3) y otro sobre por que es (o no es) una
-    respuesta valida al enunciado (Etapa 4, razonamiento).
+    respuesta valida al enunciado (Etapa 4, razonamiento) -- mas un texto de
+    explicacion de razonamiento (tambien Etapa 4) sobre por que la IA
+    aislada llego a esa respuesta concreta.
 
     A diferencia de la llamada aislada, esta SI usa el enunciado del
     ejercicio como contexto -- es una herramienta de evaluacion armada por
@@ -87,8 +98,11 @@ def generate_response_quiz(
     ninguna herramienta (`--tools ""`): es generacion de texto pura,
     restringida a un JSON Schema.
 
-    Devuelve ([], []) si algo falla (la sesion guiada sigue funcionando sin
-    preguntas antes que romperse).
+    Devuelve ([], [], "", <razon>) si algo falla (la sesion guiada sigue
+    funcionando sin preguntas ni explicacion antes que romperse) -- la razon
+    queda en ChallengeSolveResult.quiz_generation_error para que la interfaz
+    (ver session_wizard._build_quiz) pueda mostrarla en vez de un
+    "no se generaron preguntas" sin ninguna pista de por que.
     """
     prompt = (
         "Un participante de un estudio escribio un prompt para pedirle a una "
@@ -100,18 +114,33 @@ def generate_response_quiz(
         f"Enunciado del ejercicio (para tu referencia, la IA que respondio NO "
         f"lo vio):\n{challenge.statement}\n\n"
         f"Respuesta de la IA al prompt del participante:\n\"\"\"\n{response_text}\n\"\"\"\n\n"
-        "Genera dos bancos de exactamente 7 preguntas de opcion multiple en "
-        "espanol cada uno, con exactamente 4 opciones y una sola correcta "
-        "(correct_index de 0 a 3), dificultad moderada, sin ambiguedad ni "
-        "opciones absurdas.\n\n"
+        "Genera lo siguiente, en espanol:\n\n"
+        "1. Un texto \"reasoning_explanation\" de 2 a 4 parrafos, en lenguaje "
+        "claro para un participante (no un experto), describiendo el PASO A "
+        "PASO y la logica interna que se siguio para estructurar y construir "
+        "ESA respuesta concreta: en que orden hace las cosas el codigo, que "
+        "estructuras de datos o control usa y para que, que se interpreto o "
+        "asumio a partir del prompt del participante, y por que esa "
+        "respuesta es (o no es) una solucion valida al ejercicio. Anda "
+        "directo al razonamiento -- no hace falta aclarar que la respuesta "
+        "vino de una IA aislada ni que no vio el enunciado. No inventes "
+        "metricas hipoteticas (tiempos, complejidad, rendimiento), "
+        "comportamientos del sistema no verificados, ni ventajas que no "
+        "esten expresa y literalmente escritas o soportadas en el codigo de "
+        "la respuesta -- describi unicamente lo que el codigo realmente "
+        "hace.\n\n"
+        "2. Dos bancos de exactamente 7 preguntas de opcion multiple cada "
+        "uno, con exactamente 4 opciones y una sola correcta (correct_index "
+        "de 0 a 3), dificultad moderada, sin ambiguedad ni opciones "
+        "absurdas.\n\n"
         "Banco \"comprehension_questions\" (7 preguntas): sobre QUE DICE o "
         "QUE HACE esa respuesta concreta -- si resuelve el ejercicio o no, "
         "que le falto, que asumio, como se comporta si es codigo.\n"
-        "Banco \"reasoning_questions\" (7 preguntas): sobre POR QUE la "
-        "respuesta es (o no es) valida frente al enunciado -- que contexto "
-        "le hubiera hecho falta al prompt del participante para que la IA "
-        "pudiera responder mejor, y que decisiones tomo la IA al quedarse "
-        "sin ese contexto."
+        "Banco \"reasoning_questions\" (7 preguntas): sobre el razonamiento "
+        "descrito en \"reasoning_explanation\" -- por que la IA aislada llego "
+        "a esa respuesta, que contexto le hubiera hecho falta al prompt del "
+        "participante para que pudiera responder mejor, y que decisiones "
+        "tomo al quedarse sin ese contexto."
     )
     cmd = [
         CLAUDE_BIN, "-p", prompt,
@@ -125,21 +154,32 @@ def generate_response_quiz(
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=QUIZ_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired:
+        return [], [], "", f"'claude' no respondió en {QUIZ_TIMEOUT_SECONDS}s generando las preguntas."
+    except OSError as exc:
+        return [], [], "", f"No se pudo ejecutar 'claude': {exc}"
+
+    if proc.returncode != 0:
+        return [], [], "", f"'claude' terminó con error (código {proc.returncode}): {proc.stderr.strip()}"
+
+    try:
         payload = json.loads(proc.stdout)
         structured = payload.get("structured_output")
         if structured is None:
             structured = json.loads(payload["result"])
         comprehension = [_question_from_payload(q) for q in structured["comprehension_questions"]][:7]
         reasoning = [_question_from_payload(q) for q in structured["reasoning_questions"]][:7]
-        return comprehension, reasoning
-    except Exception:
-        return [], []
+        explanation = str(structured["reasoning_explanation"]).strip()
+        return comprehension, reasoning, explanation, ""
+    except Exception as exc:
+        return [], [], "", f"Respuesta inesperada de 'claude' al generar las preguntas: {exc}"
 
 
 def generate_isolated_response(challenge: Challenge, participant_prompt: str) -> ChallengeSolveResult:
     """Envia el prompt del participante a la llamada 100% aislada (ver
     isolated_prompt.ask_isolated_prompt) y, si responde, arma los bancos de
-    preguntas de las Etapas 3 y 4 a partir de esa respuesta.
+    preguntas y la explicacion de razonamiento de las Etapas 3 y 4 a partir
+    de esa respuesta.
     """
     started = time.monotonic()
     result = ask_isolated_prompt(participant_prompt)
@@ -148,8 +188,11 @@ def generate_isolated_response(challenge: Challenge, participant_prompt: str) ->
     if not result.ok:
         return ChallengeSolveResult(ok=False, error=result.error, elapsed_seconds=elapsed)
 
-    comprehension_questions, reasoning_questions = generate_response_quiz(challenge, result.text)
+    comprehension_questions, reasoning_questions, reasoning_explanation, quiz_error = generate_response_quiz(
+        challenge, result.text,
+    )
     return ChallengeSolveResult(
         ok=True, response_text=result.text, elapsed_seconds=elapsed,
         comprehension_questions=comprehension_questions, reasoning_questions=reasoning_questions,
+        reasoning_explanation=reasoning_explanation, quiz_generation_error=quiz_error,
     )

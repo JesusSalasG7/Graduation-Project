@@ -9,6 +9,7 @@ from gale.input_handler import InputData, InputListener
 from gale.state import StateMachine
 
 from src.states.game_over_state import GameOverState
+from src.states.instructions_state import InstructionsState
 from src.states.play_state import PlayState
 from src.states.results_state import ResultsState
 from src.states.story_state import StoryState
@@ -21,13 +22,14 @@ class MirrorCodeGame(Game, InputListener):
         # fire twice per event.
         self.state_machine = StateMachine(
             {
+                "instructions": InstructionsState,
                 "story": StoryState,
                 "play": PlayState,
                 "results": ResultsState,
                 "game_over": GameOverState,
             }
         )
-        self.state_machine.change("story")
+        self.state_machine.change("instructions")
 
     def on_input(self, input_id: str, input_data: InputData) -> None:
         if input_id == "quit" and input_data.pressed:

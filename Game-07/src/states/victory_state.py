@@ -98,9 +98,9 @@ class VictoryState:
         )
 
         prompt = (
-            "ENTER: siguiente nivel   ESC: menu"
+            "ENTER: siguiente nivel   ESC: menú"
             if self.has_next_level
-            else "ENTER / ESC: volver al menu"
+            else "ENTER / ESC: volver al menú"
         )
         render_text(
             surface,

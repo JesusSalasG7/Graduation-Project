@@ -106,164 +106,30 @@ class Board:
     def _compress_and_merge(
         line: List[int],
     ) -> Tuple[List[int], int, bool, List["_LineShift"]]:
+        # TODO: comprimir los huecos, fusionar cada par de fichas iguales
+        # una sola vez por turno (ej: [2,2,2,2] -> [4,4], nunca [8,0] ni
+        # [4,2,2]), y volver a rellenar con ceros hasta el tamano
+        # original. Devolver (linea_resultante, puntos_obtenidos,
+        # hubo_cambio, desplazamientos).
+        raise NotImplementedError("Implementar compresion y fusion de una linea de 2048 (A02)")
+
+    @classmethod
+    def _compress_and_merge_or_default(
+        cls, line: List[int],
+    ) -> Tuple[List[int], int, bool, List["_LineShift"]]:
+        """Envoltorio de `_compress_and_merge` que cubre el desafio A02
+        sin implementar -- ya sea que lance NotImplementedError (el TODO
+        real) o devuelva None -- tratandolo como si la linea no hubiera
+        cambiado (sin puntos ni fichas movidas) en vez de romper el
+        movimiento entero.
         """
-        Corazón del algoritmo de 2048.
-
-        Recibe una "línea" de 4 valores (una fila o una columna del
-        tablero) YA ORIENTADA en la dirección del movimiento: el primer
-        elemento de la lista es el más cercano al borde hacia el que se
-        desliza. Devuelve una tupla:
-
-            (linea_resultante, puntos_obtenidos, hubo_cambio, desplazamientos)
-
-        El proceso tiene tres fases, porque fusionar dos fichas deja un
-        hueco que hay que volver a compactar. Además, para poder animar
-        el movimiento en la interfaz, cada ficha original que no era
-        cero se rastrea desde su índice de partida hasta su índice de
-        llegada (eso es lo que guarda `shifts`).
-
-        1) COMPRIMIR: se identifican los valores distintos de cero junto
-           con su índice original, manteniendo su orden relativo, como
-           si la "gravedad" del movimiento las empujara todas hacia el
-           borde. Ej: [0,2,0,2] -> [(1,2), (3,2)].
-
-        2) FUSIONAR: se recorre esa lista de izquierda a derecha. Si un
-           valor es igual al siguiente, se combinan en una única ficha
-           del doble de valor -registrando AMBOS índices de origen como
-           desplazamientos hacia el mismo índice de destino, marcados
-           con merged=True- y el recorrido avanza DOS posiciones
-           (i += 2), de modo que la ficha resultante de la fusión nunca
-           vuelve a evaluarse en este mismo recorrido. Esto es lo que
-           garantiza la regla "una ficha sólo puede fusionarse una vez
-           por turno": en una línea [2,2,2,2] el resultado es [4,4] (dos
-           fusiones independientes) y no [4,2,2] ni [8,0] -- una ficha
-           ya fusionada jamás vuelve a sumarse con su vecina en el mismo
-           movimiento.
-
-        3) RECOMPACTAR: la fusión acorta la lista (dos fichas pasan a
-           ser una), así que se rellena con ceros hasta volver a tener
-           GRID_SIZE elementos, dejando los huecos al final (lejos del
-           borde hacia el que se deslizó).
-        """
-        # Guardamos la línea tal cual llegó (antes de tocar nada) para al
-        # final poder comparar y saber si el movimiento tuvo algún efecto.
-        # Ejemplo guía que seguimos en cada paso: line = [2, 2, 2, 4]
-        original = list(line)
-
-        # -------------------------------------------------------------
-        # PASO 1 — COMPRIMIR (quitar los huecos, sin perder de dónde
-        # venía cada ficha).
-        #
-        # `enumerate(line)` recorre la línea dando (índice, valor) para
-        # cada posición: (0,2) (1,2) (2,2) (3,4). Filtramos los ceros
-        # porque una celda vacía no es una "ficha": no debe ocupar
-        # espacio ni participar en la fusión.
-        #
-        # El resultado es una lista de PARES (índice_original, valor)
-        # -no solo los valores- porque más adelante necesitamos poder
-        # decir "la ficha que estaba en la posición X terminó en la
-        # posición Y", y para eso hay que conservar el índice original.
-        #
-        # Con line = [2, 2, 2, 4] (sin ceros que filtrar en este caso):
-        #   non_zero = [(0, 2), (1, 2), (2, 2), (3, 4)]
-        # -------------------------------------------------------------
-        non_zero = [(index, value) for index, value in enumerate(line) if value != 0]
-
-        # -------------------------------------------------------------
-        # PASO 2 — FUSIONAR, recorriendo `non_zero` de izquierda a
-        # derecha con un índice manual `i` (no un for) porque necesitamos
-        # poder "saltar de a dos" cuando ocurre una fusión.
-        #
-        #   merged_line -> los valores ya resueltos, en el orden final.
-        #   shifts      -> un registro por CADA ficha original: de
-        #                  qué índice partió, a qué índice llegó, con
-        #                  qué valor viajaba, y si se fusionó.
-        #   points_earned -> suma de los valores nuevos creados por
-        #                    cada fusión (regla oficial de 2048: la
-        #                    puntuación sube en el valor resultante).
-        # -------------------------------------------------------------
-        merged_line: List[int] = []
-        shifts: List[_LineShift] = []
-        points_earned = 0
-        i = 0
-        while i < len(non_zero):
-            source_index, current = non_zero[i]
-
-            # ¿La siguiente ficha en la lista (si existe) tiene el MISMO
-            # valor que la actual? Si es así, ambas se fusionan.
-            next_exists = i + 1 < len(non_zero)
-            is_merge = next_exists and non_zero[i + 1][1] == current
-
-            if is_merge:
-                # --- Caso A: fusión de dos fichas iguales ---
-                next_source_index, _ = non_zero[i + 1]
-                merged_value = current * 2
-
-                # `target_index` es simplemente "la próxima posición
-                # libre en el resultado", es decir cuántos elementos ya
-                # llevamos escritos en `merged_line` hasta ahora.
-                target_index = len(merged_line)
-
-                # Escribimos UNA sola ficha en el resultado (el doble de
-                # valor), pero registramos DOS desplazamientos -uno por
-                # cada ficha original que participó- apuntando ambos al
-                # mismo índice de destino. Así, más adelante, la interfaz
-                # puede animar cómo las dos fichas viajan y "chocan" en
-                # la misma celda. Ambos quedan marcados merged=True.
-                merged_line.append(merged_value)
-                points_earned += merged_value
-                shifts.append(
-                    _LineShift(source_index, target_index, current, True)
-                )
-                shifts.append(
-                    _LineShift(next_source_index, target_index, current, True)
-                )
-
-                # Avanzamos DOS posiciones (no una): la ficha resultante
-                # de la fusión ya quedó escrita y NO vuelve a evaluarse
-                # en este mismo recorrido. Esto es lo que impide que una
-                # ficha se fusione dos veces en el mismo movimiento.
-                i += 2
-            else:
-                # --- Caso B: la ficha actual queda tal cual, sin fusión ---
-                target_index = len(merged_line)
-                merged_line.append(current)
-                shifts.append(
-                    _LineShift(source_index, target_index, current, False)
-                )
-                i += 1  # Solo avanzamos una posición: no se consumió ninguna otra ficha.
-
-        # Trazando el ejemplo line = [2, 2, 2, 4] con el bucle de arriba:
-        #   i=0: non_zero[1] también vale 2 -> FUSIÓN. merged_line=[4].
-        #        shifts: (0->0, val=2, merged=True)
-        #                (1->0, val=2, merged=True)
-        #        i pasa a 2.
-        #   i=2: non_zero[3] vale 4 (distinto de 2) -> SIN fusión.
-        #        merged_line=[4, 2]. shifts += (2->1, val=2, merged=False)
-        #        i pasa a 3.
-        #   i=3: es la ficha de valor 4, no hay i+1 -> SIN fusión.
-        #        merged_line=[4, 2, 4]. shifts += (3->2, val=4, merged=False)
-        #        i pasa a 4, el bucle termina (4 == len(non_zero)).
-
-        # -------------------------------------------------------------
-        # PASO 3 — RECOMPACTAR al tamaño original de la línea.
-        #
-        # `merged_line` puede haber quedado más corta que `line` (cada
-        # fusión reduce el conteo en uno), así que rellenamos con ceros
-        # al final -lejos del borde hacia el que se deslizó- hasta
-        # recuperar la longitud original.
-        #
-        # Siguiendo el ejemplo: merged_line=[4,2,4] con len(line)=4
-        #   -> result = [4, 2, 4] + [0]*(4-3) = [4, 2, 4, 0]
-        # -------------------------------------------------------------
-        result = merged_line + [0] * (len(line) - len(merged_line))
-
-        # Si el resultado es idéntico a la línea de entrada, el
-        # movimiento no tuvo ningún efecto en esta fila/columna (por
-        # ejemplo, deslizar hacia la izquierda una línea que ya está
-        # pegada a la izquierda y sin fusiones posibles).
-        changed = result != original
-        return result, points_earned, changed, shifts
+        try:
+            outcome = cls._compress_and_merge(line)
+        except Exception:
+            outcome = None
+        if outcome is None:
+            return list(line), 0, False, []
+        return outcome
 
     @staticmethod
     def _real_index(line_index: int, reverse: bool) -> int:
@@ -280,7 +146,7 @@ class Board:
             if reverse:
                 line = line[::-1]
 
-            result, points, changed, shifts = self._compress_and_merge(line)
+            result, points, changed, shifts = self._compress_and_merge_or_default(line)
 
             if not changed:
                 continue
@@ -310,7 +176,7 @@ class Board:
             if reverse:
                 line = line[::-1]
 
-            result, points, changed, shifts = self._compress_and_merge(line)
+            result, points, changed, shifts = self._compress_and_merge_or_default(line)
 
             if not changed:
                 continue

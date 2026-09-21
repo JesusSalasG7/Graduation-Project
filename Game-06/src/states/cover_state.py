@@ -38,7 +38,7 @@ class CoverState(BaseState):
         )
         render_text(
             surface,
-            "Mecanografia al ritmo",
+            "Mecanografía al ritmo",
             settings.FONTS["hud"],
             center_x,
             center_y - 4,
@@ -64,7 +64,7 @@ class CoverState(BaseState):
         line_height = 16
 
         render_text(
-            surface, "RECORDS", settings.FONTS["hud"], x, y, settings.UI_ACCENT_COLOR, shadowed=True
+            surface, "RÉCORDS", settings.FONTS["hud"], x, y, settings.UI_ACCENT_COLOR, shadowed=True
         )
 
         entries = records.leaderboard()
@@ -72,7 +72,7 @@ class CoverState(BaseState):
         if not entries:
             render_text(
                 surface,
-                "Sin registros aun",
+                "Sin registros aún",
                 settings.FONTS["hud"],
                 x,
                 y + line_height,

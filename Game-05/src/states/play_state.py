@@ -159,7 +159,7 @@ class PlayState(BaseState):
         if self.result == "derrota" and self.time_up:
             render_text(
                 surface,
-                "Se acabo el tiempo",
+                "Se acabó el tiempo",
                 settings.FONTS["small"],
                 settings.VIRTUAL_WIDTH // 2,
                 settings.VIRTUAL_HEIGHT // 2 - 90,

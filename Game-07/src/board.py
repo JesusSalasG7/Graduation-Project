@@ -30,37 +30,12 @@ def _empty_matrix(columns: int, rows: int) -> List[List[bool]]:
 def next_generation(
     matrix: List[List[bool]], blocked: Set[Coord] = frozenset()
 ) -> List[List[bool]]:
-    """
-    Pure implementation of Conway's Game of Life, rule B3/S23.
-
-    Given the current generation as a rows x columns matrix of alive
-    flags, returns the *next* generation as a brand-new matrix -- the
-    input is never mutated, so this can be called on any matrix (not
-    just a live Board) to inspect or test how a pattern evolves.
-
-    A cell survives with 2 or 3 live neighbors, and a dead cell is born
-    with exactly 3. `blocked` names coordinates (walls) that can never
-    hold life, whichever the rule would otherwise say -- passing none
-    turns this into the unmodified, classic Game of Life.
-    """
-    rows = len(matrix)
-    columns = len(matrix[0]) if rows else 0
-    result = _empty_matrix(columns, rows)
-
-    for row in range(rows):
-        for col in range(columns):
-            if (col, row) in blocked:
-                continue
-
-            neighbors = 0
-            for dc, dr in _NEIGHBOR_OFFSETS:
-                nc, nr = col + dc, row + dr
-                if 0 <= nc < columns and 0 <= nr < rows and matrix[nr][nc]:
-                    neighbors += 1
-
-            result[row][col] = neighbors == 3 or (matrix[row][col] and neighbors == 2)
-
-    return result
+    # TODO: return a NEW matrix (same shape as `matrix`, never mutate
+    # the input) with Conway's rule B3/S23 applied: a live cell with 2
+    # or 3 live neighbors survives, a dead cell with exactly 3 is born,
+    # everything else dies/stays dead. Neighbors are the 8 surrounding
+    # cells. Any coordinate in `blocked` must stay dead regardless.
+    raise NotImplementedError("Implement Conway's next generation (A07)")
 
 
 class Board:
@@ -145,7 +120,16 @@ class Board:
         :returns: number of cells born this generation (used by the
         achievements system to detect a chain reaction).
         """
-        self._back = next_generation(self._front, self.walls)
+        # El desafio A07 sin implementar lanza NotImplementedError (el
+        # TODO real) -- el fallback (copia de _front) deja la generacion
+        # congelada -- 0 nacimientos, ningun cambio -- en vez de romper
+        # el avance.
+        try:
+            self._back = next_generation(self._front, self.walls)
+        except Exception:
+            self._back = None
+        if self._back is None:
+            self._back = [row[:] for row in self._front]
 
         births = sum(
             1

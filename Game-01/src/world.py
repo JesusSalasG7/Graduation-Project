@@ -285,10 +285,13 @@ class World:
 
         self._range_bonus_timer -= settings.CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS
 
-        # `or 0` covers count_apples_in_range() still being a TODO stub
-        # (returns None) -- the bonus is simply 0 until it's implemented,
-        # instead of crashing every 5 seconds.
-        count = self.count_apples_in_range() or 0
+        # count_apples_in_range() is a TODO (raises NotImplementedError)
+        # until the A01 challenge is solved -- the bonus is simply 0 in
+        # that case, instead of crashing every 5 seconds.
+        try:
+            count = self.count_apples_in_range() or 0
+        except Exception:
+            count = 0
         bonus = count * settings.CHALLENGE_RANGE_BONUS_PER_APPLE
         self.score += bonus
         self._range_bonus_event = (count, bonus)
@@ -297,15 +300,9 @@ class World:
         return self.filter_min <= value <= self.filter_max
 
     def count_apples_in_range(self) -> int:
-        
-        #TODO: Mi solucion
-        count = 0
-        
-        for apple in self.food_field.apples:
-            if self._apple_passes_filter(apple.value):
-                count += 1
-        
-        return count
+        # TODO: count how many apples in self.food_field.apples pass the
+        # active filter (use self._apple_passes_filter(apple.value)).
+        raise NotImplementedError("Implement counting apples in range (A01)")
 
     def _handle_challenge_apple_eaten(self, apple) -> None:
         """

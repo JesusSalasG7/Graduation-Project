@@ -20,7 +20,13 @@ from src.mirror_code_game import MirrorCodeGame
 
 @pytest.fixture
 def game():
-    """A freshly started MirrorCodeGame, on its initial StoryState."""
+    """A freshly started MirrorCodeGame, already past the static
+    InstructionsState and sitting on StoryState. InstructionsState (the
+    very first screen, see src/states/instructions_state.py) has no
+    behavior of its own to drive through here -- it just explains the
+    controls and advances on any click/confirm -- so every other test
+    module keeps expecting to start on StoryState, same as before
+    InstructionsState was added in front of it."""
     instance = MirrorCodeGame(
         settings.TITLE,
         settings.WINDOW_WIDTH,
@@ -28,6 +34,12 @@ def game():
         settings.VIRTUAL_WIDTH,
         settings.VIRTUAL_HEIGHT,
     )
+    click_anywhere = pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN,
+        pos=(settings.WINDOW_WIDTH / 2, settings.WINDOW_HEIGHT / 2),
+        button=1,
+    )
+    instance.on_input("mouse_click", MouseClickData(click_anywhere))
     yield instance
     instance.quit()
 

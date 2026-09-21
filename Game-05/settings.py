@@ -24,7 +24,7 @@ input_handler.InputHandler.set_mouse_click_action(input_handler.MOUSE_BUTTON_1, 
 
 BASE_DIR = Path(__file__).parent
 
-TITLE = "Transmutacion Arcana"
+TITLE = "Transmutación Arcana"
 
 # --- Cover / splash --------------------------------------------------
 COVER_IMAGE_PATH = BASE_DIR / "assets" / "graphics" / "ui" / "cover.jpg"

@@ -16,9 +16,9 @@ import settings
 from src import records
 
 _OPTIONS = (
-    ("classic", "Modo Clasico"),
-    ("challenge", "Modo Desafio"),
-    ("clear_records", "Borrar Records"),
+    ("classic", "Modo Clásico"),
+    ("challenge", "Modo Desafío"),
+    ("clear_records", "Borrar Récords"),
 )
 
 # Shown instead of the main list once "Borrar Records" is confirmed, so
@@ -26,7 +26,7 @@ _OPTIONS = (
 # -- navigated/confirmed the same way as the main options. "cancel" is
 # listed second and is the default selection (see enter()).
 _CONFIRM_CLEAR_OPTIONS = ("confirm", "cancel")
-_CONFIRM_CLEAR_LABELS = ("Si, borrar", "Cancelar")
+_CONFIRM_CLEAR_LABELS = ("Sí, borrar", "Cancelar")
 
 # Center-to-center vertical distance between consecutive lines in the
 # options list and the clear-records confirmation, both centered as a
@@ -118,7 +118,7 @@ class MenuState(BaseState):
     def _render_confirm_clear(self, surface: pygame.Surface, center_x: int, center_y: int) -> None:
         render_text(
             surface,
-            "Borrar todos los records? No se puede deshacer",
+            "¿Borrar todos los récords? No se puede deshacer",
             settings.FONTS["hud"],
             center_x,
             center_y - _LINE_SPACING,
@@ -153,7 +153,7 @@ class MenuState(BaseState):
 
         render_text(
             surface,
-            "RECORDS",
+            "RÉCORDS",
             settings.FONTS["hud"],
             x,
             y,
@@ -166,7 +166,7 @@ class MenuState(BaseState):
         if not entries:
             render_text(
                 surface,
-                "Sin registros aun",
+                "Sin registros aún",
                 settings.FONTS["hud"],
                 x,
                 y + line_height,
