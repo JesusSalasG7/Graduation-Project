@@ -49,8 +49,8 @@ class _Row:
 # The actual list of controls/buttons this file documents -- keep in
 # sync with src/states/play_state.py whenever a control changes there.
 _ROWS: Tuple[_Row, ...] = (
-    _Row("header", "CAMARA"),
-    _Row("line", "Arrastrar el mouse, o las flechas: rotar la camara"),
+    _Row("header", "CÁMARA"),
+    _Row("line", "Arrastrar el mouse, o las flechas: rotar la cámara"),
     _Row("header", "MOVIMIENTOS"),
     _Row("line", "U D L R F B: girar esa cara (sentido horario)"),
     _Row("line", "+ Shift: sentido antihorario"),
@@ -59,9 +59,9 @@ _ROWS: Tuple[_Row, ...] = (
     _Row("header", "BOTONES"),
     _Row("line", "Aplica 20 movimientos al azar, animados", icons=("shuffle",)),
     _Row("line", "Mezcla y activa el temporizador (abajo a la derecha)", icons=("auto",)),
-    _Row("line", "Guia: marca que cara es U/D/L/R/F/B", icons=("eye_open",)),
-    _Row("line", "Busca un bloque 2x2x2 conocido (desafio A03)", icons=("search",)),
-    _Row("line", "Deshacer / rehacer el ultimo movimiento", icons=("undo", "redo")),
+    _Row("line", "Guía: marca qué cara es U/D/L/R/F/B", icons=("eye_open",)),
+    _Row("line", "Busca un bloque 2x2x2 conocido (desafío A03)", icons=("search",)),
+    _Row("line", "Deshacer / rehacer el último movimiento", icons=("undo", "redo")),
     _Row("header", "OTROS"),
     _Row("line", "Esc: salir del juego"),
 )

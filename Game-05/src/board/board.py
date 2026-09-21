@@ -226,7 +226,14 @@ class Board:
                 # aparecieron 2 o mas veces en esta Catalisis (osea,
                 # cuantos "resuenan" dentro de la misma linea).
                 line_kinds = [[tile.kind.value for tile in line_tiles if tile is not None]]
-                catalysis_resonance_kinds += len(find_repeated(line_kinds))
+                # El desafio A05 sin implementar lanza NotImplementedError
+                # (el TODO real) -- la resonancia es simplemente 0 hasta
+                # que este implementado, en vez de romper la Catalisis.
+                try:
+                    resonance = len(find_repeated(line_kinds) or [])
+                except Exception:
+                    resonance = 0
+                catalysis_resonance_kinds += resonance
 
                 for tile in line_tiles:
                     if tile is not None and tile not in cleared:

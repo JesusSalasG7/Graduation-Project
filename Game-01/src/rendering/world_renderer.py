@@ -301,7 +301,13 @@ class WorldRenderer:
                 shadowed=True,
             )
             total_apples = len(self.world.food_field.apples)
-            count_in_range = self.world.count_apples_in_range() or 0
+            # count_apples_in_range() (A01) raises NotImplementedError
+            # until the challenge is solved -- the HUD just shows 0 in
+            # that case instead of crashing every frame.
+            try:
+                count_in_range = self.world.count_apples_in_range() or 0
+            except Exception:
+                count_in_range = 0
             render_text(
                 surface,
                 f"En rango: {count_in_range}/{total_apples}",
@@ -341,7 +347,7 @@ class WorldRenderer:
     # Labels for PlayState's _GAME_OVER_OPTIONS ("restart", "menu"), in the
     # same order -- kept here since this module owns everything drawn on
     # screen, while PlayState owns which one is selected/confirmed.
-    _GAME_OVER_LABELS = ("Volver a jugar", "Menu principal")
+    _GAME_OVER_LABELS = ("Volver a jugar", "Menú principal")
 
     def _render_game_over(
         self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int

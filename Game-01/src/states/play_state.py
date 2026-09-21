@@ -216,7 +216,7 @@ class PlayState(BaseState):
 
         render_text(
             surface,
-            "Entraste a los records! Escribe tu nombre:",
+            "¡Entraste a los récords! Escribe tu nombre:",
             settings.FONTS["hud"],
             center_x,
             center_y,
@@ -238,7 +238,7 @@ class PlayState(BaseState):
     def _render_overwrite_confirm(self, surface: pygame.Surface, center_x: int, center_y: int) -> None:
         render_text(
             surface,
-            f"Ya existe el nombre '{self._pending_record_name}' en los records",
+            f"Ya existe el nombre '{self._pending_record_name}' en los récords",
             settings.FONTS["hud"],
             center_x,
             center_y,

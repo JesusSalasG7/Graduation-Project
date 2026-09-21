@@ -350,7 +350,7 @@ class TypingRenderer:
 
     # Labels for PlayState's _WIN_OPTIONS ("same_track", "change_track",
     # "cover"), in the same order.
-    _WIN_LABELS = ("Usar misma pista", "Cambiar pista", "Menu principal")
+    _WIN_LABELS = ("Usar misma pista", "Cambiar pista", "Menú principal")
 
     def _render_game_over(
         self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int
@@ -361,7 +361,7 @@ class TypingRenderer:
         self, surface: pygame.Surface, awaiting_record_name: bool, selected_index: int
     ) -> None:
         self._render_end_screen(
-            surface, "CANCION COMPLETADA", self._WIN_LABELS, awaiting_record_name, selected_index
+            surface, "CANCIÓN COMPLETADA", self._WIN_LABELS, awaiting_record_name, selected_index
         )
 
     def _render_end_screen(
@@ -391,7 +391,7 @@ class TypingRenderer:
         )
         render_text(
             surface,
-            f"Puntaje: {self.world.score}   Precision: {self.world.accuracy_percent:.1f}%   Racha maxima: {self.world.max_combo}",
+            f"Puntaje: {self.world.score}   Precisión: {self.world.accuracy_percent:.1f}%   Racha máxima: {self.world.max_combo}",
             settings.FONTS["hud"],
             center_x,
             center_y - 32,

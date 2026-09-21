@@ -5,12 +5,10 @@ de la raiz del proyecto, y con cwd en la carpeta del juego (todos
 usan imports relativos tipo `import settings` / `from src...`).
 """
 
-import csv
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -24,13 +22,6 @@ TOOLS_DIR = PROJECT_ROOT / "tools"
 EMOTION_TRACKER_SCRIPT = TOOLS_DIR / "emotion_tracker.py"
 TOOLS_REQUIREMENTS = TOOLS_DIR / "requirements.txt"
 EMOTION_LOG_DIR = Path(__file__).resolve().parent / "data" / "emotion_logs"
-HEART_RATE_LOG_DIR = Path(__file__).resolve().parent / "data" / "heart_rate_logs"
-
-SMARTWATCH_DIR = TOOLS_DIR / "smartwatch"
-sys.path.insert(0, str(SMARTWATCH_DIR))
-from procesar_export import extract_samples_in_window  # noqa: E402
-
-HEART_RATE_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
 # Titulo declarado como `TITLE = "..."` en settings.py
 _TITLE_IN_SETTINGS = re.compile(r'^\s*TITLE\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
@@ -98,98 +89,113 @@ def open_in_vscode(game: GameInfo) -> None:
     subprocess.Popen(["code", str(game.path)])
 
 
+# Los 7 juegos extienden gale.game.Game, que abre la ventana con
+# `pygame.display.set_mode((window_width, window_height), ...)` -- un
+# tamano fijo definido en el settings.py de cada juego, mucho mas chico
+# que la pantalla y con su propia relacion de aspecto (algunos, como
+# Game-02 y Game-05, son verticales). En vez de tocar cada juego (o el
+# paquete `gale` instalado en el .venv, que se reinstala solo con
+# "Reparar entorno"), se lanza `main.py` con `-c` para poder parchear
+# pygame.display.set_mode ANTES de que el juego llame a set_mode: la
+# version parcheada agrega pygame.FULLSCREEN + pygame.SCALED,
+# conservando el tamano logico que pidio el juego.
+#
+# SCALED es clave para no deformar la imagen: hace que SDL centre y
+# escale esa resolucion logica a la resolucion real del monitor
+# manteniendo la relacion de aspecto (con barras si no coincide), en vez
+# de estirarla sin mas -- que es lo que pasaba forzando directamente el
+# tamano del escritorio (Game-02 y Game-05, verticales, se veian
+# aplastados). El resto del juego -- incluida su propia logica de
+# escalado de resolucion virtual -- sigue igual: gale sigue viendo el
+# tamano logico via screen.get_size() y reescala su render_surface a eso
+# en cada frame, como si no hubiera pantalla completa de por medio.
+#
+# `python -c` (en vez de pasarle la ruta a main.py) agrega el directorio
+# actual a sys.path como hace un script normal, asi que los imports
+# relativos de cada juego (`import settings`, `from src...`) funcionan
+# igual siempre que el cwd del proceso sea la carpeta del juego.
+_FULLSCREEN_BOOTSTRAP = """
+import runpy
+
+import pygame
+
+_real_set_mode = pygame.display.set_mode
+
+
+def _fullscreen_set_mode(size=(0, 0), flags=0, depth=0, *args, **kwargs):
+    pygame.display.init()
+    return _real_set_mode(
+        size, flags | pygame.FULLSCREEN | pygame.SCALED, depth, *args, **kwargs
+    )
+
+
+pygame.display.set_mode = _fullscreen_set_mode
+runpy.run_path("main.py", run_name="__main__")
+"""
+
+
+def launch_game_process(game_dir: Path) -> subprocess.Popen:
+    """Lanza `main.py` dentro de `game_dir` con el .venv unificado, siempre
+    en pantalla completa (ver _FULLSCREEN_BOOTSTRAP). Usado tanto por
+    play_game() (boton "Jugar" de la pestaña Juegos) como por
+    game_patch._launch_and_cleanup() (Etapas 1 y 6 de la sesion guiada).
+    """
+    return subprocess.Popen(
+        [str(venv_python()), "-c", _FULLSCREEN_BOOTSTRAP], cwd=str(game_dir),
+    )
+
+
 def play_game(game: GameInfo) -> None:
     if not game.is_playable:
         raise FileNotFoundError(f"{game.name} no tiene un main.py ejecutable.")
-    subprocess.Popen([str(venv_python()), "main.py"], cwd=str(game.path))
+    launch_game_process(game.path)
+
+
+def emotion_log_file(participant: dict) -> Path:
+    return EMOTION_LOG_DIR / f"{participant_file_stub(participant)}.csv"
+
+
+def delete_emotion_data(participant: Optional[dict]) -> None:
+    """Borra el CSV de emociones capturado para `participant` en esta
+    sesion -- se usa cuando la sesion guiada se abandona sin terminar los
+    desafios (mismo criterio que neurosky_launcher.delete_neurosky_data):
+    datos de una sesion incompleta no sirven para el analisis."""
+    if not participant:
+        return
+    try:
+        emotion_log_file(participant).unlink()
+    except FileNotFoundError:
+        pass
 
 
 def start_emotion_tracker(participant: Optional[dict], session_label: str) -> subprocess.Popen:
-    """Lanza tools/emotion_tracker.py en segundo plano con el .venv unificado.
+    """Lanza tools/emotion_tracker.py en segundo plano con el .venv unificado,
+    con su salida como pipe de texto linea a linea (ver la misma logica en
+    neurosky_launcher.start_neurosky_test) para poder mostrarla en vivo en
+    la pantalla de configuracion de la sesion guiada.
 
     Si hay un participante activo, sus lecturas se registran ademas en un
     CSV propio (graphic_interface/data/emotion_logs/<NOMBRE_APELLIDO>.csv)
     para poder correlacionarlas despues con la sesion.
     """
     if not EMOTION_TRACKER_SCRIPT.exists():
-        raise FileNotFoundError("No se encontro tools/emotion_tracker.py")
+        raise FileNotFoundError("No se encontró tools/emotion_tracker.py")
 
-    args = [str(venv_python()), str(EMOTION_TRACKER_SCRIPT), "--session-label", session_label]
+    args = [str(venv_python()), "-u", str(EMOTION_TRACKER_SCRIPT), "--session-label", session_label]
 
     if participant:
         EMOTION_LOG_DIR.mkdir(parents=True, exist_ok=True)
-        log_file = EMOTION_LOG_DIR / f"{participant_file_stub(participant)}.csv"
+        log_file = emotion_log_file(participant)
         args += [
             "--participant-id", participant["id"],
             "--participant-name", participant_label(participant),
             "--log-file", str(log_file),
         ]
 
-    return subprocess.Popen(args, cwd=str(TOOLS_DIR))
-
-
-def import_heart_rate(participant: dict, session: dict, export_dir: Path) -> tuple[Path, int]:
-    """Filtra, del export de Samsung Health en `export_dir`, las muestras BPM
-    dentro de la ventana [session.start_time, session.end_time] y las agrega
-    (sin duplicar cabecera) al CSV de frecuencia cardiaca del participante.
-
-    Devuelve (ruta_del_csv, cantidad_de_muestras_agregadas).
-    """
-    start_dt = datetime.strptime(session["start_time"], HEART_RATE_TIMESTAMP_FMT)
-    end_time = session.get("end_time") or datetime.now().strftime(HEART_RATE_TIMESTAMP_FMT)
-    end_dt = datetime.strptime(end_time, HEART_RATE_TIMESTAMP_FMT)
-
-    samples = extract_samples_in_window(export_dir, start_dt, end_dt)
-
-    HEART_RATE_LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_file = HEART_RATE_LOG_DIR / f"{participant_file_stub(participant)}.csv"
-    is_new_file = not log_file.exists() or log_file.stat().st_size == 0
-
-    with log_file.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if is_new_file:
-            writer.writerow(["timestamp", "bpm", "session_id"])
-        for sample in samples:
-            writer.writerow([sample["timestamp"].strftime(HEART_RATE_TIMESTAMP_FMT), sample["bpm"], session["id"]])
-
-    return log_file, len(samples)
-
-
-def read_combined_session_data(participant: dict, session: dict) -> list[dict]:
-    """Junta, ordenadas por tiempo, las lecturas de emocion y de BPM del
-    participante que caen dentro de la ventana de la sesion dada."""
-    stub = participant_file_stub(participant)
-    start_dt = datetime.strptime(session["start_time"], HEART_RATE_TIMESTAMP_FMT)
-    end_time = session.get("end_time") or datetime.now().strftime(HEART_RATE_TIMESTAMP_FMT)
-    end_dt = datetime.strptime(end_time, HEART_RATE_TIMESTAMP_FMT)
-
-    rows: list[dict] = []
-
-    emotion_file = EMOTION_LOG_DIR / f"{stub}.csv"
-    if emotion_file.exists():
-        with emotion_file.open(encoding="utf-8") as f:
-            for r in csv.DictReader(f):
-                try:
-                    ts = datetime.strptime(r["timestamp"], HEART_RATE_TIMESTAMP_FMT)
-                except (ValueError, KeyError):
-                    continue
-                if start_dt <= ts <= end_dt:
-                    rows.append({"timestamp": ts, "tipo": "Emoción", "valor": r["emotion"]})
-
-    heart_rate_file = HEART_RATE_LOG_DIR / f"{stub}.csv"
-    if heart_rate_file.exists():
-        with heart_rate_file.open(encoding="utf-8") as f:
-            for r in csv.DictReader(f):
-                if r.get("session_id") != session["id"]:
-                    continue
-                try:
-                    ts = datetime.strptime(r["timestamp"], HEART_RATE_TIMESTAMP_FMT)
-                except (ValueError, KeyError):
-                    continue
-                rows.append({"timestamp": ts, "tipo": "BPM", "valor": r["bpm"]})
-
-    rows.sort(key=lambda r: r["timestamp"])
-    return rows
+    return subprocess.Popen(
+        args, cwd=str(TOOLS_DIR),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+    )
 
 
 def consolidated_requirements(root: Path = PROJECT_ROOT) -> list[str]:

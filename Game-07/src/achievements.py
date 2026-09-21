@@ -18,14 +18,14 @@ import settings
 Coord = Tuple[int, int]
 
 ACHIEVEMENTS: Dict[str, Tuple[str, str]] = {
-    "first_click": ("Primer Clic", "Coloca tu primera celula."),
+    "first_click": ("Primer Clic", "Coloca tu primera célula."),
     "max_efficiency": (
-        "Eficiencia Maxima",
+        "Eficiencia Máxima",
         "Gana un nivel usando la mitad o menos del presupuesto.",
     ),
     "chain_reaction": (
-        "Reaccion en Cadena",
-        "Provoca 8 o mas nacimientos en una sola generacion.",
+        "Reacción en Cadena",
+        "Provoca 8 o más nacimientos en una sola generación.",
     ),
 }
 

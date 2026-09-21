@@ -72,14 +72,14 @@ _ROWS = settings.GRID_ROWS
 LEVELS = [
     Level(
         name="Primeros Pasos",
-        description="Lleva una celula viva hasta la zona objetivo.",
+        description="Lleva una célula viva hasta la zona objetivo.",
         budget=20,
         win_type="target",
         target_zone=rect(7, 0, 10, _ROWS - 1),
     ),
     Level(
         name="El Pasillo",
-        description="Guia una reaccion a traves del pasillo hasta el objetivo.",
+        description="Guía una reacción a través del pasillo hasta el objetivo.",
         budget=14,
         win_type="target",
         walls=(rect(0, 0, _COLS - 1, 4) | rect(0, 10, _COLS - 1, _ROWS - 1)),
@@ -87,7 +87,7 @@ LEVELS = [
     ),
     Level(
         name="Exterminio",
-        description="Elimina el patron enemigo (bloque estable) antes de rendirte.",
+        description="Elimina el patrón enemigo (bloque estable) antes de rendirte.",
         budget=10,
         win_type="eliminate",
         enemy_cells=block(_COLS // 2 - 1, _ROWS // 2 - 1),
@@ -95,7 +95,7 @@ LEVELS = [
     Level(
         name="El Planeador",
         description=(
-            "Con solo 5 celulas no llegas caminando: construye un planeador "
+            "Con solo 5 células no llegas caminando: construye un planeador "
             "para que viaje solo hasta la zona objetivo."
         ),
         budget=5,

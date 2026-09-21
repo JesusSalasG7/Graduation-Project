@@ -70,76 +70,11 @@ def _block_matches(
 def find_3d_pattern(
     big_matrix: Matrix3D, pattern_matrix: Matrix3D
 ) -> Dict[str, object]:
-    """
-    Exact implementation of the A03 challenge: searches for
-    `pattern_matrix` inside `big_matrix` by brute force.
-
-    Step by step:
-        1. Compute the dimensions of both matrices.
-        2. If the pattern does not fit inside the big matrix along any
-           axis, there is nothing to search for: return "not found".
-        3. Walk through EVERY starting position (origin_x, origin_y,
-           origin_z) where the pattern, placed there, still lands
-           completely inside the big matrix -- this is "sliding the
-           smaller matrix across all valid positions of the larger
-           one".
-        4. At each candidate position, do a "full element-by-element
-           comparison" (see `_block_matches`) to check for an exact
-           match of the whole three-dimensional block.
-        5. As soon as a candidate position matches completely, that
-           match is declared found and the search stops.
-        6. If every candidate position is exhausted with no complete
-           match, declare "not found".
-
-    :param big_matrix: The large 3D matrix (for instance, the 3x3x3 state of the Rubik's Cube).
-    :param pattern_matrix: The smaller 3D block being searched for inside `big_matrix` (for instance, a 2x2x2 block).
-    :returns: A dictionary with:
-        - 'found': True if some position was found where the pattern matches completely.
-        - 'position': the (x, y, z) tuple of that position, or None if it was not found.
-    """
-    # Step 1: dimensions of both matrices.
-    big_depth = len(big_matrix)
-    big_rows = len(big_matrix[0]) if big_depth else 0
-    big_columns = len(big_matrix[0][0]) if big_rows else 0
-
-    pattern_depth = len(pattern_matrix)
-    pattern_rows = len(pattern_matrix[0]) if pattern_depth else 0
-    pattern_columns = len(pattern_matrix[0][0]) if pattern_rows else 0
-
-    # Step 2: if the pattern doesn't fit, there's nothing to search for.
-    if (
-        pattern_depth > big_depth
-        or pattern_rows > big_rows
-        or pattern_columns > big_columns
-    ):
-        return {"found": False, "position": None}
-
-    # Step 3: walk through every valid candidate position.
-    for origin_x in range(big_depth - pattern_depth + 1):
-        for origin_y in range(big_rows - pattern_rows + 1):
-            for origin_z in range(big_columns - pattern_columns + 1):
-                # Step 4: full element-by-element comparison.
-                if _block_matches(
-                    big_matrix,
-                    pattern_matrix,
-                    origin_x,
-                    origin_y,
-                    origin_z,
-                    pattern_depth,
-                    pattern_rows,
-                    pattern_columns,
-                ):
-                    # Step 5: exact match of the whole block.
-                    return {
-                        "found": True,
-                        "position": (origin_x, origin_y, origin_z),
-                    }
-                # If _block_matches returned False, this candidate was
-                # already abandoned (at the first mismatched element)
-                # and the loop simply continues with the next position.
-
-    # Step 6: every candidate position was tried, none matched.
-    return {"found": False, "position": None}
+    # TODO: slide pattern_matrix across every valid position of
+    # big_matrix (see _block_matches for the element-by-element check),
+    # stopping at the first full match. Return
+    # {"found": bool, "position": (x, y, z) | None}.
+    raise NotImplementedError("Implement the 3D pattern search (A03)")
 
 
 def find_all_matches(

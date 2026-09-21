@@ -40,44 +40,8 @@ from typing import List
 
 
 def find_repeated(matrix: List[List[int]]) -> List[int]:
-    """
-    Recorre la matriz fila por fila, valor por valor, y reporta los
-    valores que aparecen dos o mas veces -- uno solo por valor, sin
-    importar cuantas veces se repita.
-
-    La forma de "comparar cada elemento con los valores siguientes"
-    del enunciado se hace mirandolo al reves, que es lo mismo pero en
-    un solo recorrido: en vez de, al llegar a un valor, mirar hacia
-    adelante para ver si se repite mas tarde, se guarda cada valor
-    nuevo en el conjunto `seen` apenas aparece. Asi, cuando el
-    recorrido llega a una aparicion posterior de ese mismo valor, esa
-    aparicion posterior *es* "uno de los valores siguientes" de la
-    primera, y el chequeo `value in seen` la detecta en tiempo O(1) --
-    sin tener que comparar manualmente contra cada valor restante de
-    la matriz. Un segundo conjunto, `reported`, evita que un valor que
-    se repite 3 o mas veces (p. ej. `[5, 5, 5]`) aparezca mas de una
-    vez en el resultado.
-
-    :param matrix: lista de filas, cada una una lista de enteros. No
-        se asume ninguna forma particular: no hace falta que sea
-        cuadrada ni que todas las filas midan lo mismo (incluso sirve
-        para una matriz de una sola fila, como la linea que limpia una
-        Catalisis en el tablero).
-    :returns: los valores que aparecen 2 o mas veces en la matriz, en
-        el orden en que se detecto la repeticion (su segunda
-        aparicion), cada uno una sola vez.
-    """
-    seen = set()
-    reported = set()
-    repeated: List[int] = []
-
-    for row in matrix:
-        for value in row:
-            if value in seen:
-                if value not in reported:
-                    reported.add(value)
-                    repeated.append(value)
-            else:
-                seen.add(value)
-
-    return repeated
+    # TODO: recorrer la matriz fila por fila, valor por valor, y
+    # devolver los valores que aparecen 2 o mas veces (uno solo por
+    # valor, en el orden de su segunda aparicion), usando conjuntos en
+    # una sola pasada.
+    raise NotImplementedError("Implementar la deteccion de valores repetidos (A05)")

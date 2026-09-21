@@ -120,15 +120,15 @@ class EmotionAnalyzer:
 
             if confidence < self.min_confidence:
                 print(
-                    f"[{timestamp}] Emocion incierta "
+                    f"[{timestamp}] Emoción incierta "
                     f"(mejor candidata: {emotion} con {confidence:.1f}%, por debajo del umbral)"
                 )
                 self._log_row(timestamp, "incierta", confidence)
             else:
-                print(f"[{timestamp}] Emocion detectada: {emotion} ({confidence:.1f}%)")
+                print(f"[{timestamp}] Emoción detectada: {emotion} ({confidence:.1f}%)")
                 self._log_row(timestamp, emotion, confidence)
         except Exception as exc:  # DeepFace puede fallar si no hay rostro claro
-            print(f"[{timestamp}] No se pudo analizar la emocion: {exc}")
+            print(f"[{timestamp}] No se pudo analizar la emoción: {exc}")
         finally:
             with self._lock:
                 self._busy = False
@@ -140,9 +140,9 @@ def main():
         "--interval",
         type=int,
         default=DEFAULT_ANALYSIS_INTERVAL,
-        help=f"Analizar la emocion cada N frames (default: {DEFAULT_ANALYSIS_INTERVAL})",
+        help=f"Analizar la emoción cada N frames (default: {DEFAULT_ANALYSIS_INTERVAL})",
     )
-    parser.add_argument("--camera", type=int, default=0, help="Indice de la camara (default: 0)")
+    parser.add_argument("--camera", type=int, default=0, help="Indice de la cámara (default: 0)")
     parser.add_argument("--participant-id", default="", help="ID del participante activo (opcional)")
     parser.add_argument("--participant-name", default="", help="Nombre del participante activo (opcional)")
     parser.add_argument("--session-label", default="", help="Etiqueta de la sesion, ej. nombre del juego")
@@ -160,7 +160,7 @@ def main():
     )
     parser.add_argument(
         "--min-confidence", type=float, default=0.0,
-        help="Umbral de confianza (0-100) por debajo del cual se reporta 'incierta' en vez de la emocion (default: 0, sin filtro)",
+        help="Umbral de confianza (0-100) por debajo del cual se reporta 'incierta' en vez de la emoción (default: 0, sin filtro)",
     )
     args = parser.parse_args()
 
@@ -176,7 +176,7 @@ def main():
 
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
-        print("Error: no se pudo acceder a la camara.")
+        print("Error: no se pudo acceder a la cámara.")
         return
 
     print("Emotion Tracker iniciado. Presiona 'q' en la ventana de video para salir.")
@@ -190,7 +190,7 @@ def main():
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("Error: no se pudo leer el frame de la camara.")
+                print("Error: no se pudo leer el frame de la cámara.")
                 break
 
             frame_count += 1

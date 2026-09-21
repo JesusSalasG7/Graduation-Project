@@ -33,6 +33,7 @@ el aislamiento no es tan estricto como con la API (ver el punto 2):
 """
 
 import json
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -40,6 +41,19 @@ from dataclasses import dataclass
 CLAUDE_BIN = "claude"
 ISOLATED_MODEL = "sonnet"
 ISOLATED_TIMEOUT_SECONDS = 120
+
+
+def claude_cli_available() -> bool:
+    """True si el CLI `claude` esta instalado y en el PATH.
+
+    Sin el, la sesion guiada NO se rompe -- ask_isolated_prompt/
+    generate_response_quiz ya devuelven un error prolijo si intentan
+    invocarlo igual (ver mas abajo) -- pero recien se enterarian de eso
+    en la Etapa 3, despues de haber jugado las Etapas 1/2. Se usa para
+    avisar ANTES de arrancar la sesion guiada (ver App.
+    enter_session_wizard) a quien este probando la app sin Claude Code
+    instalado, en vez de dejar que lo descubra a mitad de una sesion."""
+    return shutil.which(CLAUDE_BIN) is not None
 
 # Senal exacta que le pedimos al modelo devolver cuando NO puede producir
 # codigo (por falta de contexto en el prompt, o porque el prompt no pedia

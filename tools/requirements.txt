@@ -1,21 +1,31 @@
 # Dependencias de tools/ - modulo de tesis "Vibe Coding"
 #
-# Este archivo cubre DOS herramientas que deben instalarse en DOS venvs
-# SEPARADOS. No es posible unificarlas en un solo entorno: mediapipe
-# (usado por eye_tracker.py) depende de opencv-contrib-python, mientras
-# que deepface (usado por emotion_tracker.py) depende de opencv-python.
-# Ambos paquetes instalan archivos en el mismo directorio cv2/ del venv y
-# se pisan entre si si conviven -- confirmado de nuevo al escribir esto:
-# con los dos instalados juntos, cv2/data/ queda con 2 archivos en vez de
-# los ~20 haarcascades que trae normalmente, y
-# haarcascade_frontalface_default.xml (el que usa emotion_tracker.py)
-# directamente desaparece. No hay conflicto real de version, solo de
-# nombre de paquete, por eso la unica solucion es no mezclarlos.
+# Este archivo cubre CUATRO instalaciones (una por seccion), cada una en
+# su propio venv. Las secciones 1 y 2 son para correr emotion_tracker.py
+# y eye_tracker.py SUELTOS, uno a la vez, a mano (debug/desarrollo) --
+# NO SIRVEN PARA CORRERLOS JUNTOS: confirmado a mano, la webcam de este
+# equipo (como la mayoria de las webcams USB) solo admite un proceso con
+# la camara abierta a la vez, asi que el segundo script en arrancar ni
+# siquiera puede abrirla (cap.isOpened() da False). Para usarlos juntos
+# (como hace la sesion guiada) esta camera_tracker.py (seccion 3): fusiona
+# ambos analisis en un solo proceso, sobre una sola apertura de camara.
+#
+# Ademas, mediapipe (eye_tracker.py/camera_tracker.py) depende de
+# opencv-contrib-python, mientras que deepface (emotion_tracker.py/
+# camera_tracker.py) depende de opencv-python -- ambos paquetes instalan
+# archivos en el mismo directorio cv2/ del venv y se pisan entre si si
+# conviven (confirmado: con los dos instalados juntos, cv2/data/ queda
+# con 2 archivos en vez de los ~20 haarcascades que trae normalmente, y
+# haarcascade_frontalface_default.xml directamente desaparece). No hay
+# conflicto real de version, solo de nombre de paquete: opencv-contrib-
+# python YA INCLUYE todo lo que opencv-python trae (y mas), asi que la
+# seccion 3 instala solo contrib y fuerza deepface/retina-face con
+# --no-deps para que pip no intente instalar tambien opencv-python.
 #
 # IMPORTANTE: por eso mismo, NO instalar con "pip install -r
-# tools/requirements.txt" a secas -- eso instalaria las DOS secciones
-# juntas en el mismo venv y rompe cv2. Extraer solo la seccion que
-# corresponde con sed, como se indica en cada seccion abajo.
+# tools/requirements.txt" a secas -- eso instalaria las secciones 1 y 2
+# juntas en el mismo venv y rompe cv2. Seguir los pasos de cada seccion
+# tal cual estan (sed + pip, en ese orden).
 #
 # tools/smartwatch/procesar_export.py no necesita nada de este archivo
 # (solo usa la libreria estandar: csv, json, argparse, datetime, pathlib).
@@ -65,3 +75,27 @@ pandas==2.2.2
 opencv-contrib-python==5.0.0.93
 mediapipe==1.0.1
 # --EYETRACKER-END--
+
+
+# ============================================================
+# 3) tools/camera_tracker.py - Emotion Tracker + Eye Tracker fusionados
+# ============================================================
+#
+# Usado por la sesion guiada (ver graphic_interface/camera_tracker_
+# launcher.py): un solo proceso, una sola apertura de camara, que hace
+# ambos analisis. Vive en su propio venv, tools/.venv-tracker.
+#
+# La receta NO es "pip install -r" a secas: hay que instalar deepface y
+# retina-face con --no-deps para que pip no intente instalar tambien
+# opencv-python (ambos lo declaran como dependencia) -- opencv-contrib-
+# python, instalado primero, ya trae todo lo que necesitan. El aviso de
+# pip sobre "opencv-python requerido pero no instalado" en el paso 2 es
+# esperado e inofensivo (retina-face casi nunca se usa -- el detector
+# por defecto es mtcnn -- y aunque se use, importa cv2 sin le importar
+# que paquete lo proveyo).
+#
+#   python3 -m venv tools/.venv-tracker
+#   tools/.venv-tracker/bin/pip install opencv-contrib-python==4.10.0.84 mediapipe==1.0.1
+#   tools/.venv-tracker/bin/pip install --no-deps deepface==0.0.93 retina-face
+#   tools/.venv-tracker/bin/pip install fire Flask flask-cors gdown gunicorn keras mtcnn numpy pandas==2.2.2 Pillow requests tensorflow==2.21.0 tf-keras==2.21.0 tqdm
+#   tools/.venv-tracker/bin/python tools/camera_tracker.py --calibrate
