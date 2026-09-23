@@ -20,7 +20,8 @@ from game_launcher import (
     play_game,
     repair_environment,
 )
-from isolated_prompt import claude_cli_available
+import ai_backend
+from isolated_prompt import ai_provider_available
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
 # dataset consolidado de TODO el proyecto, no solo de esta app) -- se
@@ -213,14 +214,14 @@ class App(ctk.CTk, *_DND_MIXIN):
                 "Selecciona un participante activo en la pestaña Participantes primero.",
             )
             return
-        if not claude_cli_available():
+        if not ai_provider_available():
             continue_anyway = messagebox.askyesno(
-                "No se detectó Claude Code",
-                "No se encontró el CLI 'claude' instalado en este equipo.\n\n"
+                "Backend de IA no disponible",
+                f"{ai_backend.provider_unavailable_reason()}\n\n"
                 "Las Etapas 3, 4 y 5 de la sesión guiada dependen de él para "
                 "generar la respuesta de la IA y los cuestionarios -- sin "
-                "Claude Code, esas etapas van a mostrar un error en vez de "
-                "funcionar. El resto de la sesión (juegos, sensores, "
+                "esto configurado, esas etapas van a mostrar un error en vez "
+                "de funcionar. El resto de la sesión (juegos, sensores, "
                 "Etapa 2) funciona igual.\n\n"
                 "¿Continuar de todas formas?",
             )
@@ -370,6 +371,23 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
+
+        # Que backend responde las Etapas 3/4/5 de la sesion guiada
+        # (CLI `claude` o API de Gemini, ver ai_backend.py) depende de la
+        # variable de entorno AI_PROVIDER con la que se arranco la app --
+        # sin esto en algun lado visible, no hay forma de saber a simple
+        # vista cual de los dos genero los datos de una sesion. Se calcula
+        # una sola vez al armar el sidebar: AI_PROVIDER no cambia mientras
+        # la app esta corriendo.
+        provider_ok = ai_provider_available()
+        provider_label = "Gemini" if ai_backend.active_provider() == ai_backend.PROVIDER_GEMINI else "Claude"
+        ctk.CTkLabel(
+            footer,
+            text=f"{'✅' if provider_ok else '⚠️'}  IA: {provider_label}",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
+            text_color=TEXT_MUTED if provider_ok else WARNING,
+            wraplength=wrap(190), justify="left",
+        ).pack(anchor="w", pady=(0, 6))
 
         ctk.CTkLabel(
             footer, text=f"Proyecto: {PROJECT_ROOT.name}", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(10)),

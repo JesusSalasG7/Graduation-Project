@@ -1,12 +1,15 @@
-"""Llamada aislada al CLI `claude` (headless, `-p`): el mecanismo real
-detras del prompt que escribe el participante en la Etapa 2 de la sesion
-guiada (ver challenge_solver.generate_isolated_response), "hoja en blanco",
-sin nada mas que el texto exacto que escribio.
+"""Llamada aislada a la IA (backend configurable -- ver ai_backend.py):
+el mecanismo real detras del prompt que escribe el participante en la
+Etapa 2 de la sesion guiada (ver challenge_solver.generate_isolated_
+response), "hoja en blanco", sin nada mas que el texto exacto que escribio.
 
-Se usa el CLI en vez de la API directa de Anthropic a proposito, para no
-depender de una ANTHROPIC_API_KEY: el CLI ya funciona con el login /
-suscripcion que este equipo ya tiene configurado. La contrapartida es que
-el aislamiento no es tan estricto como con la API (ver el punto 2):
+Por defecto usa el CLI `claude` (headless, `-p`) en vez de la API directa
+de Anthropic, para no depender de una ANTHROPIC_API_KEY: el CLI ya
+funciona con el login / suscripcion que este equipo ya tiene configurado.
+Alternativamente, con AI_PROVIDER=gemini + GEMINI_API_KEY (ver
+ai_backend.py), la misma llamada aislada se hace contra la API de Gemini.
+La contrapartida del CLI (backend por defecto) es que el aislamiento no es
+tan estricto como con una API directa (ver el punto 2):
 
   1. Aislamiento: se invoca `claude -p` pasandole UNICAMENTE el texto que
      escribio el participante -- sin enunciado, sin el juego, sin historial
@@ -14,7 +17,8 @@ el aislamiento no es tan estricto como con la API (ver el punto 2):
      una carpeta temporal vacia (no la de este proyecto), para que no se
      autodescubra ningun CLAUDE.md ni configuracion de este repositorio.
      `--tools ""` deshabilita toda herramienta (no puede leer/escribir
-     archivos ni ejecutar nada).
+     archivos ni ejecutar nada). Con el backend Gemini esto no aplica: es
+     una llamada de API pura, sin acceso a filesystem en ningun caso.
   2. Determinismo: el CLI `claude` NO EXPONE un flag de temperature
      (verificado contra `claude -p --help`: no existe). Este requisito no
      se puede cumplir de forma estricta por esta via -- es la contrapartida
@@ -29,31 +33,32 @@ el aislamiento no es tan estricto como con la API (ver el punto 2):
      codigo) responda con la senal exacta NO_CODE en vez de texto libre --
      asi ask_isolated_prompt puede distinguir con certeza "no hubo
      respuesta valida" de "esto es la respuesta", sin tener que adivinar
-     leyendo el texto.
+     leyendo el texto. Con Gemini, ese mismo texto se manda como
+     systemInstruction (ver ai_backend._gemini_request).
 """
 
-import json
-import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
 
-CLAUDE_BIN = "claude"
+import ai_backend
+
 ISOLATED_MODEL = "sonnet"
 ISOLATED_TIMEOUT_SECONDS = 120
 
 
-def claude_cli_available() -> bool:
-    """True si el CLI `claude` esta instalado y en el PATH.
+def ai_provider_available() -> bool:
+    """True si el backend de IA actualmente seleccionado (ver
+    ai_backend.active_provider) esta listo para usarse.
 
     Sin el, la sesion guiada NO se rompe -- ask_isolated_prompt/
     generate_response_quiz ya devuelven un error prolijo si intentan
     invocarlo igual (ver mas abajo) -- pero recien se enterarian de eso
     en la Etapa 3, despues de haber jugado las Etapas 1/2. Se usa para
     avisar ANTES de arrancar la sesion guiada (ver App.
-    enter_session_wizard) a quien este probando la app sin Claude Code
-    instalado, en vez de dejar que lo descubra a mitad de una sesion."""
-    return shutil.which(CLAUDE_BIN) is not None
+    enter_session_wizard) a quien este probando la app sin el backend
+    configurado, en vez de dejar que lo descubra a mitad de una sesion."""
+    return ai_backend.provider_available()
+
 
 # Senal exacta que le pedimos al modelo devolver cuando NO puede producir
 # codigo (por falta de contexto en el prompt, o porque el prompt no pedia
@@ -102,49 +107,24 @@ def _strip_code_fences(text: str) -> str:
 
 
 def ask_isolated_prompt(participant_prompt: str) -> IsolatedPromptResult:
-    """Envia `participant_prompt` -- y solo eso -- al CLI `claude`, con el
-    system prompt de arriba, sin herramientas, y corriendo en una carpeta
+    """Envia `participant_prompt` -- y solo eso -- al backend de IA
+    seleccionado (ver ai_backend.py), con el system prompt de arriba, sin
+    herramientas, y (para el backend 'claude') corriendo en una carpeta
     vacia para minimizar que se cuele contexto de este proyecto.
     """
     prompt = participant_prompt.strip()
     if not prompt:
         return IsolatedPromptResult(ok=False, error="Escribe un prompt antes de enviarlo.")
 
-    cmd = [
-        CLAUDE_BIN, "-p", prompt,
-        "--system-prompt", ISOLATED_SYSTEM_PROMPT,
-        "--tools", "",
-        "--model", ISOLATED_MODEL,
-        "--output-format", "json",
-    ]
-
-    try:
-        with tempfile.TemporaryDirectory(prefix="isolated_prompt_") as empty_dir:
-            proc = subprocess.run(
-                cmd, cwd=empty_dir, capture_output=True, text=True,
-                timeout=ISOLATED_TIMEOUT_SECONDS,
-            )
-    except FileNotFoundError:
-        return IsolatedPromptResult(ok=False, error="No se encontró el comando 'claude' en el PATH.")
-    except subprocess.TimeoutExpired:
-        return IsolatedPromptResult(
-            ok=False, error=f"'claude' no respondió en {ISOLATED_TIMEOUT_SECONDS}s.",
+    with tempfile.TemporaryDirectory(prefix="isolated_prompt_") as empty_dir:
+        result = ai_backend.run_isolated_prompt(
+            prompt, ISOLATED_SYSTEM_PROMPT, ISOLATED_MODEL, ISOLATED_TIMEOUT_SECONDS, cwd=empty_dir,
         )
 
-    if proc.returncode != 0:
-        return IsolatedPromptResult(
-            ok=False,
-            error=f"'claude' terminó con error (código {proc.returncode}): {proc.stderr.strip()}",
-        )
+    if not result.ok:
+        return IsolatedPromptResult(ok=False, error=result.error)
 
-    text = proc.stdout.strip()
-    try:
-        payload = json.loads(proc.stdout)
-        text = str(payload.get("result", text)).strip()
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    text = _strip_code_fences(text).strip()
+    text = _strip_code_fences(result.text).strip()
     if not text:
         return IsolatedPromptResult(ok=False, error="La IA no devolvió ninguna respuesta.")
     if text.strip(" `\n\t.") == NO_CODE_SENTINEL:

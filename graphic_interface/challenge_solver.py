@@ -12,23 +12,22 @@ ejercicio como contexto, porque es herramienta de evaluacion armada por el
 investigador, no la respuesta que ve la IA del participante.
 """
 
-import json
-import subprocess
 import time
 from dataclasses import dataclass, field
 
+import ai_backend
 from challenges import Challenge
 from isolated_prompt import ask_isolated_prompt
 from quiz import QuizQuestion
 
-CLAUDE_BIN = "claude"
 # 14 preguntas de opcion multiple + una explicacion de razonamiento de 2-4
-# parrafos, generadas en una sola llamada JSON-schema al CLI `claude`: en la
-# practica esto puede superar 90s (visto en sesiones reales, ver
-# generate_isolated_response), lo que hacia fallar en silencio Etapas 4 Y 5
-# a la vez (ambas salen de esta misma llamada) sin ningun mensaje util.
+# parrafos, generadas en una sola llamada JSON-schema al backend de IA
+# configurado (ver ai_backend.py): en la practica esto puede superar 90s
+# (visto en sesiones reales, ver generate_isolated_response), lo que hacia
+# fallar en silencio Etapas 4 Y 5 a la vez (ambas salen de esta misma
+# llamada) sin ningun mensaje util.
 QUIZ_TIMEOUT_SECONDS = 180
-CLAUDE_MODEL = "sonnet"
+CLAUDE_MODEL = "sonnet"  # solo aplica cuando ai_backend.active_provider() == "claude"
 
 _QUESTION_JSON_SCHEMA = {
     "type": "object",
@@ -142,37 +141,20 @@ def generate_response_quiz(
         "participante para que pudiera responder mejor, y que decisiones "
         "tomo al quedarse sin ese contexto."
     )
-    cmd = [
-        CLAUDE_BIN, "-p", prompt,
-        "--output-format", "json",
-        "--json-schema", json.dumps(RESPONSE_QUIZ_JSON_SCHEMA),
-        "--tools", "",
-        "--model", CLAUDE_MODEL,
-    ]
+    result = ai_backend.run_json_schema_prompt(
+        prompt, RESPONSE_QUIZ_JSON_SCHEMA, CLAUDE_MODEL, QUIZ_TIMEOUT_SECONDS,
+    )
+    if not result.ok:
+        return [], [], "", result.error
 
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=QUIZ_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired:
-        return [], [], "", f"'claude' no respondió en {QUIZ_TIMEOUT_SECONDS}s generando las preguntas."
-    except OSError as exc:
-        return [], [], "", f"No se pudo ejecutar 'claude': {exc}"
-
-    if proc.returncode != 0:
-        return [], [], "", f"'claude' terminó con error (código {proc.returncode}): {proc.stderr.strip()}"
-
-    try:
-        payload = json.loads(proc.stdout)
-        structured = payload.get("structured_output")
-        if structured is None:
-            structured = json.loads(payload["result"])
+        structured = result.payload
         comprehension = [_question_from_payload(q) for q in structured["comprehension_questions"]][:7]
         reasoning = [_question_from_payload(q) for q in structured["reasoning_questions"]][:7]
         explanation = str(structured["reasoning_explanation"]).strip()
         return comprehension, reasoning, explanation, ""
     except Exception as exc:
-        return [], [], "", f"Respuesta inesperada de 'claude' al generar las preguntas: {exc}"
+        return [], [], "", f"Respuesta inesperada del backend de IA al generar las preguntas: {exc}"
 
 
 def generate_isolated_response(challenge: Challenge, participant_prompt: str) -> ChallengeSolveResult:

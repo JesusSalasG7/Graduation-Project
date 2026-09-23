@@ -15,7 +15,7 @@ respuestas a cuestionarios de comprensión/razonamiento.
 3. [Requisitos previos](#requisitos-previos)
 4. [Instalación](#instalación)
    - [1. Entorno base (panel + juegos)](#1-entorno-base-panel--juegos)
-   - [2. CLI `claude`](#2-cli-claude)
+   - [2. Backend de IA (`claude` o Gemini)](#2-backend-de-ia-claude-o-gemini)
    - [3. Sensores opcionales](#3-sensores-opcionales)
 5. [Cómo usar la aplicación](#cómo-usar-la-aplicación)
    - [Arrancar el panel](#arrancar-el-panel)
@@ -94,12 +94,21 @@ datos](#dónde-quedan-los-datos).
   proyecto no está probado ahí.
 - **Python 3.12** (o razonablemente cercano — el proyecto usa
   anotaciones de tipo modernas como `list[str]`, que requieren 3.9+).
-- **[Claude Code](https://claude.com/claude-code)** instalado y con
-  sesión iniciada (`claude` en el `PATH`): lo usa la Etapa 3 de la
-  sesión guiada (respuesta aislada de la IA) y la generación de los
-  cuestionarios de comprensión/razonamiento. No hace falta una
-  `ANTHROPIC_API_KEY` propia — usa la sesión/suscripción que ya tengas
-  configurada en el CLI.
+- **Un backend de IA** para la Etapa 3 de la sesión guiada (respuesta
+  aislada de la IA) y la generación de los cuestionarios de
+  comprensión/razonamiento — configurable con la variable de entorno
+  `AI_PROVIDER` (ver `graphic_interface/ai_backend.py`):
+  - `AI_PROVIDER=claude` (default, o simplemente no definir la
+    variable): **[Claude Code](https://claude.com/claude-code)**
+    instalado y con sesión iniciada (`claude` en el `PATH`). No hace
+    falta una `ANTHROPIC_API_KEY` propia — usa la sesión/suscripción
+    que ya tengas configurada en el CLI.
+  - `AI_PROVIDER=gemini`: una **API key de [Google AI
+    Studio](https://aistudio.google.com/apikey)** en la variable de
+    entorno `GEMINI_API_KEY`. Opcionalmente `GEMINI_MODEL` para
+    cambiar el modelo (default `gemini-3.6-flash`). No requiere
+    Claude Code ni ningún paquete extra — habla por REST con
+    `requests` (ya en `graphic_interface/requirements.txt`).
 - **Hardware opcional** (la app funciona sin ninguno de estos —
   simplemente se destildan en el modal de dispositivos de la sesión):
   - Diadema NeuroSky MindWave Mobile (Bluetooth).
@@ -140,25 +149,87 @@ Con el entorno instalado, arrancá el panel:
 .venv/bin/python graphic_interface/main.py
 ```
 
-### 2. CLI `claude`
+### 2. Backend de IA (`claude` o Gemini)
+
+Ambos usos (respuesta "aislada" de la Etapa 3 en
+`graphic_interface/isolated_prompt.py`, y los bancos de preguntas de
+comprensión/razonamiento + explicación de la Etapa 5 en
+`graphic_interface/challenge_solver.py`) pasan por el mismo selector
+configurable en `graphic_interface/ai_backend.py`.
+
+**Opción A — CLI `claude` (default):**
 
 Instalá Claude Code siguiendo la [documentación
 oficial](https://docs.claude.com/claude-code) e iniciá sesión una vez
 (`claude` sin argumentos, o `claude login`). El proyecto lo invoca en
-modo headless (`claude -p ...`) para:
+modo headless (`claude -p ...`). No hace falta definir `AI_PROVIDER` —
+es el comportamiento si esa variable no está seteada.
 
-- Generar la respuesta "aislada" que recibe el participante en la
-  Etapa 3 (`graphic_interface/isolated_prompt.py`).
-- Generar los bancos de preguntas de comprensión/razonamiento y la
-  explicación de la Etapa 5 (`graphic_interface/challenge_solver.py`).
+**Opción B — API de Gemini:**
 
-Si `claude` no está en el `PATH`, la app lo detecta solo (`shutil.which`,
-ver `isolated_prompt.claude_cli_available`) y te avisa **antes** de
-arrancar la sesión guiada, con la opción de seguir de todas formas —
-útil si alguien solo quiere probar la interfaz, los juegos o los
-sensores sin tener Claude Code instalado. Si igual continuás sin él,
-las Etapas 3, 4 y 5 muestran un error explicando que no se pudo
-invocar el CLI, en vez de romper la sesión.
+No requiere Claude Code instalado ni ningún paquete extra (usa
+`requests`, ya en `graphic_interface/requirements.txt`).
+
+1. **Conseguí una API key** en [Google AI
+   Studio](https://aistudio.google.com/apikey):
+   - Entrá con una cuenta de Google (cualquiera sirve, no hace falta
+     que sea la del proyecto).
+   - Click en **"Create API key"** ("Crear clave de API").
+   - Si te pide elegir/crear un proyecto de Google Cloud, dejá que lo
+     genere automático — no hace falta configurar nada ahí.
+   - Copiá la key que te muestra (empieza con algo como `AIza...`).
+     Tiene un nivel gratuito con límite de requests por minuto/día,
+     suficiente para pruebas, sin necesidad de tarjeta de crédito.
+
+2. **Exportá las variables** en la terminal desde la que vas a
+   arrancar el panel:
+
+   ```bash
+   export AI_PROVIDER=gemini
+   export GEMINI_API_KEY="tu-api-key"
+   # opcional, default gemini-3.6-flash:
+   export GEMINI_MODEL="gemini-3.6-flash"
+   ```
+
+   Esto solo dura mientras esa terminal esté abierta. Para no tener
+   que repetirlo cada vez, agregá esas mismas líneas al final de tu
+   `~/.bashrc` (o `~/.zshrc` si usás zsh) y abrí una terminal nueva.
+
+3. **Verificá la conexión** antes de correr una sesión real:
+
+   ```bash
+   .venv/bin/python graphic_interface/test_gemini_connection.py
+   ```
+
+   Si imprime `Conexión OK. Respuesta del modelo: 'OK'`, quedó bien
+   configurado. Si falla, el mensaje de error indica la causa (key
+   inválida, modelo no disponible, etc.).
+
+4. **Arrancá el panel** con esas variables ya exportadas en la misma
+   terminal (`.venv/bin/python graphic_interface/main.py`) y fijate
+   en el indicador **"IA: Gemini"** de la barra lateral (abajo a la
+   izquierda) — si aparece con ✅ está todo listo; con ⚠️ falta algo
+   (revisá el mensaje que muestra la app al entrar a la sesión
+   guiada).
+
+> 🔒 **Nunca compartas tu `GEMINI_API_KEY`** (por chat, en un commit,
+> en un issue, etc.) — cualquiera que la tenga puede usarla a tu
+> nombre. Si por error quedó expuesta en algún lado, revocala en
+> [Google AI Studio](https://aistudio.google.com/apikey) y generá una
+> nueva. El proyecto no la guarda en ningún archivo: siempre se lee
+> desde la variable de entorno en el momento de cada llamada (ver
+> `graphic_interface/ai_backend.py`).
+
+---
+
+Si el backend seleccionado no está disponible (CLI `claude` fuera del
+`PATH`, o `AI_PROVIDER=gemini` sin `GEMINI_API_KEY`), la app lo detecta
+solo (`ai_backend.provider_available`) y te avisa **antes** de arrancar
+la sesión guiada, con la opción de seguir de todas formas — útil si
+alguien solo quiere probar la interfaz, los juegos o los sensores sin
+tener ningún backend de IA configurado. Si igual continuás sin él, las
+Etapas 3, 4 y 5 muestran un error explicando que no se pudo invocar la
+IA, en vez de romper la sesión.
 
 ### 3. Sensores opcionales
 
