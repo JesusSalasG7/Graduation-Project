@@ -12,7 +12,6 @@ disco y los recorta por el rango [inicio, fin] de cada etapa.
 import csv
 import json
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +19,6 @@ from typing import Optional
 
 import pandas as pd
 
-from personal_records import load_personal_record
 from quiz import QuizQuestion
 
 SESSIONS_DIR_NAME = "Sesiones_participantes"
@@ -30,28 +28,29 @@ SESSIONS_DIR_NAME = "Sesiones_participantes"
 # nada que exportar. Orden en el que ocurren durante la sesion.
 GUIDED_SESSION_STAGE_ORDER = [2, 3, 4, 5]
 
-_UNSAFE_CHARS_RE = re.compile(r"[^A-Za-z0-9_-]+")
-
-
-def sanitize_component(text: str) -> str:
-    """Normaliza un componente de nombre de archivo/carpeta: sin tildes, sin
-    espacios ni caracteres invalidos en distintos sistemas de archivos."""
-    normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    normalized = normalized.strip().replace(" ", "_")
-    normalized = _UNSAFE_CHARS_RE.sub("_", normalized)
-    return normalized.strip("_") or "SinNombre"
+# Carpetas viejas "Nombre_Apellido_N" (ver _migrate_legacy_participant_folder).
+_LEGACY_FOLDER_RE = re.compile(r"[A-Za-z0-9-]+(?:_[A-Za-z0-9-]+)*_\d+")
 
 
 def participant_folder_name(participant: dict) -> str:
-    """"Nombre_Apellido_N" usando el registro personal ya cargado al crear
-    el participante (ver personal_records.py) -- si no existe (participante
-    viejo sin registro), cae a "Participante_N"."""
-    number = participant["number"]
-    record = load_personal_record(number)
-    if record:
-        nombre, apellido = record
-        return f"{sanitize_component(nombre)}_{sanitize_component(apellido)}_{number}"
-    return f"Participante_{number}"
+    """"Participante_N" -- a proposito SIN nombre/apellido: estas carpetas
+    tienen los datos biometricos de la sesion, y el nombre real vive solo
+    en el registro personal fuera del proyecto (ver personal_records.py)."""
+    return f"Participante_{participant['number']}"
+
+
+def _migrate_legacy_participant_folder(number: int) -> None:
+    """Sesiones grabadas antes del cambio a "Participante_N" quedaron en
+    "Nombre_Apellido_N" -- se renombran la primera vez que se accede a
+    ese participante, para no dejar dos carpetas del mismo numero."""
+    root = sessions_root()
+    target = root / f"Participante_{number}"
+    if target.exists() or not root.is_dir():
+        return
+    for legacy in root.glob(f"*_{number}"):
+        if legacy.is_dir() and legacy.name != target.name and _LEGACY_FOLDER_RE.fullmatch(legacy.name):
+            legacy.rename(target)
+            return
 
 
 def sessions_root() -> Path:
@@ -59,6 +58,7 @@ def sessions_root() -> Path:
 
 
 def participant_session_dir(participant: dict) -> Path:
+    _migrate_legacy_participant_folder(participant["number"])
     path = sessions_root() / participant_folder_name(participant)
     path.mkdir(parents=True, exist_ok=True)
     return path
@@ -75,6 +75,7 @@ def challenge_dir_readonly(participant: dict, challenge_number: int) -> Path:
     lecturas (p.ej. la matriz de datos guardados en la pestaña Sesión, ver
     app.py) que no deben dejar rastro en disco por el solo hecho de
     mirar un desafío que todavia no tiene datos."""
+    _migrate_legacy_participant_folder(participant["number"])
     return sessions_root() / participant_folder_name(participant) / f"Desafio_{challenge_number}"
 
 

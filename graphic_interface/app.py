@@ -1025,7 +1025,7 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
         # Matriz de lo que ya se exporto para el participante activo, leyendo
-        # directo de Sesiones_participantes/<Nombre_Apellido_N>/Desafio_N/
+        # directo de Sesiones_participantes/Participante_N/Desafio_N/
         # Etapa_N/ (ver stage_capture.py) -- las Etapas 1 y 6 no capturan
         # datos (ver GUIDED_SESSION_STAGE_ORDER), asi que no se listan.
         data_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)

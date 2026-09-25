@@ -411,7 +411,7 @@ Con un participante activo, esta pestaña muestra:
 
 | Qué | Dónde |
 |---|---|
-| Datos de cada sesión (sensores, cuestionarios, prompts) | `~/Escritorio/Sesiones_participantes/<Nombre_Apellido_N>/Desafio_N/Etapa_N/...` |
+| Datos de cada sesión (sensores, cuestionarios, prompts) | `~/Escritorio/Sesiones_participantes/Participante_N/Desafio_N/Etapa_N/...` |
 | Nombre/apellido de los participantes (dato personal) | `~/Escritorio/Participantes/participantes.csv` |
 | Registro anónimo de participantes de la app | `graphic_interface/data/participants.json` (ignorado por git) |
 | Respuestas de cuestionarios | `graphic_interface/data/quiz_results/PARTICIPANTE_N.json` (ignorado por git) |
