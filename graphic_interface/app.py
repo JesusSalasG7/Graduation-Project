@@ -2,6 +2,7 @@
 
 import sys
 import threading
+import tkinter as tk
 import tkinter.messagebox as messagebox
 from pathlib import Path
 from tkinter import ttk
@@ -53,6 +54,7 @@ except ImportError:
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DATA_FILE = DATA_DIR / "participants.json"
+APP_ICON_FILE = Path(__file__).resolve().parent / "assets" / "app_icon.png"
 
 EXPERIENCE_LEVELS = [
     "Avanzado",
@@ -140,8 +142,16 @@ def _enable_linux_wheel_scroll(root: ctk.CTk) -> None:
 
 class App(ctk.CTk, *_DND_MIXIN):
     def __init__(self):
-        super().__init__()
-        self.title("Panel de Experimento")
+        # className fija el WM_CLASS de la ventana, que es lo que muestra el
+        # dock/barra de tareas de Linux al pasar el mouse (si no, sale "Tk").
+        super().__init__(className="Panel Experimental")
+        self.title("Panel Experimental")
+        # default=True: tambien lo heredan los modales/ventanas secundarias.
+        # Se guarda la referencia -- si el PhotoImage se recolecta, el
+        # icono desaparece.
+        if APP_ICON_FILE.exists():
+            self._app_icon = tk.PhotoImage(file=str(APP_ICON_FILE))
+            self.iconphoto(True, self._app_icon)
         self.geometry(f"{wrap(1080)}x{wrap(680)}")
         self.minsize(wrap(920), wrap(580))
         self.configure(fg_color=BG_APP)

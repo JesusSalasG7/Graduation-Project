@@ -1,0 +1,815 @@
+{
+  "participant_number": 2,
+  "records": [
+    {
+      "game": "Game-01",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Qué representa exactamente el valor que debe devolver count_apples_in_range()?",
+          "options": [
+            "La suma de los valores de las manzanas dentro del rango",
+            "La cantidad de manzanas cuyo valor está dentro del rango activo (límites inclusive)",
+            "La cantidad total de manzanas en el tablero, sin importar el filtro",
+            "El valor máximo entre las manzanas que pasan el filtro"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "Según el enunciado, los límites del rango [filter_min, filter_max] son...",
+          "options": [
+            "Exclusivos (no cuentan los extremos)",
+            "Solo el mínimo es inclusivo",
+            "Inclusive en ambos extremos",
+            "Solo el máximo es inclusivo"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué método ya existente debe reutilizarse para decidir si una manzana individual pasa el filtro?",
+          "options": [
+            "count_apples_in_range()",
+            "_apple_passes_filter(value)",
+            "food_field.apples()",
+            "_update_range_bonus()"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "Con valores = [-5, +5, +15, +5, -5, +15], ¿cuál es el resultado esperado para el rango [-5, 5]?",
+          "options": [
+            "2",
+            "4",
+            "6",
+            "0"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué complejidad temporal se pide para la solución?",
+          "options": [
+            "O(n²), comparando cada manzana con todas las demás",
+            "O(log n), usando búsqueda binaria",
+            "O(n), con una sola pasada sobre la lista",
+            "O(1), sin importar la cantidad de manzanas"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "Si self.food_field.apples está vacía, ¿qué debe devolver la función?",
+          "options": [
+            "None",
+            "Una excepción (ValueError)",
+            "0",
+            "-1"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué partes del juego consumen el resultado de count_apples_in_range(), según el enunciado?",
+          "options": [
+            "Solo el sistema de puntuación final",
+            "El HUD \"En rango: N/Total\" y el bono periódico de puntos del modo Desafío",
+            "La generación aleatoria de nuevas manzanas",
+            "El sistema de colisiones de la serpiente"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué devuelve la función count_apples_in_range de la respuesta?",
+          "options": [
+            "Una lista con las manzanas que están dentro del filtro",
+            "Un entero con la cantidad de manzanas cuyo valor pasa el filtro",
+            "Un booleano que indica si hay alguna manzana en rango",
+            "La suma de los valores de las manzanas en rango"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cómo decide la respuesta si una manzana individual está dentro del rango?",
+          "options": [
+            "Compara apple.value con filter_min y filter_max directamente",
+            "Llama a self._apple_passes_filter(apple.value)",
+            "Revisa si el valor es -5, 5 o 15",
+            "Usa un temporizador que cambia el filtro"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué estructura de código usa la respuesta para contar?",
+          "options": [
+            "Un bucle while con un contador manual",
+            "Recursión sobre la lista de manzanas",
+            "Una expresión generadora dentro de sum() con una condición if",
+            "Un diccionario que agrupa manzanas por valor"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué parte del enunciado NO aparece implementada en la respuesta?",
+          "options": [
+            "El conteo de manzanas en rango",
+            "El uso de _apple_passes_filter",
+            "El bono automático de +2 puntos por manzana en rango cada 5 segundos",
+            "La lectura del atributo .value de cada manzana"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Sobre qué colección itera la función?",
+          "options": [
+            "self.apples",
+            "self.food_field.apples",
+            "self.world.apples",
+            "self.filter_apples"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué se puede decir de la respuesta respecto al indicador en pantalla \"En rango: N/Total\"?",
+          "options": [
+            "Lo dibuja en pantalla con el conteo",
+            "Lo calcula y también imprime el total de manzanas",
+            "No lo dibuja; solo entrega el número N que podría alimentarlo",
+            "Lo reemplaza por un mensaje de consola"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cómo se valora mejor la respuesta frente al ejercicio completo?",
+          "options": [
+            "Correcta para el método count_apples_in_range, pero incompleta respecto al bono y al indicador",
+            "Totalmente incorrecta porque no compara los límites",
+            "Completa, porque el bono se calcula dentro del sum",
+            "Es texto sin código, no resuelve nada"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "game": "Game-01",
+      "stage": "etapa4_razonamiento",
+      "questions": [
+        {
+          "text": "¿Por qué la respuesta delega la decisión de rango en _apple_passes_filter en lugar de escribir la comparación con filter_min y filter_max?",
+          "options": [
+            "Porque el prompt del participante mencionaba ese método existente y se asumió que ya encapsula el filtro",
+            "Porque la respuesta no sabe qué es un rango",
+            "Porque los límites siempre son -5 y 15",
+            "Porque sum() no permite comparaciones"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué asumió la respuesta sobre las manzanas a partir del prompt?",
+          "options": [
+            "Que son tuplas (x, y, valor)",
+            "Que cada elemento de food_field.apples tiene un atributo .value",
+            "Que el valor se guarda en un diccionario aparte",
+            "Que todas las manzanas valen lo mismo"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué el código se limita a contar y no incluye el bono de +2 puntos cada 5 segundos?",
+          "options": [
+            "Porque el bono es imposible de implementar",
+            "Porque solo se implementó el método concreto que el prompt pedía, sin lógica de temporizador ni puntaje",
+            "Porque el bono se calcula solo dentro de sum()",
+            "Porque el filtro cambia cada 8 segundos y eso lo resuelve"
+          ],
+          "correct_index": 1,
+          "selected_index": 3,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué contexto adicional en el prompt del participante habría permitido una respuesta más completa?",
+          "options": [
+            "El color de las manzanas",
+            "Que el conteo alimenta un indicador en pantalla y un bono automático cada 5 segundos",
+            "El nombre del participante",
+            "La versión de Python únicamente"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué se eligió una expresión generadora con sum() para la estructura?",
+          "options": [
+            "Permite contar en una sola expresión los elementos que cumplen una condición, sin variables auxiliares",
+            "Porque es la única forma de leer atributos",
+            "Porque evita llamar a _apple_passes_filter",
+            "Porque guarda las manzanas en memoria para después"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "Al no tener el enunciado, ¿qué decisión tomó la respuesta respecto a la firma del método?",
+          "options": [
+            "Lo escribió como método de instancia con self y anotación de retorno int",
+            "Lo escribió como función estática sin parámetros",
+            "Le añadió parámetros filter_min y filter_max",
+            "Lo devolvió como una lambda"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Por qué se puede decir que la respuesta es válida para el método pedido pero no para el ejercicio completo?",
+          "options": [
+            "Porque el conteo es correcto según el filtro, pero faltan el temporizador del bono y la visualización",
+            "Porque cuenta manzanas fuera de rango",
+            "Porque modifica el filtro activo",
+            "Porque usa un nombre de método distinto"
+          ],
+          "correct_index": 0,
+          "selected_index": -1,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-04",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Cuándo se considera que una señal \"conserva su patrón\" (es estable)?",
+          "options": [
+            "Cuando tiene un número par de caracteres",
+            "Cuando se lee exactamente igual en sentido inverso, carácter por carácter",
+            "Cuando todas sus letras son mayúsculas",
+            "Cuando no contiene espacios ni símbolos"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué debe devolver is_stable_signal(\"\") (cadena vacía)?",
+          "options": [
+            "False",
+            "None",
+            "True",
+            "Lanza una excepción"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿La comparación debe normalizar mayúsculas/minúsculas o espacios antes de comparar?",
+          "options": [
+            "Sí, todo se pasa a mayúsculas primero",
+            "Sí, se eliminan los espacios",
+            "No, se compara carácter por carácter tal cual viene el texto",
+            "Solo se normalizan los acentos"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cuál de estas palabras es estable (True) según los casos de prueba dados?",
+          "options": [
+            "PYTHON",
+            "CIRCUITO",
+            "ANILINA",
+            "VENTANA"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué tipo de dato exacto debe devolver la función?",
+          "options": [
+            "Un entero (0 o 1)",
+            "Un string (\"True\"/\"False\")",
+            "Un bool puro",
+            "Cualquier valor \"truthy\""
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cuánto tiempo tiene el jugador para responder en cada ronda, según el enunciado?",
+          "options": [
+            "2 segundos",
+            "4 segundos",
+            "10 segundos",
+            "No hay límite de tiempo"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué característica particular tiene la regla de verificación dentro del juego?",
+          "options": [
+            "Se explica en una pantalla de instrucciones antes de cada ronda",
+            "Cambia aleatoriamente en cada partida",
+            "Nunca se explica en pantalla; el jugador debe inferirla jugando",
+            "Se muestra como pista después de fallar una vez"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "game": "Game-04",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué hace exactamente la función is_stable_signal de la respuesta?",
+          "options": [
+            "Compara el texto con su versión invertida y devuelve True si son iguales",
+            "Cuenta las letras del texto y devuelve True si la cantidad es par",
+            "Ordena las letras del texto y comprueba si quedan igual",
+            "Recorre el texto con un bucle while y devuelve la posición del primer error"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué expresión se usa para invertir la cadena?",
+          "options": [
+            "reversed(text)",
+            "text[::-1]",
+            "text.reverse()",
+            "text.split()[::-1]"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué devuelve is_stable_signal(\"abba\")?",
+          "options": [
+            "False",
+            "None",
+            "True",
+            "Lanza un error"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué devuelve is_stable_signal(\"Abba\") con el código tal como está?",
+          "options": [
+            "True, porque ignora mayúsculas",
+            "False, porque 'A' y 'a' son caracteres distintos",
+            "True, porque solo compara la longitud",
+            "Lanza un error de tipo"
+          ],
+          "correct_index": 1,
+          "selected_index": 0,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué devuelve la función para una cadena vacía \"\"?",
+          "options": [
+            "False",
+            "None",
+            "Lanza IndexError",
+            "True"
+          ],
+          "correct_index": 3,
+          "selected_index": 3,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué partes del enunciado NO aparecen en la respuesta (más allá de la función)?",
+          "options": [
+            "Ninguna parte; la función es lo único que pedía el ejercicio de código",
+            "La firma con el tipo str y bool",
+            "La comparación letra por letra",
+            "El archivo src/signal_check.py, el temporizador de 4 segundos y el juego"
+          ],
+          "correct_index": 3,
+          "selected_index": 3,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cómo se relaciona la respuesta con la regla de 'conservar el patrón' del enunciado?",
+          "options": [
+            "No se relaciona: implementa otra regla distinta",
+            "Implementa la regla literal de leerse igual en sentido inverso, letra por letra",
+            "Solo funciona con palabras de longitud impar",
+            "Ignora los espacios y la puntuación antes de comparar"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "game": "Game-04",
+      "stage": "etapa4_razonamiento",
+      "questions": [
+        {
+          "text": "Según el razonamiento, ¿cuál fue el primer paso lógico para construir la respuesta?",
+          "options": [
+            "Limpiar el texto quitando espacios y signos",
+            "Interpretar que la tarea es decidir si un texto es igual a su reverso, es decir, un palíndromo",
+            "Crear una lista con todas las letras del texto",
+            "Medir el tiempo que tarda la comparación"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué la solución es una sola línea sin estructuras de datos adicionales?",
+          "options": [
+            "Porque la comparación directa entre el texto y su inverso ya expresa la regla completa",
+            "Porque se necesita una pila para invertir el texto",
+            "Porque Python no permite usar bucles en funciones con bool",
+            "Porque la IA optimizó el rendimiento con un algoritmo avanzado"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué suposición hace la respuesta sobre las mayúsculas, espacios y signos?",
+          "options": [
+            "Los normaliza antes de comparar",
+            "Los elimina con una expresión regular",
+            "Los trata como caracteres normales: no aplica ningún filtrado",
+            "Los ignora solo al principio y al final"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué contexto del enunciado le habría servido a la IA para responder mejor?",
+          "options": [
+            "La ruta src/signal_check.py y las restricciones de no depender de pygame ni de gale",
+            "El color de la interfaz del juego",
+            "El número de participantes del estudio",
+            "La versión del sistema operativo"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "Ante la falta de contexto, ¿qué decisión tomó la IA?",
+          "options": [
+            "Pedir aclaraciones al participante antes de escribir código",
+            "Devolver solo texto explicativo sin código",
+            "Dar una función mínima basada en la interpretación más directa del prompt",
+            "Construir el juego completo con pygame"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué la respuesta es una solución válida a la lógica del ejercicio?",
+          "options": [
+            "Porque la regla del enunciado es leerse igual al revés letra por letra, y el código compara exactamente eso",
+            "Porque maneja el límite de 4 segundos por ronda",
+            "Porque muestra la regla en pantalla al jugador",
+            "Porque ignora mayúsculas y espacios como pide el enunciado"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué limitación queda sin resolver en la respuesta respecto al ejercicio completo?",
+          "options": [
+            "La comparación es incorrecta para cadenas simples",
+            "No se ubica en src/signal_check.py ni se incluye nada del temporizador o del juego; solo aparece la función",
+            "No devuelve un valor booleano",
+            "Depende de pygame para funcionar"
+          ],
+          "correct_index": 1,
+          "selected_index": 0,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-05",
+      "stage": "etapa1_enunciado",
+      "questions": [
+        {
+          "text": "¿Qué debe devolver find_repeated(matrix)?",
+          "options": [
+            "Todos los valores de la matriz, sin repetir",
+            "Los valores que aparecen 2 o más veces, cada uno una sola vez",
+            "La cantidad total de valores repetidos",
+            "Solo el valor que más se repite"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "Según el enunciado, ¿en qué orden deben aparecer los valores repetidos en el resultado?",
+          "options": [
+            "De mayor a menor valor",
+            "En el orden de su primera aparición",
+            "En el orden en que se detectó su repetición (su segunda aparición)",
+            "En orden alfabético/numérico ascendente"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué estructura de datos es el \"Key Concept\" para resolver esto en una sola pasada?",
+          "options": [
+            "Una lista ordenada con búsqueda binaria",
+            "Un diccionario de conteo con sort() al final",
+            "Conjuntos (sets) para marcar valores ya vistos y ya reportados",
+            "Una matriz auxiliar del mismo tamaño"
+          ],
+          "correct_index": 2,
+          "selected_index": 3,
+          "is_correct": false
+        },
+        {
+          "text": "Con find_repeated([[1, 2, 2, 3], [3, 1, 4]]), ¿cuál es el resultado exacto esperado?",
+          "options": [
+            "[1, 2, 3]",
+            "[2, 3, 1]",
+            "[2, 3]",
+            "[1, 2, 2, 3, 3, 1]"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "Si un valor aparece 3 o más veces en la matriz, ¿cuántas veces debe aparecer en el resultado?",
+          "options": [
+            "Tantas veces como se repita",
+            "Dos veces",
+            "Una sola vez",
+            "Ninguna, se descartan"
+          ],
+          "correct_index": 2,
+          "selected_index": 0,
+          "is_correct": false
+        },
+        {
+          "text": "¿La matriz de entrada debe asumirse cuadrada (mismo número de filas y columnas)?",
+          "options": [
+            "Sí, siempre es cuadrada",
+            "No, ni siquiera se asume que todas las filas midan igual",
+            "Sí, pero solo en Transmutación Arcana",
+            "No se puede saber sin ejecutar el código"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "En el juego real, ¿qué evento del tablero genera la \"línea\" que se analiza con este algoritmo?",
+          "options": [
+            "El movimiento aleatorio de fichas al iniciar la partida",
+            "La Regla de Catálisis, que limpia una fila o columna completa",
+            "El cálculo del daño del hechizo",
+            "La generación de nuevas fichas al caer por gravedad"
+          ],
+          "correct_index": 1,
+          "selected_index": 0,
+          "is_correct": false
+        }
+      ]
+    },
+    {
+      "game": "Game-05",
+      "stage": "etapa3_comprension",
+      "questions": [
+        {
+          "text": "¿Qué devuelve la función `find_repeated` cuando recibe `[[3, 1, 3, 3, 1]]`?",
+          "options": [
+            "[3, 1]",
+            "[3, 3, 1]",
+            "[1, 3]",
+            "[3, 3]"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Para qué sirve el conjunto `reported` en el código?",
+          "options": [
+            "Para guardar todos los valores vistos en la matriz",
+            "Para evitar que un mismo valor repetido se agregue más de una vez al resultado",
+            "Para ordenar los valores del resultado",
+            "Para contar cuántas veces aparece cada valor"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué devuelve la función con `[[1, 2, 2, 1]]`?",
+          "options": [
+            "[1, 2]",
+            "[1, 2, 2, 1]",
+            "[2, 1]",
+            "[2]"
+          ],
+          "correct_index": 2,
+          "selected_index": 0,
+          "is_correct": false
+        },
+        {
+          "text": "¿Cómo trata la función las varias filas de una matriz?",
+          "options": [
+            "Analiza cada fila por separado y reinicia `seen` en cada una",
+            "Solo analiza la primera fila",
+            "Solo compara filas contiguas entre sí",
+            "Usa un único `seen` para todas las filas, así que un valor en dos filas distintas se reporta como repetido"
+          ],
+          "correct_index": 3,
+          "selected_index": 2,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué ocurriría si se llama a la función con una lista plana como `[1, 2, 2]` en lugar de una lista de listas?",
+          "options": [
+            "Devolvería [2]",
+            "Devolvería una lista vacía",
+            "Lanzaría un error porque intenta iterar sobre un entero",
+            "Devolvería [1, 2]"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué elementos propios del contexto del juego (TileKind, tablero 6x6, swaps, Catálisis) aparecen en el código?",
+          "options": [
+            "Ninguno; trabaja con enteros genéricos dentro de una matriz",
+            "Valida que los enteros estén entre 0 y 7",
+            "Comprueba que la línea tenga 6 casillas",
+            "Reconstruye la línea a partir de los swaps del jugador"
+          ],
+          "correct_index": 0,
+          "selected_index": 1,
+          "is_correct": false
+        },
+        {
+          "text": "¿Qué devuelve la función si la matriz de entrada está vacía o no tiene valores repetidos?",
+          "options": [
+            "Lanza una excepción",
+            "Devuelve None",
+            "Devuelve una lista vacía",
+            "Devuelve la matriz original"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        }
+      ]
+    },
+    {
+      "game": "Game-05",
+      "stage": "etapa4_razonamiento",
+      "questions": [
+        {
+          "text": "¿Qué interpretó la respuesta a partir del prompt sobre el formato de la entrada?",
+          "options": [
+            "Que la entrada es un diccionario de casillas",
+            "Que la entrada es una cadena de texto con la línea",
+            "Que la entrada es una matriz, es decir, una lista de listas de enteros",
+            "Que la entrada es una lista plana de TileKind"
+          ],
+          "correct_index": 2,
+          "selected_index": 2,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué el resultado sale en el orden de la segunda aparición de cada valor?",
+          "options": [
+            "Porque el código ordena el resultado al final",
+            "Porque agrega un valor a `result` en el momento en que lo encuentra estando ya en `seen`",
+            "Porque `result` es un conjunto que se ordena solo",
+            "Porque recorre la matriz de atrás hacia adelante"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué estructura usa el código para saber si un valor ya apareció antes, en lugar de comparar cada ficha con todas las siguientes?",
+          "options": [
+            "Un conjunto `seen`",
+            "Un diccionario de posiciones",
+            "Un doble bucle con índices",
+            "Una pila"
+          ],
+          "correct_index": 0,
+          "selected_index": 0,
+          "is_correct": true
+        },
+        {
+          "text": "¿Qué contexto habría ayudado más a que la respuesta se ajustara al ejercicio?",
+          "options": [
+            "Saber qué versión de Python se usa",
+            "Conocer el nombre de la función, el formato exacto de entrada y salida y que se trata de una línea del tablero",
+            "Saber cuántos participantes hay en el estudio",
+            "Conocer el color de cada ficha"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "Al no conocer las reglas del juego, ¿qué decisión tomó la respuesta?",
+          "options": [
+            "Pedir más información antes de escribir código",
+            "Escribir solo texto explicativo sin código",
+            "Inventar una clase `Tile` con reglas propias",
+            "Dar una solución genérica sobre enteros y una matriz, sin referencias al tablero ni a los swaps"
+          ],
+          "correct_index": 3,
+          "selected_index": 3,
+          "is_correct": true
+        },
+        {
+          "text": "¿Por qué se puede decir que la solución es razonable para el caso de una matriz de una sola fila?",
+          "options": [
+            "Porque valida que la fila tenga 6 elementos",
+            "Porque recorre esa única fila y reporta una vez cada valor que ya había visto antes",
+            "Porque compara explícitamente cada ficha con las que le siguen mediante índices",
+            "Porque devuelve las posiciones de los repetidos"
+          ],
+          "correct_index": 1,
+          "selected_index": 1,
+          "is_correct": true
+        },
+        {
+          "text": "¿Cuál es una limitación de la respuesta que se deriva de haber asumido el prompt sin el enunciado?",
+          "options": [
+            "Que usa conjuntos en vez de listas",
+            "Que puede devolver la lista vacía",
+            "Que podría no coincidir con el nombre, la firma o el formato de salida (valores frente a posiciones) que esperaba el ejercicio",
+            "Que recorre la matriz una sola vez"
+          ],
+          "correct_index": 2,
+          "selected_index": 1,
+          "is_correct": false
+        }
+      ]
+    }
+  ]
+}

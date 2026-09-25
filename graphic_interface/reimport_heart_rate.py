@@ -20,7 +20,7 @@ a minuto de la medicion continua vive en JSON aparte dentro de ella (ver
 heart_rate_import.HEART_RATE_JSON_SUBDIR); con solo el CSV se pierden esas
 lecturas y quedan unicamente los chequeos puntuales sueltos.
 
-Requiere que las Etapas 2/4/5 de ese desafio ya esten exportadas (con su
+Requiere que las Etapas 2/3/4/5 de ese desafio ya esten exportadas (con su
 sync_timeline.json) -- ver stage_capture.write_sync_timeline.
 """
 

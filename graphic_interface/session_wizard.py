@@ -494,8 +494,9 @@ class SessionWizard:
         """Recorta por tiempo (StageTimer) los CSV continuos de
         NeuroSky/Emotion/Eye para `stage_number` y los exporta a la carpeta
         de esa etapa en el Escritorio, junto con el cuestionario (si se
-        pasa). Se llama al terminar las etapas 2, 4 y 5 -- la 3 no tiene
-        corte de sensores (ver on_send en _show_stage3), y la 1/6 no
+        pasa). Se llama al terminar las etapas 2, 4 y 5 -- la 3 recorta
+        los mismos sensores pero desde _save_stage3_files (no tiene
+        cuestionario, sino prompt + registro del enunciado), y la 1/6 no
         capturan datos.
 
         Solo recorta los dispositivos habilitados para esta sesion (ver
@@ -514,6 +515,20 @@ class SessionWizard:
         attempt = self._attempt_number if stage_number in (3, 4, 5) else None
         folder = stage_dir(participant, challenge_number, stage_number, attempt=attempt)
 
+        warnings, sync_sources = self._write_stage_sensors(participant, folder, window)
+
+        if questions:
+            write_cuestionario_txt(folder, questions, answers or {})
+
+        write_sync_timeline(folder, window, sync_sources)
+        if warnings:
+            self._stage_warnings[stage_number] = warnings
+
+    def _write_stage_sensors(self, participant: dict, folder: Path, window) -> tuple[list[str], dict]:
+        """Recorta NeuroSky/Emotion/Eye a la ventana `window` de una etapa
+        y escribe sus CSV en `folder` (compartido por _export_stage y
+        _save_stage3_files). Devuelve (advertencias, fuentes para
+        sync_timeline.json)."""
         start = window.started_at
         end = window.ended_at or window.started_at
 
@@ -534,13 +549,7 @@ class SessionWizard:
             sync_sources["eye"] = source_info(eye_df, "timestamp", eye_warnings)
 
         write_stage_sensor_files(folder, neurosky_df, emotion_df, eye_df)
-
-        if questions:
-            write_cuestionario_txt(folder, questions, answers or {})
-
-        write_sync_timeline(folder, window, sync_sources)
-        if warnings:
-            self._stage_warnings[stage_number] = warnings
+        return warnings, sync_sources
 
     def _render_pending_warnings(self, parent):
         """Banner inline (nunca un messagebox bloqueante) con las
@@ -1632,8 +1641,10 @@ class SessionWizard:
 
     def _save_stage3_files(self, prompt_text: str):
         """Guarda lo escrito en la Etapa 3 (prompt libre + registro de
-        aperturas del enunciado) -- esta etapa no recorta sensores, solo
-        estos dos archivos (ver _export_stage para las etapas 2/4/5)."""
+        aperturas del enunciado) y, igual que las etapas 2/4/5 (ver
+        _export_stage), el recorte de NeuroSky/Emotion/Eye de esta etapa --
+        la frecuencia cardiaca se corta despues, al cargar el reloj (ver
+        _snapshot_pending_heart_rate)."""
         participant = self.app.store.get_active()
         window = self._stage_timer.finish(3)
         if participant is None:
@@ -1641,9 +1652,11 @@ class SessionWizard:
         challenge_number = self.game_index + 1
         folder = stage_dir(participant, challenge_number, 3, attempt=self._attempt_number)
         write_stage3_files(folder, prompt_text, self._statement_log)
-        write_sync_timeline(folder, window, {
-            "enunciado_aperturas": {"count": len(self._statement_log)},
-        })
+        warnings, sync_sources = self._write_stage_sensors(participant, folder, window)
+        sync_sources["enunciado_aperturas"] = {"count": len(self._statement_log)}
+        write_sync_timeline(folder, window, sync_sources)
+        if warnings:
+            self._stage_warnings[3] = warnings
 
     def _run_isolated_prompt(self, participant_prompt: str):
         try:
@@ -1956,7 +1969,7 @@ class SessionWizard:
 
     def _snapshot_pending_heart_rate(self):
         """Guarda, para el desafío actual, las carpetas/ventanas de las
-        etapas 2/4/5 tal como están AHORA, en una cola a procesar cuando
+        etapas 2/3/4/5 tal como están AHORA, en una cola a procesar cuando
         finalmente aparezca la pantalla de importar el reloj.
 
         Por que hace falta: self._stage_timer solo guarda UNA ventana por
@@ -1969,7 +1982,7 @@ class SessionWizard:
         más arriba), un solo export del reloj entregado al final de una
         sesión de varios desafíos solo alcanzaba a recortarle la
         frecuencia cardíaca al ÚLTIMO -- los anteriores quedaban con la
-        etapa 2/4/5 ya exportada (NeuroSky/Emotion/Eye) pero sin
+        etapa 2/3/4/5 ya exportada (NeuroSky/Emotion/Eye) pero sin
         heart_rate.csv, porque su ventana ya se habia perdido para cuando
         se pedia el reloj."""
         participant = self.app.store.get_active()
@@ -1988,11 +2001,13 @@ class SessionWizard:
             "challenge_folder": challenge_dir(participant, challenge_number),
             "stage_folders": {
                 2: stage_dir(participant, challenge_number, 2),
+                3: stage_dir(participant, challenge_number, 3, attempt=self._attempt_number),
                 4: stage_dir(participant, challenge_number, 4, attempt=self._attempt_number),
                 5: stage_dir(participant, challenge_number, 5, attempt=self._attempt_number),
             },
             "stage_windows": {
                 2: self._stage_timer.window(2),
+                3: self._stage_timer.window(3),
                 4: self._stage_timer.window(4),
                 5: self._stage_timer.window(5),
             },
@@ -2000,7 +2015,7 @@ class SessionWizard:
 
     def _finish_challenge(self, heart_rate_export_folder: Optional[Path], on_done):
         """Recorta (si se cargó) la frecuencia cardíaca del reloj en las
-        etapas 2/4/5 de TODOS los desafíos acumulados desde la última vez
+        etapas 2/3/4/5 de TODOS los desafíos acumulados desde la última vez
         que se pidió el reloj (ver _pending_heart_rate_challenges /
         _snapshot_pending_heart_rate) -- no solo el desafío actual, porque
         "Siguiente juego" puede haber encadenado varios sin pasar por acá.

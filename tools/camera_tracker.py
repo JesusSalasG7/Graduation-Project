@@ -399,25 +399,88 @@ def _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris):
         cv2.circle(frame, (int(cx), int(cy)), 2, (0, 255, 255), -1)
 
 
-def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float):
+# Respaldo para rostros chicos (participante lejos de la camara o poca
+# luz): el detector interno del Face Landmarker esta pensado para rostros
+# cercanos y a 640x480 pierde uno de ~70 px, aunque el Haar cascade si lo
+# encuentra. En ese caso se recorta la zona del rostro que marca Haar y se
+# vuelve a correr el Landmarker sobre el recorte (en modo IMAGE, aparte,
+# para no mezclar recortes con el seguimiento entre frames del de VIDEO).
+FALLBACK_CROP_SCALE = 2.2
+_fallback_cascade = None
+_fallback_landmarker = None
+
+
+class _Landmark:
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x: float, y: float, z: float):
+        self.x, self.y, self.z = x, y, z
+
+
+def _landmarks_from_face_crop(frame, model_path: Path):
+    """Landmarks (normalizados al frame completo) buscando primero el
+    rostro con Haar y corriendo el Landmarker sobre ese recorte -- None si
+    tampoco asi se encuentra."""
+    global _fallback_cascade, _fallback_landmarker
+    if _fallback_cascade is None:
+        _fallback_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = _fallback_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+    if len(faces) == 0:
+        return None
+
+    height, width = frame.shape[:2]
+    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+    side = int(max(w, h) * FALLBACK_CROP_SCALE)
+    cx, cy = x + w // 2, y + h // 2
+    x0, y0 = max(cx - side // 2, 0), max(cy - side // 2, 0)
+    x1, y1 = min(x0 + side, width), min(y0 + side, height)
+    crop = frame[y0:y1, x0:x1]
+    if crop.size == 0:
+        return None
+
+    if _fallback_landmarker is None:
+        _fallback_landmarker = vision.FaceLandmarker.create_from_options(
+            vision.FaceLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=str(model_path)),
+                running_mode=vision.RunningMode.IMAGE,
+            )
+        )
+    rgb_crop = cv2.cvtColor(np.ascontiguousarray(crop), cv2.COLOR_BGR2RGB)
+    result = _fallback_landmarker.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_crop))
+    if not result.face_landmarks:
+        return None
+
+    crop_w, crop_h = x1 - x0, y1 - y0
+    return [
+        _Landmark((x0 + lm.x * crop_w) / width, (y0 + lm.y * crop_h) / height, lm.z)
+        for lm in result.face_landmarks[0]
+    ]
+
+
+def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float, model_path: Path = MODEL_PATH):
     """Corre el Face Landmarker sobre `frame` y, si detecta un rostro,
     devuelve (landmarks, gaze_x, gaze_y, direction, right_iris, left_iris);
-    si no detecta ninguno, devuelve None. Logica compartida por el loop
-    principal y por run_calibration.
+    si no detecta ninguno (ni siquiera con el respaldo de recorte, ver
+    _landmarks_from_face_crop), devuelve None. Logica compartida por el
+    loop principal y por run_calibration.
     """
     height, width = frame.shape[:2]
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
     timestamp_ms = int((time.monotonic() - start_time) * 1000)
     result = landmarker.detect_for_video(mp_image, timestamp_ms)
-    if not result.face_landmarks:
-        return None
-    landmarks = result.face_landmarks[0]
+    if result.face_landmarks:
+        landmarks = result.face_landmarks[0]
+    else:
+        landmarks = _landmarks_from_face_crop(frame, model_path)
+        if landmarks is None:
+            return None
     gaze_x, gaze_y, direction, right_iris, left_iris = estimator.estimate(landmarks, width, height)
     return landmarks, gaze_x, gaze_y, direction, right_iris, left_iris
 
 
-def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
+def run_calibration(cap, landmarker, mirror: bool, model_path: Path = MODEL_PATH) -> Optional[tuple]:
     """Rutina de calibracion izquierda/derecha por participante -- identica
     a eye_tracker.py::run_calibration. No usa DeepFace: la calibracion es
     corta y solo necesita la mirada.
@@ -428,7 +491,10 @@ def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
         CALIBRATION_FAILED reason=<motivo>
     """
     estimator = GazeEstimator()
-    window_name = "Camera Tracker - Calibración"
+    # Sin tilde a proposito: con Qt, getWindowProperty no encuentra una
+    # ventana cuyo nombre tiene caracteres no ASCII (devuelve 0) y la
+    # calibracion se cortaba al primer frame como si se hubiera cerrado.
+    window_name = "Camera Tracker - Calibracion"
     start_time = time.monotonic()
 
     def run_phase(label: str) -> Optional[float]:
@@ -441,7 +507,7 @@ def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
             if not ret:
                 return None
 
-            detected = _detect_gaze(landmarker, estimator, frame, start_time)
+            detected = _detect_gaze(landmarker, estimator, frame, start_time, model_path)
             now = time.monotonic()
             countdown_elapsed = now - countdown_start
 
@@ -570,7 +636,7 @@ def main():
 
     if args.calibrate:
         try:
-            run_calibration(cap, landmarker, args.mirror)
+            run_calibration(cap, landmarker, args.mirror, model_path)
         finally:
             landmarker.close()
             cap.release()
@@ -638,7 +704,7 @@ def main():
             # invertidas respecto a la mirada real. El volteo (--mirror)
             # se aplica solo al final, unicamente para la ventana de
             # video, despues de dibujar los overlays sobre el frame crudo.
-            detected = _detect_gaze(landmarker, eye_estimator, frame, start_time)
+            detected = _detect_gaze(landmarker, eye_estimator, frame, start_time, model_path)
             if detected is not None:
                 landmarks, gaze_x, gaze_y, direction, right_iris, left_iris = detected
                 height, width = frame.shape[:2]

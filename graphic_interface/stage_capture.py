@@ -707,10 +707,10 @@ def summarize_stage(challenge_folder: Path, stage: int, attempt: Optional[int] =
     (sesion en curso, o el participante todavia no llego ahi) devuelve
     todas las columnas en EMPTY_CELL, no rompe la interfaz.
 
-    Las columnas de sensores/cuestionario solo aplican a las etapas
-    2/4/5; las de enunciado/escrito solo a la etapa 3 (ver
-    session_wizard._export_stage / _save_stage3_files) -- la etapa
-    contraria queda en EMPTY_CELL por no ser aplicable, no por faltar.
+    Las columnas de sensores aplican a las etapas 2/3/4/5; la de
+    cuestionario solo a 2/4/5 y las de enunciado/escrito solo a la etapa 3
+    (ver session_wizard._export_stage / _save_stage3_files) -- lo que no
+    aplica a una etapa queda en EMPTY_CELL, no por faltar.
     """
     result = {
         "neurosky": EMPTY_CELL, "emotion": EMPTY_CELL, "eye": EMPTY_CELL,
@@ -724,11 +724,11 @@ def summarize_stage(challenge_folder: Path, stage: int, attempt: Optional[int] =
     if folder is None:
         return result
 
+    result["neurosky"] = _summarize_csv_rows(folder / "neurosky.csv")
+    result["emotion"] = _summarize_csv_rows(folder / "emotion_tracker.csv")
+    result["eye"] = _summarize_eye_looks(folder / "eye_tracker_miradas.csv")
+    result["heart_rate"] = _summarize_heart_rate(folder / "heart_rate.csv")
     if stage in (2, 4, 5):
-        result["neurosky"] = _summarize_csv_rows(folder / "neurosky.csv")
-        result["emotion"] = _summarize_csv_rows(folder / "emotion_tracker.csv")
-        result["eye"] = _summarize_eye_looks(folder / "eye_tracker_miradas.csv")
-        result["heart_rate"] = _summarize_heart_rate(folder / "heart_rate.csv")
         result["cuestionario"] = _summarize_cuestionario(folder / "cuestionario.txt")
     elif stage == 3:
         result["enunciado"] = _summarize_enunciado(folder / "registro_enunciado.csv")
