@@ -60,13 +60,16 @@ después responder cuestionarios sobre la respuesta que le llegó.
 ```
 Graduation-Project/
 ├── graphic_interface/     # Panel principal (GUI, orquesta toda la sesión guiada)
-│   ├── app.py             # Ventana principal: pestañas Juegos/Participantes/Sesión
 │   ├── main.py            # Punto de entrada (python graphic_interface/main.py)
-│   ├── session_wizard.py  # Flujo completo de la sesión guiada (Etapas 1-6)
-│   ├── challenges.py      # Enunciados de los 7 desafíos de programación
-│   ├── heart_rate_import.py, neurosky_launcher.py, camera_tracker_launcher.py, eye_tracker_launcher.py
-│   │                      # Integración con cada dispositivo/sensor
-│   ├── stage_capture.py   # Recorte y resumen de los datos por etapa
+│   ├── paths.py           # Rutas compartidas (raíz del proyecto, tools/, data/, assets/)
+│   ├── ui/                # Interfaz: app.py (ventana principal), session_wizard.py (Etapas 1-6), statement_view.py
+│   ├── ai/                # IA: ai_backend.py (Claude/Gemini), isolated_prompt.py (Etapa 3), challenge_solver.py (cuestionarios 4-5)
+│   ├── content/           # Contenido estático: challenges.py, statement_quiz.py, quiz.py, difficulty.py
+│   ├── sensors/           # Integración con cada sensor: NeuroSky, cámara, eye tracker, reloj (heart_rate_import.py)
+│   ├── games/             # Lanzar juegos y parchearlos con la solución de la IA
+│   ├── storage/           # Persistencia: participantes, récords, respuestas de cuestionarios, stage_capture.py
+│   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py
+│   ├── assets/
 │   ├── requirements.txt
 │   └── data/              # participants.json, quiz_results/, emotion_logs/ (NO va al repo)
 ├── Game-01/ … Game-07/    # Un juego por carpeta, cada uno con su propio .venv y requirements.txt
@@ -97,7 +100,7 @@ datos](#dónde-quedan-los-datos).
 - **Un backend de IA** para la Etapa 3 de la sesión guiada (respuesta
   aislada de la IA) y la generación de los cuestionarios de
   comprensión/razonamiento — configurable con la variable de entorno
-  `AI_PROVIDER` (ver `graphic_interface/ai_backend.py`):
+  `AI_PROVIDER` (ver `graphic_interface/ai/ai_backend.py`):
   - `AI_PROVIDER=claude` (default, o simplemente no definir la
     variable): **[Claude Code](https://claude.com/claude-code)**
     instalado y con sesión iniciada (`claude` en el `PATH`). No hace
@@ -152,10 +155,10 @@ Con el entorno instalado, arrancá el panel:
 ### 2. Backend de IA (`claude` o Gemini)
 
 Ambos usos (respuesta "aislada" de la Etapa 3 en
-`graphic_interface/isolated_prompt.py`, y los bancos de preguntas de
+`graphic_interface/ai/isolated_prompt.py`, y los bancos de preguntas de
 comprensión/razonamiento + explicación de la Etapa 5 en
-`graphic_interface/challenge_solver.py`) pasan por el mismo selector
-configurable en `graphic_interface/ai_backend.py`.
+`graphic_interface/ai/challenge_solver.py`) pasan por el mismo selector
+configurable en `graphic_interface/ai/ai_backend.py`.
 
 **Opción A — CLI `claude` (default):**
 
@@ -198,7 +201,7 @@ No requiere Claude Code instalado ni ningún paquete extra (usa
 3. **Verificá la conexión** antes de correr una sesión real:
 
    ```bash
-   .venv/bin/python graphic_interface/test_gemini_connection.py
+   .venv/bin/python graphic_interface/scripts/test_gemini_connection.py
    ```
 
    Si imprime `Conexión OK. Respuesta del modelo: 'OK'`, quedó bien
@@ -218,7 +221,7 @@ No requiere Claude Code instalado ni ningún paquete extra (usa
 > [Google AI Studio](https://aistudio.google.com/apikey) y generá una
 > nueva. El proyecto no la guarda en ningún archivo: siempre se lee
 > desde la variable de entorno en el momento de cada llamada (ver
-> `graphic_interface/ai_backend.py`).
+> `graphic_interface/ai/ai_backend.py`).
 
 ---
 
@@ -302,7 +305,7 @@ cerrado (por ejemplo, si el evaluador consiguió el export después de
 terminar la sesión), hay un CLI dedicado:
 
 ```bash
-.venv/bin/python graphic_interface/reimport_heart_rate.py \
+.venv/bin/python graphic_interface/scripts/reimport_heart_rate.py \
     --participante 1 --desafio 1 --carpeta "/ruta/al/export/samsunghealth_usuario_<fecha>"
 ```
 

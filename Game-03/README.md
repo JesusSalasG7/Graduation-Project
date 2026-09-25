@@ -16,8 +16,11 @@ bruta, aplicado al propio estado del cubo.
 Game-03/
 ├── main.py                      # punto de entrada: crea el Game y lo ejecuta
 ├── settings.py                   # configuración (resolución, input)
-├── test_search_3d_pattern.py      # caso de prueba integrado del desafío A03
-├── GUIA_A03_find_3d_pattern.md    # guía del desafío A03 para el participante
+├── assets/                      # fuentes, íconos de botones y sonidos
+├── docs/
+│   └── GUIA_A03_find_3d_pattern.md # guía del desafío A03 para el participante
+├── tests/
+│   └── test_search_3d_pattern.py  # caso de prueba integrado del desafío A03
 └── src/
     ├── cube_game.py               # clase Game: arranca el StateMachine
     ├── algorithm.py                # *** desafío A03: find_3d_pattern *** (sin pygame)
@@ -81,7 +84,7 @@ alrededor de un eje (`RubikCube.rotate_layer`), y actualiza `matrix` y
 
 - La guía paso a paso para resolverlo, pensada para el participante
   (sin spoilear el código terminado), está en
-  [`GUIA_A03_find_3d_pattern.md`](GUIA_A03_find_3d_pattern.md).
+  [`docs/GUIA_A03_find_3d_pattern.md`](docs/GUIA_A03_find_3d_pattern.md).
 - La función a implementar es
   `src/algorithm.py::find_3d_pattern` (fuerza bruta pura, sin
   depender del cubo).
@@ -96,7 +99,7 @@ alrededor de un eje (`RubikCube.rotate_layer`), y actualiza `matrix` y
 
 ```bash
 cd Game-03
-.venv/bin/python test_search_3d_pattern.py
+.venv/bin/python tests/test_search_3d_pattern.py
 ```
 
 No necesita pygame ni una ventana (`rubik_cube.py` y `algorithm.py` no

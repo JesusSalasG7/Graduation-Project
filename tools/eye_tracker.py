@@ -304,7 +304,7 @@ def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
     se cerro la ventana / se presiono 'q' a mitad de la calibracion.
 
     Imprime por stdout el resultado en un formato fijo que el lanzador
-    (graphic_interface/eye_tracker_launcher.py) sabe parsear:
+    (graphic_interface/sensors/eye_tracker_launcher.py) sabe parsear:
         CALIBRATION_RESULT left_x=<float> right_x=<float>
         CALIBRATION_FAILED reason=<motivo>
     """

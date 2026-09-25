@@ -1,0 +1,57 @@
+"""
+game_2048.py
+
+Juego contenedor de 2048: registra las teclas y delega toda la lógica en
+la StateMachine de Gale.
+"""
+from __future__ import annotations
+
+from gale.game import Game
+from gale.state import StateMachine
+from gale.input_handler import (
+    InputHandler,
+    KEY_UP,
+    KEY_DOWN,
+    KEY_LEFT,
+    KEY_RIGHT,
+    KEY_r,
+    KEY_RETURN,
+    KEY_KP_ENTER,
+    KEY_ESCAPE,
+)
+
+from src.states import CoverState, GameOverState, PlayState
+
+
+class Game2048(Game):
+    """Juego contenedor: delega toda la lógica en la StateMachine de Gale."""
+
+    def init(self) -> None:
+        # Flechas de dirección -> acciones de movimiento del tablero.
+        InputHandler.set_keyboard_action(KEY_UP, "move_up")
+        InputHandler.set_keyboard_action(KEY_DOWN, "move_down")
+        InputHandler.set_keyboard_action(KEY_LEFT, "move_left")
+        InputHandler.set_keyboard_action(KEY_RIGHT, "move_right")
+        InputHandler.set_keyboard_action(KEY_r, "restart")
+        InputHandler.set_keyboard_action(KEY_ESCAPE, "quit")
+
+        # ENTER (principal o del teclado numérico) confirma en la portada.
+        InputHandler.set_keyboard_action(KEY_RETURN, "confirm")
+        InputHandler.set_keyboard_action(KEY_KP_ENTER, "confirm")
+
+        self.state_machine = StateMachine(
+            {"cover": CoverState, "play": PlayState, "gameover": GameOverState}
+        )
+        self.state_machine.change("cover")
+
+    def on_input(self, input_id: str, input_data) -> None:
+        if input_id == "quit" and getattr(input_data, "pressed", False):
+            self.quit()
+            return
+        self.state_machine.on_input(input_id, input_data)
+
+    def update(self, dt: float) -> None:
+        self.state_machine.update(dt)
+
+    def render(self, surface) -> None:
+        self.state_machine.render(surface)

@@ -21,8 +21,8 @@ limpia la Catálisis del propio tablero.
 Game-05/
 ├── main.py                          # punto de entrada: crea el Game y lo ejecuta
 ├── settings.py                       # configuración (ventana, tablero, sprites, puntaje)
-├── test_find_repeated.py              # caso de prueba integrado del desafío A05
-├── GUIA_A05_find_repeated.md          # guía del desafío A05 para el participante
+├── tests/
+│   └── test_find_repeated.py          # caso de prueba integrado del desafío A05
 ├── assets/graphics/
 │   ├── ui/cover.jpg                   # portada de la pantalla de inicio (StartState)
 │   ├── board/tiles.png                # spritesheet de los 8 iconos elementales
@@ -85,7 +85,7 @@ poder leerse, probarse y calificarse de forma aislada de lo gráfico.
 ## Caso de prueba integrado
 
 ```bash
-.venv/bin/python test_find_repeated.py
+.venv/bin/python tests/test_find_repeated.py
 ```
 
 No necesita ventana. Corre dos grupos de casos: `find_repeated` en
