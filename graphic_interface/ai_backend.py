@@ -4,7 +4,7 @@ CLI `claude` (por defecto, sin API key propia -- ver README, sección
 "Requisitos previos") o API de Gemini (Google AI Studio), si se configura
 AI_PROVIDER=gemini + GEMINI_API_KEY.
 
-Este modulo NO decide nada de negocio (system prompt, sentinel NO_CODE,
+Este modulo NO decide nada de negocio (system prompt,
 contenido del JSON Schema de las preguntas): eso sigue viviendo en
 isolated_prompt.py / challenge_solver.py, que llaman a run_isolated_prompt /
 run_json_schema_prompt de aca sin saber que proveedor responde en realidad.
@@ -176,7 +176,7 @@ def run_isolated_prompt(
     prompt: str, system_prompt: str, model: str, timeout: int, cwd: Optional[str] = None,
 ) -> AIResult:
     """Llamada aislada de texto libre (Etapa 2 -- ver isolated_prompt.py
-    para el sentinel NO_CODE y el resto del aislamiento real: system prompt
+    para el aislamiento real: system prompt
     restrictivo, sin tools, carpeta de trabajo vacia). `cwd` solo aplica al
     backend 'claude' (aislamiento de filesystem); Gemini es una llamada de
     API pura, sin acceso a filesystem en ningun caso."""

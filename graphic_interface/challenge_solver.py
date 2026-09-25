@@ -83,13 +83,12 @@ def _question_from_payload(payload: dict) -> QuizQuestion:
 def generate_response_quiz(
     challenge: Challenge, response_text: str,
 ) -> tuple[list[QuizQuestion], list[QuizQuestion], str, str]:
-    """Genera, a partir de la respuesta AISLADA que le llego al participante
-    (puede ser codigo, texto explicativo, o la IA diciendo que le falta
-    contexto), dos bancos de 7 preguntas de opcion multiple -- uno sobre que
-    dice/hace esa respuesta (Etapa 3) y otro sobre por que es (o no es) una
-    respuesta valida al enunciado (Etapa 4, razonamiento) -- mas un texto de
-    explicacion de razonamiento (tambien Etapa 4) sobre por que la IA
-    aislada llego a esa respuesta concreta.
+    """Genera, a partir del codigo que devolvio la IA AISLADA al prompt del
+    participante, dos bancos de 7 preguntas de opcion multiple -- uno sobre
+    que hace esa implementacion (Etapa 3) y otro sobre si el razonamiento y
+    la implementacion son correctos y alcanzan para resolver el desafio
+    (Etapa 4, razonamiento) -- mas un texto (tambien Etapa 4) que evalua esa
+    solucion contra el enunciado.
 
     A diferencia de la llamada aislada, esta SI usa el enunciado del
     ejercicio como contexto -- es una herramienta de evaluacion armada por
@@ -105,41 +104,38 @@ def generate_response_quiz(
     """
     prompt = (
         "Un participante de un estudio escribio un prompt para pedirle a una "
-        "IA que resuelva el siguiente ejercicio de programacion. Esa IA "
-        "respondio SIN conocer el enunciado (aislada, solo vio el prompt del "
-        "participante), asi que su respuesta puede ser una solucion correcta, "
-        "una solucion incompleta, texto que no es codigo, o directamente la "
-        "IA diciendo que le falta contexto.\n\n"
-        f"Enunciado del ejercicio (para tu referencia, la IA que respondio NO "
-        f"lo vio):\n{challenge.statement}\n\n"
+        "IA que resuelva el siguiente ejercicio de programacion. Tu tarea es "
+        "evaluar si el codigo que devolvio esa IA es correcto y suficiente "
+        "para resolver el ejercicio tal como lo pide el enunciado.\n\n"
+        f"Enunciado del ejercicio:\n{challenge.statement}\n\n"
         f"Respuesta de la IA al prompt del participante:\n\"\"\"\n{response_text}\n\"\"\"\n\n"
         "Genera lo siguiente, en espanol:\n\n"
         "1. Un texto \"reasoning_explanation\" de 2 a 4 parrafos, en lenguaje "
-        "claro para un participante (no un experto), describiendo el PASO A "
-        "PASO y la logica interna que se siguio para estructurar y construir "
-        "ESA respuesta concreta: en que orden hace las cosas el codigo, que "
-        "estructuras de datos o control usa y para que, que se interpreto o "
-        "asumio a partir del prompt del participante, y por que esa "
-        "respuesta es (o no es) una solucion valida al ejercicio. Anda "
-        "directo al razonamiento -- no hace falta aclarar que la respuesta "
-        "vino de una IA aislada ni que no vio el enunciado. No inventes "
-        "metricas hipoteticas (tiempos, complejidad, rendimiento), "
-        "comportamientos del sistema no verificados, ni ventajas que no "
-        "esten expresa y literalmente escritas o soportadas en el codigo de "
-        "la respuesta -- describi unicamente lo que el codigo realmente "
-        "hace.\n\n"
+        "claro para un participante (no un experto), que evalue ESA "
+        "respuesta concreta contra el enunciado: el paso a paso y la logica "
+        "que sigue el codigo (en que orden hace las cosas, que estructuras "
+        "de datos o control usa y para que), si ese razonamiento es "
+        "correcto, si la implementacion cumple cada requisito del enunciado "
+        "(firma, tipo de retorno, casos borde, restricciones), y una "
+        "conclusion clara de si alcanza o no para resolver el desafio -- y, "
+        "si no alcanza, que requisito concreto no cumple o en que caso "
+        "falla. No inventes metricas hipoteticas (tiempos, rendimiento), "
+        "comportamientos no verificados, ni ventajas que no esten soportadas "
+        "por el codigo de la respuesta -- evalua unicamente lo que el codigo "
+        "realmente hace.\n\n"
         "2. Dos bancos de exactamente 7 preguntas de opcion multiple cada "
         "uno, con exactamente 4 opciones y una sola correcta (correct_index "
         "de 0 a 3), dificultad moderada, sin ambiguedad ni opciones "
         "absurdas.\n\n"
-        "Banco \"comprehension_questions\" (7 preguntas): sobre QUE DICE o "
-        "QUE HACE esa respuesta concreta -- si resuelve el ejercicio o no, "
-        "que le falto, que asumio, como se comporta si es codigo.\n"
-        "Banco \"reasoning_questions\" (7 preguntas): sobre el razonamiento "
-        "descrito en \"reasoning_explanation\" -- por que la IA aislada llego "
-        "a esa respuesta, que contexto le hubiera hecho falta al prompt del "
-        "participante para que pudiera responder mejor, y que decisiones "
-        "tomo al quedarse sin ese contexto."
+        "Banco \"comprehension_questions\" (7 preguntas): sobre QUE HACE esa "
+        "implementacion concreta -- que devuelve para entradas especificas, "
+        "como maneja los casos borde, que estructuras usa y como se "
+        "comporta paso a paso.\n"
+        "Banco \"reasoning_questions\" (7 preguntas): sobre la evaluacion "
+        "descrita en \"reasoning_explanation\" -- si el razonamiento y la "
+        "implementacion son correctos, que requisitos del enunciado cumple "
+        "o no cumple, en que casos daria un resultado correcto o incorrecto, "
+        "y si en conjunto resuelve el desafio."
     )
     result = ai_backend.run_json_schema_prompt(
         prompt, RESPONSE_QUIZ_JSON_SCHEMA, CLAUDE_MODEL, QUIZ_TIMEOUT_SECONDS,
