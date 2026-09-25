@@ -19,6 +19,12 @@ VENV_DIR = PROJECT_ROOT / ".venv"
 
 EMOTION_TRACKER_SCRIPT = TOOLS_DIR / "emotion_tracker.py"
 TOOLS_REQUIREMENTS = TOOLS_DIR / "requirements.txt"
+# De tools/requirements.txt, SOLO esta seccion va al .venv unificado
+# (emotion_tracker.py). Las demas son para venvs propios de tools/ y no
+# pueden convivir con esta: la de MediaPipe trae opencv-contrib-python,
+# que pisa los archivos de cv2/ de opencv-python (ver el comentario al
+# principio de ese archivo).
+ROOT_VENV_TOOLS_SECTION = "EMOTION"
 EMOTION_LOG_DIR = DATA_DIR / "emotion_logs"
 
 # Titulo declarado como `TITLE = "..."` en settings.py
@@ -207,8 +213,37 @@ def consolidated_requirements(root: Path = PROJECT_ROOT) -> list[str]:
     return sorted(lines)
 
 
+def tools_requirements_section(name: str, path: Path = TOOLS_REQUIREMENTS) -> list[str]:
+    """Lineas de requisito entre `# --<name>-START--` y `# --<name>-END--`
+    de tools/requirements.txt (sin comentarios ni lineas vacias)."""
+    lines: list[str] = []
+    inside = False
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line == f"# --{name}-START--":
+            inside = True
+        elif line == f"# --{name}-END--":
+            break
+        elif inside and line and not line.startswith("#"):
+            lines.append(line)
+    return lines
+
+
+def _package_installed(python: Path, package: str) -> bool:
+    result = subprocess.run(
+        [str(python), "-m", "pip", "show", "-q", package], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    return result.returncode == 0
+
+
 def repair_environment(on_output: Optional[Callable[[str], None]] = None) -> tuple[bool, str]:
-    """Reinstala en el .venv unificado las dependencias de todos los juegos + la GUI.
+    """Reinstala en el .venv unificado las dependencias de todos los juegos, la
+    GUI y la seccion de tools/requirements.txt que le corresponde a este venv
+    (ROOT_VENV_TOOLS_SECTION) -- nunca el archivo entero.
+
+    Si quedo instalado opencv-contrib-python (versiones anteriores de este
+    boton instalaban tools/requirements.txt completo), lo desinstala y
+    reinstala opencv-python para restaurar los archivos de cv2/ pisados.
 
     `on_output`, si se pasa, se llama con cada linea de salida de pip (progreso en vivo).
     Devuelve (exito, log_completo).
@@ -237,8 +272,14 @@ def repair_environment(on_output: Optional[Callable[[str], None]] = None) -> tup
     if requirements:
         commands.append([str(python), "-m", "pip", "install"] + requirements)
 
-    if TOOLS_REQUIREMENTS.exists():
-        commands.append([str(python), "-m", "pip", "install", "-r", str(TOOLS_REQUIREMENTS)])
+    tools_requirements = tools_requirements_section(ROOT_VENV_TOOLS_SECTION) if TOOLS_REQUIREMENTS.exists() else []
+    if tools_requirements:
+        if _package_installed(python, "opencv-contrib-python"):
+            commands.append([str(python), "-m", "pip", "uninstall", "-y", "opencv-contrib-python"])
+            opencv = [r for r in tools_requirements if re.split(r"[=<>!~ ]", r, 1)[0].lower() == "opencv-python"]
+            if opencv:
+                commands.append([str(python), "-m", "pip", "install", "--force-reinstall", "--no-deps", *opencv])
+        commands.append([str(python), "-m", "pip", "install", *tools_requirements])
 
     if GUI_REQUIREMENTS.exists():
         commands.append([str(python), "-m", "pip", "install", "-r", str(GUI_REQUIREMENTS)])

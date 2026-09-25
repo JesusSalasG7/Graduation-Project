@@ -5,7 +5,7 @@ A diferencia del resto de las herramientas (que usan el .venv unificado de
 la raiz del proyecto), eye_tracker.py vive en su propio entorno virtual
 (tools/.venv-eyetracker) porque mediapipe necesita opencv-contrib-python,
 que no puede convivir con opencv-python (la que usa emotion_tracker.py via
-deepface) en el mismo entorno -- ver tools/requirements.txt.
+emotiefflib) en el mismo entorno -- ver tools/requirements.txt.
 
 Flujo (ver session_wizard._show_configure_eye_tracker):
     1. run_calibration(...) corre `eye_tracker.py --calibrate`: le pide al

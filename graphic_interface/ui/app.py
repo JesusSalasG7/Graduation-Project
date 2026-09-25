@@ -1086,8 +1086,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         ctk.CTkLabel(
             dataset_card,
             text="Une en un solo CSV los datos crudos de TODOS los participantes y desafíos ya "
-                 "exportados: NeuroSky (bandas EEG), Emotion Tracker (emoción dominante + el "
-                 "porcentaje de cada categoría), Eye Tracker (mirada + izq/der agregado), "
+                 "exportados: NeuroSky (bandas EEG), Emotion Tracker (emoción dominante, el "
+                 "porcentaje de cada categoría, valencia y arousal), Eye Tracker (mirada + izq/der agregado), "
                  "frecuencia cardíaca del reloj y resultado de los cuestionarios -- una fila por "
                  "etapa de cada desafío.",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
