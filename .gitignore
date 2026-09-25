@@ -234,6 +234,12 @@ graphic_interface/data/*.json
 
 # Registros de emociones por participante (datos sensibles del experimento)
 graphic_interface/data/emotion_logs/
+# Mirada y respuestas de cuestionarios por participante (mismo motivo)
+graphic_interface/data/eye_logs/
+graphic_interface/data/quiz_results/
+
+# Entornos virtuales de las herramientas (se recrean con tools/requirements.txt)
+tools/.venv-*/
 
 # Dataset consolidado de la sesion guiada (datos biometricos de
 # participantes, no debe ir al repo -- se regenera con data/build_dataset.py)
