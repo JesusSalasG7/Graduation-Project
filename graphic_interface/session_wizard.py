@@ -21,9 +21,10 @@ Etapa 4 -- pantalla dividida: la respuesta cruda que devolvio esa IA
            aislada a la izquierda, 7 preguntas de opcion multiple sobre esa
            respuesta concreta a la derecha (generadas dinamicamente).
 Etapa 5 -- pantalla dividida: a la izquierda, la misma respuesta de la
-           Etapa 4 junto con una explicacion generada por IA de por que esa
-           IA aislada llego a esa respuesta concreta; a la derecha, 7
-           preguntas de opcion multiple sobre ese razonamiento (generadas
+           Etapa 4 junto con una evaluacion generada por IA de si el
+           razonamiento y la implementacion son correctos y alcanzan para
+           resolver el desafio; a la derecha, 7 preguntas de opcion
+           multiple sobre esa evaluacion (generadas
            junto con las de la Etapa 4 y la explicacion, ver
            challenge_solver.generate_response_quiz).
 Etapa 6 -- se lanza otra copia temporal del juego, esta vez con la funcion/
@@ -32,8 +33,9 @@ Etapa 6 -- se lanza otra copia temporal del juego, esta vez con la funcion/
            concreta en accion (ver game_patch.launch_game_with_solution).
 
 Las respuestas de los 3 cuestionarios se guardan por participante (ver
-quiz_results.py) sin bloquear el avance -- son un registro, no un examen
-con nota de corte.
+quiz_results.py). Hay que responder las 7 preguntas para poder avanzar,
+pero no se exige acertarlas -- son un registro, no un examen con nota de
+corte.
 
 Al terminar un desafio se puede pasar al siguiente (en orden de
 dificultad), o guardar el progreso y salir: la proxima vez que este
@@ -470,6 +472,27 @@ class SessionWizard:
                 option_label.pack(side="left", padx=(scaled(8), 0), fill="x", expand=True)
                 option_label.bind("<Button-1>", lambda _e, v=var, idx=j: v.set(idx))
             ctk.CTkLabel(card, text="", height=scaled(8)).pack()
+
+    def _require_all_answered(self, button, answers: dict[int, ctk.IntVar]):
+        """Deja `button` deshabilitado hasta que se respondan todas las
+        preguntas del cuestionario. Si no se generaron preguntas (answers
+        vacio) no bloquea nada, para no dejar al participante trabado."""
+        if not answers:
+            return
+        enabled_text = button.cget("text")
+
+        def refresh(*_):
+            if not button.winfo_exists():
+                return
+            pending = sum(1 for var in answers.values() if var.get() < 0)
+            if pending:
+                button.configure(state="disabled", text=f"Responde todas las preguntas ({pending} pendientes)")
+            else:
+                button.configure(state="normal", text=enabled_text)
+
+        for var in answers.values():
+            var.trace_add("write", refresh)
+        refresh()
 
     @staticmethod
     def _answers_as_ints(answers: dict[int, ctk.IntVar]) -> dict[int, int]:
@@ -1494,12 +1517,14 @@ class SessionWizard:
             self._export_stage(2, questions, self._answers_as_ints(self.stage1_answers))
             self._show_stage3()
 
-        ctk.CTkButton(
+        continue_button = ctk.CTkButton(
             buttons_row, text="Ya entendí el problema · Escribir mi prompt  ▶", height=scaled(42), corner_radius=10,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
             fg_color=self.c["ACCENT"], hover_color=self.c["ACCENT_HOVER"],
             command=on_continue,
-        ).pack(fill="x")
+        )
+        continue_button.pack(fill="x")
+        self._require_all_answered(continue_button, self.stage1_answers)
 
     # ---------------- Ventana del enunciado (Etapa 3) ----------------
     def _toggle_statement_window(self, game, challenge):
@@ -1725,12 +1750,14 @@ class SessionWizard:
             fg_color=self.c["BG_CARD_ALT"], hover_color=self.c["BORDER"],
             command=on_retry,
         ).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(
+        continue_button = ctk.CTkButton(
             buttons_row, text="Continuar a Etapa 5 · Razonamiento  ▶", height=scaled(42), corner_radius=10,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
             fg_color=self.c["ACCENT"], hover_color=self.c["ACCENT_HOVER"],
             command=on_continue,
-        ).pack(side="left")
+        )
+        continue_button.pack(side="left")
+        self._require_all_answered(continue_button, self.stage3_answers)
 
     # ---------------- Etapa 5 ----------------
     def _show_stage5(self):
@@ -1748,7 +1775,7 @@ class SessionWizard:
         self._section(left, "💻  Código generado (referencia)")
         self._code_block(left, result.response_text if result else "(sin respuesta para mostrar)")
 
-        self._section(left, "🧭  Por qué llegó a esa respuesta")
+        self._section(left, "🧭  ¿Resuelve el desafío? Análisis de la solución")
         quiz_error = result.quiz_generation_error if result else ""
         explanation_text = (result.reasoning_explanation if result else "") or (
             f"No se generó una explicación para este caso. ({quiz_error})" if quiz_error
@@ -1782,12 +1809,14 @@ class SessionWizard:
             fg_color=self.c["BG_CARD_ALT"], hover_color=self.c["BORDER"],
             command=on_retry,
         ).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(
+        continue_button = ctk.CTkButton(
             buttons_row, text="Continuar a Etapa 6 · Ver la solución en acción  ▶", height=scaled(42), corner_radius=10,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
             fg_color=self.c["ACCENT"], hover_color=self.c["ACCENT_HOVER"],
             command=on_continue,
-        ).pack(side="left")
+        )
+        continue_button.pack(side="left")
+        self._require_all_answered(continue_button, self.stage4_answers)
 
     # ---------------- Etapa 6 ----------------
     def _show_stage6(self):

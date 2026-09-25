@@ -29,11 +29,10 @@ tan estricto como con una API directa (ver el punto 2):
      prompt`, que solo le agrega texto encima), con el texto pedido para
      el estudio (ver ISOLATED_SYSTEM_PROMPT) mas dos clausulas agregadas:
      que la respuesta sea codigo puro (sin explicaciones ni comentarios), y
-     que si no hay codigo posible (falta de contexto, o el prompt no pedia
-     codigo) responda con la senal exacta NO_CODE en vez de texto libre --
-     asi ask_isolated_prompt puede distinguir con certeza "no hubo
-     respuesta valida" de "esto es la respuesta", sin tener que adivinar
-     leyendo el texto. Con Gemini, ese mismo texto se manda como
+     que SIEMPRE devuelva codigo, aunque el prompt sea incompleto o ambiguo
+     -- si al prompt le falta contexto, eso se ve en el codigo que genera
+     (y lo evaluan las Etapas 4/5 contra el enunciado), en vez de cortar
+     la sesion en la Etapa 3. Con Gemini, ese mismo texto se manda como
      systemInstruction (ver ai_backend._gemini_request).
 """
 
@@ -60,28 +59,19 @@ def ai_provider_available() -> bool:
     return ai_backend.provider_available()
 
 
-# Senal exacta que le pedimos al modelo devolver cuando NO puede producir
-# codigo (por falta de contexto en el prompt, o porque el prompt no pedia
-# codigo). Se detecta por igualdad exacta en ask_isolated_prompt para
-# decidir si hay o no una respuesta valida -- mucho mas confiable que
-# tratar de adivinar, leyendo el texto, si "esto es codigo o no".
-NO_CODE_SENTINEL = "NO_CODE"
-
 ISOLATED_SYSTEM_PROMPT = (
     "Eres un asistente de IA que inicia como una hoja en blanco. No tienes "
     "conocimiento de ningún contexto previo, sistema o problema subyacente. "
     "Debes responder única y exclusivamente basándote en la información y "
     "las instrucciones explícitas proporcionadas en el prompt del usuario. "
-    "No asumas hechos, no inventes información (cero alucinaciones) y sé "
-    "completamente literal con la solicitud. "
+    "No agregues requisitos que el prompt no pida y sé completamente "
+    "literal con la solicitud. "
     "Tu respuesta debe ser ÚNICAMENTE código: sin explicaciones antes o "
     "después, sin comentarios dentro del código, y sin bloques de markdown "
     "(```) -- solo el código en sí, listo para copiar y pegar. "
-    f"Si el prompt no pide generar código, o le falta el contexto "
-    f"necesario para que puedas escribir código correcto (por ejemplo, no "
-    f"dice qué función/firma implementar, o no describe el comportamiento "
-    f"esperado), no inventes nada: respondé ÚNICAMENTE con el texto exacto "
-    f"{NO_CODE_SENTINEL} (nada más, sin explicación)."
+    "Responde SIEMPRE con código, aunque el prompt sea incompleto o "
+    "ambiguo: en ese caso escribe la mejor implementación que puedas a "
+    "partir de lo que el prompt dice literalmente."
 )
 
 
@@ -127,11 +117,5 @@ def ask_isolated_prompt(participant_prompt: str) -> IsolatedPromptResult:
     text = _strip_code_fences(result.text).strip()
     if not text:
         return IsolatedPromptResult(ok=False, error="La IA no devolvió ninguna respuesta.")
-    if text.strip(" `\n\t.") == NO_CODE_SENTINEL:
-        return IsolatedPromptResult(
-            ok=False,
-            error="La IA no pudo generar código para este prompt (falta contexto o el "
-            "prompt no pedía código).",
-        )
 
     return IsolatedPromptResult(ok=True, text=text)
