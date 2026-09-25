@@ -209,18 +209,20 @@ def _slice_by_timestamp_column(
     return sliced, warnings
 
 
-# Categorias que loguea tools/camera_tracker.py.EmotionAnalyzer (una
-# columna "pct_<categoria>" por cada una, ver EMOTION_CSV_FIELDNAMES ahi) --
-# duplicada aca (en vez de importar desde tools/) porque ese modulo carga
-# opencv/deepface/mediapipe, pesado para lo unico que hace falta aca: los
-# nombres de columna para construir un DataFrame vacio cuando falta el CSV.
-DEEPFACE_EMOTION_CATEGORIES = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+# Categorias que loguea tools/emotion_recognizer.py.EmotionAnalyzer (una
+# columna "pct_<categoria>" por cada una, mas valence/arousal, ver
+# EMOTION_CSV_FIELDNAMES ahi) -- duplicada aca (en vez de importar desde
+# tools/) porque ese modulo carga opencv/onnxruntime/emotiefflib, pesado
+# para lo unico que hace falta aca: los nombres de columna para construir
+# un DataFrame vacio cuando falta el CSV.
+EMOTION_CATEGORIES = ["anger", "contempt", "disgust", "fear", "happiness", "neutral", "sadness", "surprise"]
 
 
 def slice_emotion(csv_path: Path, start: datetime, end: datetime) -> tuple[pd.DataFrame, list[str]]:
     columns = [
         "timestamp", "participant_id", "participant_name", "session_label", "emotion", "confidence",
-        *(f"pct_{category}" for category in DEEPFACE_EMOTION_CATEGORIES),
+        *(f"pct_{category}" for category in EMOTION_CATEGORIES),
+        "valence", "arousal",
     ]
     return _slice_by_timestamp_column(csv_path, start, end, columns, "Emotion Tracker")
 
