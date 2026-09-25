@@ -154,7 +154,7 @@ def import_heart_rate_for_challenge(
 ) -> dict[int, list[str]]:
     """Copia el CSV crudo (y los JSON de medicion continua, si estan) a la
     carpeta del desafio (trazabilidad) y recorta un heart_rate.csv por
-    cada etapa 2/4/5 usando la ventana de tiempo de esa etapa (del ultimo
+    cada etapa 2/3/4/5 usando la ventana de tiempo de esa etapa (del ultimo
     intento, ver stage_capture.stage_dir). `export_folder` es la carpeta
     COMPLETA que exporta Samsung Health (ver validate_heart_rate_export_
     folder), no el CSV suelto.
@@ -183,7 +183,7 @@ def reimport_heart_rate_for_challenge(
     participant_number: int, challenge_number: int, export_folder: Path,
 ) -> dict[int, list[str]]:
     """Reprocesa la frecuencia cardiaca de un desafio YA CERRADO (Etapas
-    2/4/5 ya exportadas), a partir de la carpeta completa del export de
+    2/3/4/5 ya exportadas), a partir de la carpeta completa del export de
     Samsung Health -- la misma que se cargo durante la sesion, o una
     nueva/corregida -- sin depender de que la sesion guiada siga
     corriendo: la ventana de tiempo de cada etapa se reconstruye desde
@@ -218,7 +218,7 @@ def reimport_heart_rate_for_challenge(
     _copy_heart_rate_traceability(export_folder, csv_path, challenge_folder)
 
     warnings_by_stage: dict[int, list[str]] = {}
-    for stage in (2, 4, 5):
+    for stage in (2, 3, 4, 5):
         folder = resolve_stage_folder(challenge_folder, stage)
         if folder is None:
             warnings_by_stage[stage] = [

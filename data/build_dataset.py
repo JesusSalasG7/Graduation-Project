@@ -13,7 +13,10 @@ No incluye nombre/apellido de los participantes a proposito: ese registro
 vive deliberadamente FUERA del proyecto (ver
 graphic_interface/personal_records.py) para no mezclar datos personales con
 los datos anonimos de la sesion -- este dataset respeta esa misma
-separacion y solo identifica a cada participante por su numero.
+separacion y solo identifica a cada participante por su numero. El nivel de
+experiencia del jugador (Avanzado/Intermedio/Principiante, elegido al
+registrarlo) si se incluye: se lee de graphic_interface/data/participants.json
+y queda vacio si ese participante ya no esta registrado ahi.
 
 Una sesion vieja (grabada antes de agregar el desglose de emociones por
 categoria) simplemente no tiene esas columnas -- quedan vacias en vez de
@@ -46,6 +49,7 @@ from challenge_solver import GUIDED_SESSION_GAME_ORDER  # noqa: E402
 from stage_capture import GUIDED_SESSION_STAGE_ORDER, list_stage_attempts, sessions_root  # noqa: E402
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "dataset_sesiones.csv"
+PARTICIPANTS_FILE = GRAPHIC_INTERFACE_DIR / "data" / "participants.json"
 
 # Mismas categorias que devuelve DeepFace.analyze(actions=["emotion"]) --
 # ver tools/camera_tracker.py::DEEPFACE_EMOTION_CATEGORIES.
@@ -88,6 +92,17 @@ def _list_str(values) -> str:
 def _round_mean(values: "pd.Series"):
     numeric = pd.to_numeric(values, errors="coerce").dropna()
     return round(numeric.mean(), 1) if not numeric.empty else ""
+
+
+def _experience_by_participant() -> dict[int, str]:
+    """{numero de participante: nivel de experiencia} a partir del registro
+    anonimo de participants.json (ver graphic_interface/participant_store.py)."""
+    payload = _read_json_safe(PARTICIPANTS_FILE)
+    return {
+        p["number"]: p.get("attributes", {}).get("nivel_experiencia", "")
+        for p in payload.get("participants", [])
+        if isinstance(p, dict) and "number" in p
+    }
 
 
 # ============================================================
@@ -232,23 +247,24 @@ def _device_status_columns(stage: int, stage_status: dict) -> dict:
 
 
 def _build_row(
-    participant_number: int, challenge_number: int, game_name: str,
+    participant_number: int, experience_level: str, challenge_number: int, game_name: str,
     stage: int, attempt: int, stage_folder: Path, stage_status: dict,
 ) -> dict:
     row = {
         "Participante_ID": participant_number,
+        "Nivel_Experiencia": experience_level,
         "Desafio": challenge_number,
         "Juego": game_name,
         "Etapa": stage,
         "Intento": attempt,
     }
     row.update(_timing_columns(stage_folder))
+    row.update(_neurosky_columns(stage_folder))
+    row.update(_emotion_columns(stage_folder))
+    row.update(_eye_columns(stage_folder))
+    row.update(_heart_rate_columns(stage_folder))
+    row.update(_device_status_columns(stage, stage_status))
     if stage in (2, 4, 5):
-        row.update(_neurosky_columns(stage_folder))
-        row.update(_emotion_columns(stage_folder))
-        row.update(_eye_columns(stage_folder))
-        row.update(_heart_rate_columns(stage_folder))
-        row.update(_device_status_columns(stage, stage_status))
         row.update(_cuestionario_columns(stage_folder))
     elif stage == 3:
         row.update(_stage3_columns(stage_folder))
@@ -264,6 +280,7 @@ def build_dataset() -> pd.DataFrame:
     root = sessions_root()
     if not root.is_dir():
         return pd.DataFrame()
+    experience_levels = _experience_by_participant()
 
     for participant_dir in sorted(root.iterdir()):
         if not participant_dir.is_dir():
@@ -271,6 +288,7 @@ def build_dataset() -> pd.DataFrame:
         participant_number = _participant_number(participant_dir.name)
         if participant_number is None:
             continue
+        experience_level = experience_levels.get(participant_number, "")
 
         for challenge_dir in sorted(participant_dir.glob("Desafio_*")):
             match = _CHALLENGE_DIR_RE.match(challenge_dir.name)
@@ -291,12 +309,12 @@ def build_dataset() -> pd.DataFrame:
                     for attempt in attempts:
                         stage_folder = stage_root / f"intento_{attempt}"
                         rows.append(_build_row(
-                            participant_number, challenge_number, game_name,
+                            participant_number, experience_level, challenge_number, game_name,
                             stage, attempt, stage_folder, stage_status,
                         ))
                 elif stage_root.is_dir():
                     rows.append(_build_row(
-                        participant_number, challenge_number, game_name,
+                        participant_number, experience_level, challenge_number, game_name,
                         stage, 1, stage_root, stage_status,
                     ))
 

@@ -309,7 +309,8 @@ def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
         CALIBRATION_FAILED reason=<motivo>
     """
     estimator = GazeEstimator()
-    window_name = "Eye Tracker - Calibración"
+    # Sin tilde a proposito (ver camera_tracker.run_calibration).
+    window_name = "Eye Tracker - Calibracion"
     start_time = time.monotonic()
 
     def run_phase(label: str) -> Optional[float]:
