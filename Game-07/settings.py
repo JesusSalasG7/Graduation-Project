@@ -67,10 +67,10 @@ ACHIEVEMENT_CHAIN_REACTION_BIRTHS = 8  # births in a single generation
 # only ever holds one track at a time), so it's referenced by path and
 # loaded/played by whoever starts it -- unlike SOUNDS below, there's
 # nothing to preload here.
-BACKGROUND_MUSIC_PATH = str(BASE_DIR / "background_music.mp3")
+BACKGROUND_MUSIC_PATH = str(BASE_DIR / "assets" / "sounds" / "background_music.mp3")
 
 SOUNDS = {
-    "click": pygame.mixer.Sound(str(BASE_DIR / "Click_button.mp3")),
+    "click": pygame.mixer.Sound(str(BASE_DIR / "assets" / "sounds" / "Click_button.mp3")),
 }
 
 # --- Fonts -------------------------------------------------------------

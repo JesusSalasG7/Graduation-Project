@@ -486,7 +486,7 @@ def run_calibration(cap, landmarker, mirror: bool, model_path: Path = MODEL_PATH
     corta y solo necesita la mirada.
 
     Imprime por stdout el resultado en un formato fijo que el lanzador
-    (graphic_interface/camera_tracker_launcher.py) sabe parsear:
+    (graphic_interface/sensors/camera_tracker_launcher.py) sabe parsear:
         CALIBRATION_RESULT left_x=<float> right_x=<float>
         CALIBRATION_FAILED reason=<motivo>
     """

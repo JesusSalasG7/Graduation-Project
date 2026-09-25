@@ -18,7 +18,7 @@ scrambling look physically correct when drawing the cube
 (`src/view_3d.py`).
 
 This module has no dependency on pygame: it is pure logic, so it can
-be tested and used (for instance from test_search_3d_pattern.py)
+be tested and used (for instance from tests/test_search_3d_pattern.py)
 without needing a window or gale.
 """
 import random
@@ -367,7 +367,7 @@ class RubikCube:
         Returns a copy of the 3D block of `self.matrix` that starts at
         (origin_x, origin_y, origin_z) with the given dimensions.
         Useful for building, from the cube itself, a test pattern
-        known to exist (see test_search_3d_pattern.py).
+        known to exist (see tests/test_search_3d_pattern.py).
         """
         return [
             [

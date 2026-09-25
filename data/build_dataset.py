@@ -1,6 +1,6 @@
 """Consolida en un unico CSV todos los datos crudos que la sesion guiada ya
 exporta por participante/desafio/etapa en el Escritorio (ver
-graphic_interface/stage_capture.py): NeuroSky crudo (bandas EEG,
+graphic_interface/storage/stage_capture.py): NeuroSky crudo (bandas EEG,
 atencion/meditacion), Emotion Tracker (emocion dominante + el porcentaje de
 CADA categoria que devuelve DeepFace, ver tools/camera_tracker.py), Eye
 Tracker (mirada cruda + miradas izquierda/derecha agregadas), frecuencia
@@ -11,7 +11,7 @@ Data_Completa_Editada.csv que se uso como modelo).
 
 No incluye nombre/apellido de los participantes a proposito: ese registro
 vive deliberadamente FUERA del proyecto (ver
-graphic_interface/personal_records.py) para no mezclar datos personales con
+graphic_interface/storage/personal_records.py) para no mezclar datos personales con
 los datos anonimos de la sesion -- este dataset respeta esa misma
 separacion y solo identifica a cada participante por su numero. El nivel de
 experiencia del jugador (Avanzado/Intermedio/Principiante, elegido al
@@ -25,7 +25,7 @@ romper la generacion del dataset.
 Uso:
     python data/build_dataset.py [--out data/dataset_sesiones.csv]
 
-Tambien se puede llamar programaticamente (ver graphic_interface/app.py,
+Tambien se puede llamar programaticamente (ver graphic_interface/ui/app.py,
 seccion "Dataset consolidado" de la pestaña Sesion):
     from build_dataset import build_dataset, save_dataset
     df = build_dataset()
@@ -45,8 +45,8 @@ GRAPHIC_INTERFACE_DIR = Path(__file__).resolve().parent.parent / "graphic_interf
 if str(GRAPHIC_INTERFACE_DIR) not in sys.path:
     sys.path.insert(0, str(GRAPHIC_INTERFACE_DIR))
 
-from challenge_solver import GUIDED_SESSION_GAME_ORDER  # noqa: E402
-from stage_capture import GUIDED_SESSION_STAGE_ORDER, list_stage_attempts, sessions_root  # noqa: E402
+from ai.challenge_solver import GUIDED_SESSION_GAME_ORDER  # noqa: E402
+from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, list_stage_attempts, sessions_root  # noqa: E402
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "dataset_sesiones.csv"
 PARTICIPANTS_FILE = GRAPHIC_INTERFACE_DIR / "data" / "participants.json"
@@ -96,7 +96,7 @@ def _round_mean(values: "pd.Series"):
 
 def _experience_by_participant() -> dict[int, str]:
     """{numero de participante: nivel de experiencia} a partir del registro
-    anonimo de participants.json (ver graphic_interface/participant_store.py)."""
+    anonimo de participants.json (ver graphic_interface/storage/participant_store.py)."""
     payload = _read_json_safe(PARTICIPANTS_FILE)
     return {
         p["number"]: p.get("attributes", {}).get("nivel_experiencia", "")
