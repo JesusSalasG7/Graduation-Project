@@ -1,10 +1,10 @@
-"""Vinculacion Bluetooth + lanzador de tools/NeuroSky/test_neurosky.py.
+"""Vinculación Bluetooth + lanzador de tools/NeuroSky/test_neurosky.py.
 
 El NeuroSky MindWave Mobile se conecta por Bluetooth SPP: antes de poder
 leerlo como puerto serial hay que "bindearlo" a /dev/rfcomm0 con su MAC
 (ver tools/NeuroSky/GUIA_NEUROSKY.md), y eso requiere permisos de root.
-Este modulo automatiza esos dos comandos (pidiendo la contraseña de sudo
-por stdin, nunca por linea de comando, solo si hace falta) y despues
+Este módulo automatiza esos dos comandos (pidiendo la contraseña de sudo
+por stdin, nunca por línea de comando, solo si hace falta) y después
 lanza test_neurosky.py con el .venv unificado del proyecto.
 """
 
@@ -18,8 +18,8 @@ from paths import TOOLS_DIR
 NEUROSKY_DIR = TOOLS_DIR / "NeuroSky"
 NEUROSKY_TEST_SCRIPT = NEUROSKY_DIR / "test_neurosky.py"
 # test_neurosky.py abre este archivo en modo "w" (trunca) cada vez que
-# arranca -- nunca acumula datos de corridas anteriores, asi que borrarlo
-# borra exactamente (y solamente) lo capturado en la sesion que se acaba
+# arranca -- nunca acumula datos de corridas anteriores, así que borrarlo
+# borra exactamente (y solamente) lo capturado en la sesión que se acaba
 # de abandonar.
 NEUROSKY_DATA_FILE = NEUROSKY_DIR / "test_neurodata.csv"
 NEUROSKY_MAC = "20:68:9D:79:DE:7C"
@@ -39,16 +39,16 @@ def sudo_needs_password() -> bool:
 
 
 def bind_neurosky(on_output: Callable[[str], None], password: Optional[str] = None) -> bool:
-    """Corre `sudo rfcomm bind /dev/rfcomm0 <MAC> 1` y despues
+    """Corre `sudo rfcomm bind /dev/rfcomm0 <MAC> 1` y después
     `sudo chmod 666 /dev/rfcomm0`, en ese orden, cortando en el primero que
     falle. La contraseña (si hace falta) se le pasa a `sudo -S` por stdin,
-    nunca como argumento -- asi no queda visible en la lista de procesos.
+    nunca como argumento -- así no queda visible en la lista de procesos.
 
-    Si /dev/rfcomm0 ya existe (p.ej. un reintento despues de haber
+    Si /dev/rfcomm0 ya existe (p.ej. un reintento después de haber
     encendido el dispositivo) se salta el bind -- repetirlo falla con
     "Device or resource busy" -- y solo se corre el chmod.
 
-    Devuelve True si los comandos corridos terminaron con codigo 0.
+    Devuelve True si los comandos corridos terminaron con código 0.
     """
     commands = []
     if not Path(RFCOMM_DEVICE).exists():
@@ -81,9 +81,9 @@ def bind_neurosky(on_output: Callable[[str], None], password: Optional[str] = No
 def release_neurosky(on_output: Callable[[str], None], password: Optional[str] = None) -> bool:
     """Corre `sudo rfcomm release /dev/rfcomm0` -- la contraparte de
     `bind_neurosky`, para dejar el dispositivo Bluetooth desvinculado de
-    forma prolija en vez de dejarlo bindeado sin nadie leyendolo.
+    forma prolija en vez de dejarlo bindeado sin nadie leyéndolo.
 
-    Si el puerto ya no existe (nunca se bindeo, o ya se libero antes) no
+    Si el puerto ya no existe (nunca se bindeó, o ya se liberó antes) no
     hace nada y devuelve True -- no hay nada que liberar.
     """
     if not Path(RFCOMM_DEVICE).exists():
@@ -111,8 +111,8 @@ def release_neurosky(on_output: Callable[[str], None], password: Optional[str] =
 
 
 def delete_neurosky_data() -> None:
-    """Borra el CSV con las lecturas capturadas en la sesion (se usa
-    cuando la sesion guiada se abandona sin terminar los desafios)."""
+    """Borra el CSV con las lecturas capturadas en la sesión (se usa
+    cuando la sesión guiada se abandona sin terminar los desafíos)."""
     try:
         NEUROSKY_DATA_FILE.unlink()
     except FileNotFoundError:
@@ -121,17 +121,17 @@ def delete_neurosky_data() -> None:
 
 def start_neurosky_test() -> subprocess.Popen:
     """Lanza tools/NeuroSky/test_neurosky.py en segundo plano con el .venv
-    unificado (pyserial ya esta instalado ahi), con su salida como pipe de
-    texto linea a linea para poder mostrarla en vivo.
+    unificado (pyserial ya está instalado ahí), con su salida como pipe de
+    texto línea a línea para poder mostrarla en vivo.
 
     El flag `-u` es necesario: al no estar conectado a una terminal, el
-    stdout del proceso hijo queda bufferizado por bloques (no por linea),
-    asi que sin esto los `print()` de test_neurosky.py no llegan por el
-    pipe en tiempo real -- se acumulan y aparecen todos juntos recien al
+    stdout del proceso hijo queda bufferizado por bloques (no por línea),
+    así que sin esto los `print()` de test_neurosky.py no llegan por el
+    pipe en tiempo real -- se acumulan y aparecen todos juntos recién al
     terminar el proceso.
     """
     if not NEUROSKY_TEST_SCRIPT.exists():
-        raise FileNotFoundError("No se encontro tools/NeuroSky/test_neurosky.py")
+        raise FileNotFoundError("No se encontró tools/NeuroSky/test_neurosky.py")
 
     return subprocess.Popen(
         [str(venv_python()), "-u", str(NEUROSKY_TEST_SCRIPT)],

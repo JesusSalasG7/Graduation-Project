@@ -42,8 +42,9 @@ experimento. Desde ahí se puede:
   opcional, tres fuentes de datos biométricos:
   - **NeuroSky MindWave Mobile** (EEG: atención, meditación, ondas
     cerebrales).
-  - **Cámara** (emoción dominante + porcentaje por categoría vía
-    DeepFace, y dirección de mirada izquierda/derecha vía MediaPipe).
+  - **Cámara** (emoción dominante, porcentaje por categoría, valencia
+    y arousal vía EmotiEffLib, y dirección de mirada izquierda/derecha
+    vía MediaPipe).
   - **Reloj compatible con Samsung Health** (frecuencia cardíaca).
 - Consolidar todo lo capturado en un único dataset CSV para análisis
   (`data/build_dataset.py`).
@@ -139,12 +140,15 @@ vez con los comandos de arriba, y después usar ese botón cada vez que
 agregues un juego nuevo o cambie alguna versión, en vez de repetir el
 proceso manual.
 
-> ⚠️ El botón "Reparar entorno" **no** instala las dependencias de
-> `tools/` (cámara/NeuroSky) — esas requieren pasos manuales
-> especiales, ver la sección 3 de más abajo. No corras
-> `pip install -r tools/requirements.txt` a secas: instalaría a la vez
-> dos paquetes de OpenCV incompatibles entre sí (ver el comentario al
-> principio de ese archivo).
+> ⚠️ De `tools/requirements.txt`, el botón "Reparar entorno" instala
+> **solo** la sección 1 (`emotion_tracker.py`, que usa este mismo
+> `.venv`). La cámara de la sesión guiada y el eye tracker viven en
+> venvs propios que requieren pasos manuales especiales (ver la
+> sección 3 de más abajo). No corras `pip install -r tools/requirements.txt`
+> a secas: instalaría a la vez dos paquetes de OpenCV incompatibles
+> entre sí (ver el comentario al principio de ese archivo). Si eso ya
+> pasó, el botón lo corrige: desinstala `opencv-contrib-python` del
+> `.venv` y reinstala `opencv-python`.
 
 Con el entorno instalado, arrancá el panel:
 
@@ -240,7 +244,7 @@ Cada sensor es completamente opcional (se puede destildar en el modal
 de "¿Qué dispositivos vas a usar en esta sesión?"), y cada uno tiene
 su propia receta de instalación. **No las mezcles**: cámara y
 NeuroSky usan entornos distintos a propósito, porque sus dependencias
-(OpenCV con y sin extras, TensorFlow, MediaPipe) se pisan entre sí si
+(OpenCV con y sin extras, MediaPipe) se pisan entre sí si
 conviven en el mismo `.venv`.
 
 #### NeuroSky (diadema EEG)
@@ -267,8 +271,8 @@ vos (nunca la pasa por línea de comandos, solo por stdin).
 #### Cámara (emoción + mirada)
 
 Vive en su **propio entorno virtual**, `tools/.venv-tracker`, porque
-mezcla `mediapipe` (necesita `opencv-contrib-python`) y `deepface`
-(necesita `opencv-python`) — instalar ambos paquetes de OpenCV juntos
+mezcla `mediapipe` (necesita `opencv-contrib-python`) y `emotiefflib`
+(declara `opencv-python`) — instalar ambos paquetes de OpenCV juntos
 rompe `cv2` (confirmado: pisa los archivos de `cv2/data/`). La receta
 exacta (con las banderas `--no-deps` necesarias) está documentada en
 `tools/requirements.txt`, sección 3:
@@ -276,9 +280,19 @@ exacta (con las banderas `--no-deps` necesarias) está documentada en
 ```bash
 python3 -m venv tools/.venv-tracker
 tools/.venv-tracker/bin/pip install opencv-contrib-python==4.10.0.84 mediapipe==1.0.1
-tools/.venv-tracker/bin/pip install --no-deps deepface==0.0.93 retina-face
-tools/.venv-tracker/bin/pip install fire Flask flask-cors gdown gunicorn keras mtcnn numpy pandas==2.2.2 Pillow requests tensorflow==2.21.0 tf-keras==2.21.0 tqdm
+tools/.venv-tracker/bin/pip install --no-deps emotiefflib==1.1.1
+tools/.venv-tracker/bin/pip install onnx onnxruntime pillow
+# Descarga el modelo de emociones (~16 MB, a ~/.emotiefflib/) antes de la primera sesión:
+tools/.venv-tracker/bin/python -c "from emotiefflib.facial_analysis import EmotiEffLibRecognizer as R; R(engine='onnx', model_name='enet_b0_8_va_mtl')"
 ```
+
+El reconocimiento de emociones usa EmotiEffLib con el modelo
+`enet_b0_8_va_mtl` (ONNX, sin PyTorch ni TensorFlow): por cada lectura
+registra la emoción dominante, el porcentaje de 8 categorías (anger,
+contempt, disgust, fear, happiness, neutral, sadness, surprise) y la
+valencia y el arousal (de -1 a 1). EmotiEffLib no detecta rostros: el
+recorte sale de los landmarks de MediaPipe (o de un Haar cascade si
+MediaPipe no encuentra la cara) — ver `tools/emotion_recognizer.py`.
 
 Para calibrar la dirección de mirada antes de la primera sesión con
 una webcam nueva:
@@ -331,7 +345,7 @@ registrarlos en ningún lado, alcanza con que la carpeta tenga un
 - **📊 Ver juegos en dificultad**: reordena la lista de más fácil a
   más difícil (mismo orden que usa la sesión guiada).
 - **🛠️ Reparar entorno**: reinstala en `.venv` las dependencias del
-  panel + de todos los juegos (ver [Instalación](#1-entorno-base-panel--juegos));
+  panel, de todos los juegos y de `emotion_tracker.py` (ver [Instalación](#1-entorno-base-panel--juegos));
   útil después de un `git pull` que haya cambiado algún
   `requirements.txt`.
 - **🔄 Actualizar**: vuelve a escanear la carpeta del proyecto por si

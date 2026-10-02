@@ -16,6 +16,7 @@ from gale.input_handler import InputData, MouseClickData, MouseMotionData
 from gale.state import BaseState
 
 import settings
+from src import text
 from src.signal_check import is_stable_signal
 
 # A mix of real Spanish words that keep their shape when reversed and
@@ -91,8 +92,7 @@ def _draw_button(surface: pygame.Surface, rect: pygame.Rect, label: str, is_hove
     background_color = settings.COLORS["button_hover"] if is_hovered else settings.COLORS["button_background"]
     pygame.draw.rect(surface, background_color, rect, border_radius=6)
     pygame.draw.rect(surface, settings.COLORS["button_border"], rect, width=2, border_radius=6)
-    label_surface = settings.FONTS["button"].render(label, True, settings.COLORS["text"])
-    surface.blit(label_surface, label_surface.get_rect(center=rect.center))
+    text.draw_text(surface, "button", label, settings.COLORS["text"], center=rect.center)
 
 
 class PlayState(BaseState):
@@ -229,12 +229,16 @@ class PlayState(BaseState):
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(settings.COLORS["background"])
 
-        title_surface = settings.FONTS["title"].render("ESPEJO DE CÓDIGOS", True, settings.COLORS["accent"])
-        surface.blit(title_surface, title_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=14))
+        text.draw_text(
+            surface, "title", "ESPEJO DE CÓDIGOS", settings.COLORS["accent"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=14,
+        )
 
         round_text = f"RONDA {self.current_round} / {TOTAL_ROUNDS}"
-        round_surface = settings.FONTS["hint"].render(round_text, True, settings.COLORS["text_dim"])
-        surface.blit(round_surface, round_surface.get_rect(right=settings.VIRTUAL_WIDTH - 16, top=16))
+        text.draw_text(
+            surface, "hint", round_text, settings.COLORS["text_dim"],
+            right=settings.VIRTUAL_WIDTH - 16, top=16,
+        )
 
         if self.time_remaining <= TIMER_DANGER_THRESHOLD:
             timer_color = settings.COLORS["error"]
@@ -246,18 +250,18 @@ class PlayState(BaseState):
         # frame reads as "the clock is really running out", more so than a
         # rounded whole-second countdown would.
         timer_text = f"{self.time_remaining:.3f}s"
-        timer_surface = settings.FONTS["timer"].render(timer_text, True, timer_color)
-        surface.blit(timer_surface, timer_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=34))
+        text.draw_text(surface, "timer", timer_text, timer_color, centerx=settings.VIRTUAL_WIDTH / 2, top=34)
 
         transmission_text = f"TRANSMISIÓN RECIBIDA: {self.current_string}"
-        transmission_surface = settings.FONTS["transmission"].render(transmission_text, True, settings.COLORS["text"])
-        surface.blit(
-            transmission_surface,
-            transmission_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=70),
+        text.draw_text(
+            surface, "transmission", transmission_text, settings.COLORS["text"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=70,
         )
 
-        prompt_surface = settings.FONTS["prompt"].render(PROMPT_QUESTION, True, settings.COLORS["text_dim"])
-        surface.blit(prompt_surface, prompt_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=105))
+        text.draw_text(
+            surface, "prompt", PROMPT_QUESTION, settings.COLORS["text_dim"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=105,
+        )
 
         stable_hovered = self.hover_position is not None and self.stable_button_rect.collidepoint(
             self.hover_position
@@ -270,8 +274,12 @@ class PlayState(BaseState):
 
         feedback_top = 250
         if self.phase == "feedback":
-            feedback_surface = settings.FONTS["feedback"].render(self.feedback_message, True, self.feedback_color)
-            surface.blit(feedback_surface, feedback_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=feedback_top))
+            text.draw_text(
+                surface, "feedback", self.feedback_message, self.feedback_color,
+                centerx=settings.VIRTUAL_WIDTH / 2, top=feedback_top,
+            )
         elif self.error_message is not None:
-            error_surface = settings.FONTS["feedback"].render(self.error_message, True, settings.COLORS["warning"])
-            surface.blit(error_surface, error_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=feedback_top))
+            text.draw_text(
+                surface, "feedback", self.error_message, settings.COLORS["warning"],
+                centerx=settings.VIRTUAL_WIDTH / 2, top=feedback_top,
+            )

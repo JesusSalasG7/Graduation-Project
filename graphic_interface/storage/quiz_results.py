@@ -1,9 +1,9 @@
-"""Guarda las respuestas de los cuestionarios de la sesion guiada, por
-participante anonimo, en graphic_interface/data/quiz_results/PARTICIPANTE_N.json.
+"""Guarda las respuestas de los cuestionarios de la sesión guiada, por
+participante anónimo, en graphic_interface/data/quiz_results/PARTICIPANTE_N.json.
 
-No se usa para bloquear el avance de la sesion guiada (eso sigue siendo
-libre) -- es solo el registro de lo que respondio cada participante, para
-poder analizarlo despues.
+No se usa para bloquear el avance de la sesión guiada (eso sigue siendo
+libre) -- es solo el registro de lo que respondió cada participante, para
+poder analizarlo después.
 """
 
 import json
@@ -23,8 +23,8 @@ def save_quiz_answers(
 
     `stage` identifica de cual de los 3 cuestionarios se trata (ej.
     "etapa1_enunciado", "etapa3_comprension", "etapa4_razonamiento").
-    `answers` mapea indice de pregunta -> indice de opcion elegida (-1 si no
-    se respondio).
+    `answers` mapea índice de pregunta -> índice de opción elegida (-1 si no
+    se respondió).
     """
     if not questions:
         return

@@ -1,7 +1,7 @@
-"""Escaneo dinamico y lanzamiento de los juegos del proyecto.
+"""Escaneo dinámico y lanzamiento de los juegos del proyecto.
 
 Los juegos se ejecutan siempre con el interprete del .venv unificado
-de la raiz del proyecto, y con cwd en la carpeta del juego (todos
+de la raíz del proyecto, y con cwd en la carpeta del juego (todos
 usan imports relativos tipo `import settings` / `from src...`).
 """
 
@@ -19,17 +19,17 @@ VENV_DIR = PROJECT_ROOT / ".venv"
 
 EMOTION_TRACKER_SCRIPT = TOOLS_DIR / "emotion_tracker.py"
 TOOLS_REQUIREMENTS = TOOLS_DIR / "requirements.txt"
-# De tools/requirements.txt, SOLO esta seccion va al .venv unificado
-# (emotion_tracker.py). Las demas son para venvs propios de tools/ y no
+# De tools/requirements.txt, SOLO esta sección va al .venv unificado
+# (emotion_tracker.py). Las demás son para venvs propios de tools/ y no
 # pueden convivir con esta: la de MediaPipe trae opencv-contrib-python,
 # que pisa los archivos de cv2/ de opencv-python (ver el comentario al
 # principio de ese archivo).
 ROOT_VENV_TOOLS_SECTION = "EMOTION"
 EMOTION_LOG_DIR = DATA_DIR / "emotion_logs"
 
-# Titulo declarado como `TITLE = "..."` en settings.py
+# Título declarado como `TITLE = "..."` en settings.py
 _TITLE_IN_SETTINGS = re.compile(r'^\s*TITLE\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
-# Titulo pasado como primer literal a un constructor tipo `SnakeGame("Snake", ...)`
+# Título pasado como primer literal a un constructor tipo `SnakeGame("Snake", ...)`
 _TITLE_IN_MAIN = re.compile(r'\w+Game\(\s*["\']([^"\']+)["\']')
 
 
@@ -95,27 +95,27 @@ def open_in_vscode(game: GameInfo) -> None:
 
 # Los 7 juegos extienden gale.game.Game, que abre la ventana con
 # `pygame.display.set_mode((window_width, window_height), ...)` -- un
-# tamano fijo definido en el settings.py de cada juego, mucho mas chico
-# que la pantalla y con su propia relacion de aspecto (algunos, como
+# tamaño fijo definido en el settings.py de cada juego, mucho más chico
+# que la pantalla y con su propia relación de aspecto (algunos, como
 # Game-02 y Game-05, son verticales). En vez de tocar cada juego (o el
 # paquete `gale` instalado en el .venv, que se reinstala solo con
 # "Reparar entorno"), se lanza `main.py` con `-c` para poder parchear
 # pygame.display.set_mode ANTES de que el juego llame a set_mode: la
 # version parcheada agrega pygame.FULLSCREEN + pygame.SCALED,
-# conservando el tamano logico que pidio el juego.
+# conservando el tamaño lógico que pidió el juego.
 #
 # SCALED es clave para no deformar la imagen: hace que SDL centre y
-# escale esa resolucion logica a la resolucion real del monitor
-# manteniendo la relacion de aspecto (con barras si no coincide), en vez
-# de estirarla sin mas -- que es lo que pasaba forzando directamente el
-# tamano del escritorio (Game-02 y Game-05, verticales, se veian
-# aplastados). El resto del juego -- incluida su propia logica de
-# escalado de resolucion virtual -- sigue igual: gale sigue viendo el
-# tamano logico via screen.get_size() y reescala su render_surface a eso
+# escale esa resolución lógica a la resolución real del monitor
+# manteniendo la relación de aspecto (con barras si no coincide), en vez
+# de estirarla sin más -- que es lo que pasaba forzando directamente el
+# tamaño del escritorio (Game-02 y Game-05, verticales, se veían
+# aplastados). El resto del juego -- incluida su propia lógica de
+# escalado de resolución virtual -- sigue igual: gale sigue viendo el
+# tamaño lógico vía screen.get_size() y reescala su render_surface a eso
 # en cada frame, como si no hubiera pantalla completa de por medio.
 #
 # `python -c` (en vez de pasarle la ruta a main.py) agrega el directorio
-# actual a sys.path como hace un script normal, asi que los imports
+# actual a sys.path como hace un script normal, así que los imports
 # relativos de cada juego (`import settings`, `from src...`) funcionan
 # igual siempre que el cwd del proceso sea la carpeta del juego.
 _FULLSCREEN_BOOTSTRAP = """
@@ -141,8 +141,8 @@ runpy.run_path("main.py", run_name="__main__")
 def launch_game_process(game_dir: Path) -> subprocess.Popen:
     """Lanza `main.py` dentro de `game_dir` con el .venv unificado, siempre
     en pantalla completa (ver _FULLSCREEN_BOOTSTRAP). Usado tanto por
-    play_game() (boton "Jugar" de la pestaña Juegos) como por
-    game_patch._launch_and_cleanup() (Etapas 1 y 6 de la sesion guiada).
+    play_game() (botón "Jugar" de la pestaña Juegos) como por
+    game_patch._launch_and_cleanup() (Etapas 1 y 6 de la sesión guiada).
     """
     return subprocess.Popen(
         [str(venv_python()), "-c", _FULLSCREEN_BOOTSTRAP], cwd=str(game_dir),
@@ -161,9 +161,9 @@ def emotion_log_file(participant: dict) -> Path:
 
 def delete_emotion_data(participant: Optional[dict]) -> None:
     """Borra el CSV de emociones capturado para `participant` en esta
-    sesion -- se usa cuando la sesion guiada se abandona sin terminar los
-    desafios (mismo criterio que neurosky_launcher.delete_neurosky_data):
-    datos de una sesion incompleta no sirven para el analisis."""
+    sesión -- se usa cuando la sesión guiada se abandona sin terminar los
+    desafíos (mismo criterio que neurosky_launcher.delete_neurosky_data):
+    datos de una sesión incompleta no sirven para el análisis."""
     if not participant:
         return
     try:
@@ -174,13 +174,13 @@ def delete_emotion_data(participant: Optional[dict]) -> None:
 
 def start_emotion_tracker(participant: Optional[dict], session_label: str) -> subprocess.Popen:
     """Lanza tools/emotion_tracker.py en segundo plano con el .venv unificado,
-    con su salida como pipe de texto linea a linea (ver la misma logica en
+    con su salida como pipe de texto línea a línea (ver la misma lógica en
     neurosky_launcher.start_neurosky_test) para poder mostrarla en vivo en
-    la pantalla de configuracion de la sesion guiada.
+    la pantalla de configuración de la sesión guiada.
 
-    Si hay un participante activo, sus lecturas se registran ademas en un
+    Si hay un participante activo, sus lecturas se registran además en un
     CSV propio (graphic_interface/data/emotion_logs/<NOMBRE_APELLIDO>.csv)
-    para poder correlacionarlas despues con la sesion.
+    para poder correlacionarlas después con la sesión.
     """
     if not EMOTION_TRACKER_SCRIPT.exists():
         raise FileNotFoundError("No se encontró tools/emotion_tracker.py")
@@ -203,7 +203,7 @@ def start_emotion_tracker(participant: Optional[dict], session_label: str) -> su
 
 
 def consolidated_requirements(root: Path = PROJECT_ROOT) -> list[str]:
-    """Junta (sin duplicados) las lineas de todos los Game-*/requirements.txt."""
+    """Junta (sin duplicados) las líneas de todos los Game-*/requirements.txt."""
     lines: set[str] = set()
     for req_file in sorted(root.glob("Game-*/requirements.txt")):
         for line in req_file.read_text(encoding="utf-8").splitlines():
@@ -214,8 +214,8 @@ def consolidated_requirements(root: Path = PROJECT_ROOT) -> list[str]:
 
 
 def tools_requirements_section(name: str, path: Path = TOOLS_REQUIREMENTS) -> list[str]:
-    """Lineas de requisito entre `# --<name>-START--` y `# --<name>-END--`
-    de tools/requirements.txt (sin comentarios ni lineas vacias)."""
+    """Líneas de requisito entre `# --<name>-START--` y `# --<name>-END--`
+    de tools/requirements.txt (sin comentarios ni líneas vacías)."""
     lines: list[str] = []
     inside = False
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -238,15 +238,15 @@ def _package_installed(python: Path, package: str) -> bool:
 
 def repair_environment(on_output: Optional[Callable[[str], None]] = None) -> tuple[bool, str]:
     """Reinstala en el .venv unificado las dependencias de todos los juegos, la
-    GUI y la seccion de tools/requirements.txt que le corresponde a este venv
+    GUI y la sección de tools/requirements.txt que le corresponde a este venv
     (ROOT_VENV_TOOLS_SECTION) -- nunca el archivo entero.
 
-    Si quedo instalado opencv-contrib-python (versiones anteriores de este
-    boton instalaban tools/requirements.txt completo), lo desinstala y
+    Si quedó instalado opencv-contrib-python (versiones anteriores de este
+    botón instalaban tools/requirements.txt completo), lo desinstala y
     reinstala opencv-python para restaurar los archivos de cv2/ pisados.
 
-    `on_output`, si se pasa, se llama con cada linea de salida de pip (progreso en vivo).
-    Devuelve (exito, log_completo).
+    `on_output`, si se pasa, se llama con cada línea de salida de pip (progreso en vivo).
+    Devuelve (éxito, log_completo).
     """
     python = venv_python()
     log_lines: list[str] = []

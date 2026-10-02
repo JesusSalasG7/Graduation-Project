@@ -1,14 +1,14 @@
-"""Genera la respuesta de la Etapa 2/3 de la sesion guiada a partir del
+"""Genera la respuesta de la Etapa 2/3 de la sesión guiada a partir del
 prompt que escribe el participante.
 
 La llamada a la IA en si (aislada, sin contexto del ejercicio ni del juego,
-system prompt restrictivo -- ver ahi mismo por que NO tiene temperature
+system prompt restrictivo -- ver ahí mismo por qué NO tiene temperature
 baja) vive en isolated_prompt.py. Este archivo solo orquesta: le pasa el
 prompt del participante a esa llamada aislada y, con la respuesta que
-vuelva, genera los dos bancos de preguntas de opcion multiple (comprension
-para la Etapa 3, razonamiento para la Etapa 4) y el texto de explicacion
+vuelva, genera los dos bancos de preguntas de opción multiple (comprension
+para la Etapa 3, razonamiento para la Etapa 4) y el texto de explicación
 de razonamiento de la Etapa 4 -- todo esto sí puede usar el enunciado del
-ejercicio como contexto, porque es herramienta de evaluacion armada por el
+ejercicio como contexto, porque es herramienta de evaluación armada por el
 investigador, no la respuesta que ve la IA del participante.
 """
 
@@ -20,12 +20,12 @@ from content.challenges import Challenge
 from ai.isolated_prompt import ask_isolated_prompt
 from content.quiz import QuizQuestion
 
-# 14 preguntas de opcion multiple + una explicacion de razonamiento de 2-4
+# 14 preguntas de opción multiple + una explicación de razonamiento de 2-4
 # parrafos, generadas en una sola llamada JSON-schema al backend de IA
 # configurado (ver ai_backend.py): en la practica esto puede superar 90s
 # (visto en sesiones reales, ver generate_isolated_response), lo que hacia
 # fallar en silencio Etapas 4 Y 5 a la vez (ambas salen de esta misma
-# llamada) sin ningun mensaje util.
+# llamada) sin ningún mensaje útil.
 QUIZ_TIMEOUT_SECONDS = 180
 CLAUDE_MODEL = "sonnet"  # solo aplica cuando ai_backend.active_provider() == "claude"
 
@@ -53,8 +53,8 @@ RESPONSE_QUIZ_JSON_SCHEMA = {
     "required": ["comprehension_questions", "reasoning_questions", "reasoning_explanation"],
 }
 
-# Orden de "siguiente desafio" del modulo de sesion guiada: los 7 juegos,
-# de mas facil a mas dificil (ver difficulty.py).
+# Orden de "siguiente desafio" del módulo de sesión guiada: los 7 juegos,
+# de más fácil a más difícil (ver difficulty.py).
 GUIDED_SESSION_GAME_ORDER = [
     "Game-01", "Game-04", "Game-05", "Game-06", "Game-07", "Game-02", "Game-03",
 ]
@@ -68,8 +68,8 @@ class ChallengeSolveResult:
     elapsed_seconds: float = 0.0
     comprehension_questions: list[QuizQuestion] = field(default_factory=list)  # Etapa 3
     reasoning_questions: list[QuizQuestion] = field(default_factory=list)  # Etapa 4
-    reasoning_explanation: str = ""  # Etapa 4 -- por que la IA aislada llego a esa respuesta
-    quiz_generation_error: str = ""  # por que comprehension/reasoning quedaron vacios (si aplica)
+    reasoning_explanation: str = ""  # Etapa 4 -- por qué la IA aislada llegó a esa respuesta
+    quiz_generation_error: str = ""  # por qué comprehension/reasoning quedaron vacíos (si aplica)
 
 
 def _question_from_payload(payload: dict) -> QuizQuestion:
@@ -83,59 +83,59 @@ def _question_from_payload(payload: dict) -> QuizQuestion:
 def generate_response_quiz(
     challenge: Challenge, response_text: str,
 ) -> tuple[list[QuizQuestion], list[QuizQuestion], str, str]:
-    """Genera, a partir del codigo que devolvio la IA AISLADA al prompt del
-    participante, dos bancos de 7 preguntas de opcion multiple -- uno sobre
-    que hace esa implementacion (Etapa 3) y otro sobre si el razonamiento y
-    la implementacion son correctos y alcanzan para resolver el desafio
-    (Etapa 4, razonamiento) -- mas un texto (tambien Etapa 4) que evalua esa
-    solucion contra el enunciado.
+    """Genera, a partir del código que devolvió la IA AISLADA al prompt del
+    participante, dos bancos de 7 preguntas de opción multiple -- uno sobre
+    que hace esa implementación (Etapa 3) y otro sobre si el razonamiento y
+    la implementación son correctos y alcanzan para resolver el desafío
+    (Etapa 4, razonamiento) -- más un texto (también Etapa 4) que evalua esa
+    solución contra el enunciado.
 
     A diferencia de la llamada aislada, esta SI usa el enunciado del
-    ejercicio como contexto -- es una herramienta de evaluacion armada por
+    ejercicio como contexto -- es una herramienta de evaluación armada por
     el investigador, no la respuesta que recibe el participante. No usa
-    ninguna herramienta (`--tools ""`): es generacion de texto pura,
+    ninguna herramienta (`--tools ""`): es generación de texto pura,
     restringida a un JSON Schema.
 
-    Devuelve ([], [], "", <razon>) si algo falla (la sesion guiada sigue
-    funcionando sin preguntas ni explicacion antes que romperse) -- la razon
+    Devuelve ([], [], "", <razón>) si algo falla (la sesión guiada sigue
+    funcionando sin preguntas ni explicación antes que romperse) -- la razón
     queda en ChallengeSolveResult.quiz_generation_error para que la interfaz
     (ver session_wizard._build_quiz) pueda mostrarla en vez de un
-    "no se generaron preguntas" sin ninguna pista de por que.
+    "no se generaron preguntas" sin ninguna pista de por qué.
     """
     prompt = (
-        "Un participante de un estudio escribio un prompt para pedirle a una "
-        "IA que resuelva el siguiente ejercicio de programacion. Tu tarea es "
-        "evaluar si el codigo que devolvio esa IA es correcto y suficiente "
+        "Un participante de un estudio escribió un prompt para pedirle a una "
+        "IA que resuelva el siguiente ejercicio de programación. Tu tarea es "
+        "evaluar si el código que devolvió esa IA es correcto y suficiente "
         "para resolver el ejercicio tal como lo pide el enunciado.\n\n"
         f"Enunciado del ejercicio:\n{challenge.statement}\n\n"
         f"Respuesta de la IA al prompt del participante:\n\"\"\"\n{response_text}\n\"\"\"\n\n"
-        "Genera lo siguiente, en espanol:\n\n"
-        "1. Un texto \"reasoning_explanation\" de 2 a 4 parrafos, en lenguaje "
-        "claro para un participante (no un experto), que evalue ESA "
-        "respuesta concreta contra el enunciado: el paso a paso y la logica "
-        "que sigue el codigo (en que orden hace las cosas, que estructuras "
-        "de datos o control usa y para que), si ese razonamiento es "
-        "correcto, si la implementacion cumple cada requisito del enunciado "
+        "Genera lo siguiente, en español:\n\n"
+        "1. Un texto \"reasoning_explanation\" de 2 a 4 párrafos, en lenguaje "
+        "claro para un participante (no un experto), que evalúe ESA "
+        "respuesta concreta contra el enunciado: el paso a paso y la lógica "
+        "que sigue el código (en qué orden hace las cosas, qué estructuras "
+        "de datos o control usa y para qué), si ese razonamiento es "
+        "correcto, si la implementación cumple cada requisito del enunciado "
         "(firma, tipo de retorno, casos borde, restricciones), y una "
-        "conclusion clara de si alcanza o no para resolver el desafio -- y, "
-        "si no alcanza, que requisito concreto no cumple o en que caso "
-        "falla. No inventes metricas hipoteticas (tiempos, rendimiento), "
-        "comportamientos no verificados, ni ventajas que no esten soportadas "
-        "por el codigo de la respuesta -- evalua unicamente lo que el codigo "
+        "conclusión clara de si alcanza o no para resolver el desafío -- y, "
+        "si no alcanza, qué requisito concreto no cumple o en qué caso "
+        "falla. No inventes métricas hipotéticas (tiempos, rendimiento), "
+        "comportamientos no verificados, ni ventajas que no estén soportadas "
+        "por el código de la respuesta -- evalúa únicamente lo que el código "
         "realmente hace.\n\n"
-        "2. Dos bancos de exactamente 7 preguntas de opcion multiple cada "
+        "2. Dos bancos de exactamente 7 preguntas de opción múltiple cada "
         "uno, con exactamente 4 opciones y una sola correcta (correct_index "
-        "de 0 a 3), dificultad moderada, sin ambiguedad ni opciones "
+        "de 0 a 3), dificultad moderada, sin ambigüedad ni opciones "
         "absurdas.\n\n"
-        "Banco \"comprehension_questions\" (7 preguntas): sobre QUE HACE esa "
-        "implementacion concreta -- que devuelve para entradas especificas, "
-        "como maneja los casos borde, que estructuras usa y como se "
+        "Banco \"comprehension_questions\" (7 preguntas): sobre QUÉ HACE esa "
+        "implementación concreta -- qué devuelve para entradas específicas, "
+        "cómo maneja los casos borde, qué estructuras usa y cómo se "
         "comporta paso a paso.\n"
-        "Banco \"reasoning_questions\" (7 preguntas): sobre la evaluacion "
+        "Banco \"reasoning_questions\" (7 preguntas): sobre la evaluación "
         "descrita en \"reasoning_explanation\" -- si el razonamiento y la "
-        "implementacion son correctos, que requisitos del enunciado cumple "
-        "o no cumple, en que casos daria un resultado correcto o incorrecto, "
-        "y si en conjunto resuelve el desafio."
+        "implementación son correctos, qué requisitos del enunciado cumple "
+        "o no cumple, en qué casos daría un resultado correcto o incorrecto, "
+        "y si en conjunto resuelve el desafío."
     )
     result = ai_backend.run_json_schema_prompt(
         prompt, RESPONSE_QUIZ_JSON_SCHEMA, CLAUDE_MODEL, QUIZ_TIMEOUT_SECONDS,
@@ -154,9 +154,9 @@ def generate_response_quiz(
 
 
 def generate_isolated_response(challenge: Challenge, participant_prompt: str) -> ChallengeSolveResult:
-    """Envia el prompt del participante a la llamada 100% aislada (ver
+    """Envía el prompt del participante a la llamada 100% aislada (ver
     isolated_prompt.ask_isolated_prompt) y, si responde, arma los bancos de
-    preguntas y la explicacion de razonamiento de las Etapas 3 y 4 a partir
+    preguntas y la explicación de razonamiento de las Etapas 3 y 4 a partir
     de esa respuesta.
     """
     started = time.monotonic()

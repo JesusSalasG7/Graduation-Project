@@ -1,5 +1,5 @@
-"""Prueba rapida y manual de la configuracion de Gemini (AI_PROVIDER=gemini
-+ GEMINI_API_KEY), sin arrancar la sesion guiada completa.
+"""Prueba rápida y manual de la configuración de Gemini (AI_PROVIDER=gemini
++ GEMINI_API_KEY), sin arrancar la sesión guiada completa.
 
 No hardcodea ni imprime la API key -- solo lee las variables de entorno ya
 exportadas en la terminal donde se corre este script.
@@ -25,7 +25,7 @@ if not ai_backend.provider_available():
 
 print("Variables detectadas, probando llamada real a Gemini...")
 result = ai_backend.run_isolated_prompt(
-    prompt="Responde unicamente con la palabra: OK",
+    prompt="Responde únicamente con la palabra: OK",
     system_prompt="Eres un asistente que responde de forma extremadamente breve.",
     model="",  # no aplica al backend gemini
     timeout=30,

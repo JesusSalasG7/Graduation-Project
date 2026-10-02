@@ -120,9 +120,9 @@ class Board:
         :returns: number of cells born this generation (used by the
         achievements system to detect a chain reaction).
         """
-        # El desafio A07 sin implementar lanza NotImplementedError (el
-        # TODO real) -- el fallback (copia de _front) deja la generacion
-        # congelada -- 0 nacimientos, ningun cambio -- en vez de romper
+        # El desafío A07 sin implementar lanza NotImplementedError (el
+        # TODO real) -- el fallback (copia de _front) deja la generación
+        # congelada -- 0 nacimientos, ningún cambio -- en vez de romper
         # el avance.
         try:
             self._back = next_generation(self._front, self.walls)

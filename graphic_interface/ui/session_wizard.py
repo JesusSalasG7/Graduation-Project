@@ -1,45 +1,45 @@
-"""Modulo de "sesion guiada": reemplaza toda la interfaz por un asistente de
-6 etapas para el participante activo, empezando por el juego mas facil.
+"""Modulo de "sesión guiada": reemplaza toda la interfaz por un asistente de
+6 etapas para el participante activo, empezando por el juego más fácil.
 
-Etapa 1 -- se lanza una copia temporal del juego TAL CUAL esta en el repo
-           -- la funcion/metodo del desafio ya queda sin resolver ahi
+Etapa 1 -- se lanza una copia temporal del juego TAL CUAL está en el repo
+           -- la función/método del desafío ya queda sin resolver ahí
            (TODO + raise NotImplementedError, ver CHALLENGES en
            challenges.py) -- para que el participante vea en vivo la
            falla real ANTES de leer el enunciado (ver game_patch.
-           launch_game_without_solution). Nunca se toca el codigo fuente
+           launch_game_without_solution). Nunca se toca el código fuente
            real del proyecto.
-Etapa 2 -- pantalla dividida: enunciado completo del desafio a la izquierda,
-           7 preguntas de opcion multiple sobre ESE enunciado a la derecha
-           (banco estatico, ver statement_quiz.py).
+Etapa 2 -- pantalla dividida: enunciado completo del desafío a la izquierda,
+           7 preguntas de opción multiple sobre ESE enunciado a la derecha
+           (banco estático, ver statement_quiz.py).
 Etapa 3 -- el participante escribe su propio prompt para resolverlo; al
            enviarlo, ese prompt -- y SOLO ese prompt, sin el enunciado ni
-           ningun otro contexto -- se envia a una IA completamente aislada
+           ningún otro contexto -- se envía a una IA completamente aislada
            (ver isolated_prompt.py y challenge_solver.generate_isolated_
            response): si el prompt no alcanza a describir el problema, la
            respuesta lo va a reflejar.
-Etapa 4 -- pantalla dividida: la respuesta cruda que devolvio esa IA
-           aislada a la izquierda, 7 preguntas de opcion multiple sobre esa
-           respuesta concreta a la derecha (generadas dinamicamente).
+Etapa 4 -- pantalla dividida: la respuesta cruda que devolvió esa IA
+           aislada a la izquierda, 7 preguntas de opción multiple sobre esa
+           respuesta concreta a la derecha (generadas dinámicamente).
 Etapa 5 -- pantalla dividida: a la izquierda, la misma respuesta de la
-           Etapa 4 junto con una evaluacion generada por IA de si el
-           razonamiento y la implementacion son correctos y alcanzan para
-           resolver el desafio; a la derecha, 7 preguntas de opcion
-           multiple sobre esa evaluacion (generadas
-           junto con las de la Etapa 4 y la explicacion, ver
+           Etapa 4 junto con una evaluación generada por IA de si el
+           razonamiento y la implementación son correctos y alcanzan para
+           resolver el desafío; a la derecha, 7 preguntas de opción
+           multiple sobre esa evaluación (generadas
+           junto con las de la Etapa 4 y la explicación, ver
            challenge_solver.generate_response_quiz).
-Etapa 6 -- se lanza otra copia temporal del juego, esta vez con la funcion/
-           metodo del desafio reemplazada por el codigo EXACTO que genero
-           la IA aislada en la Etapa 3-4, para observar esa solucion
-           concreta en accion (ver game_patch.launch_game_with_solution).
+Etapa 6 -- se lanza otra copia temporal del juego, esta vez con la función/
+           método del desafío reemplazada por el código EXACTO que generó
+           la IA aislada en la Etapa 3-4, para observar esa solución
+           concreta en acción (ver game_patch.launch_game_with_solution).
 
 Las respuestas de los 3 cuestionarios se guardan por participante (ver
 quiz_results.py). Hay que responder las 7 preguntas para poder avanzar,
 pero no se exige acertarlas -- son un registro, no un examen con nota de
 corte.
 
-Al terminar un desafio se puede pasar al siguiente (en orden de
-dificultad), o guardar el progreso y salir: la proxima vez que este
-participante entre a la sesion guiada, retoma en el desafio siguiente
+Al terminar un desafío se puede pasar al siguiente (en orden de
+dificultad), o guardar el progreso y salir: la próxima vez que este
+participante entre a la sesión guiada, retoma en el desafío siguiente
 en lugar de volver a empezar desde el primero.
 """
 
@@ -97,21 +97,21 @@ from ui.statement_view import render_statement
 FONT_FAMILY = "Segoe UI"
 PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
 
-# Dispositivos que la sesion guiada puede usar -- el evaluador elige
-# cuales de estos van en cada sesion en el modal previo (ver
+# Dispositivos que la sesión guiada puede usar -- el evaluador elige
+# cuales de estos van en cada sesión en el modal previo (ver
 # App._ask_session_devices), y SessionWizard.start() recibe esa
-# seleccion. El orden importa: es el orden en que aparecen sus pantallas
-# de configuracion (ver _show_next_setup_screen).
+# selección. El orden importa: es el orden en que aparecen sus pantallas
+# de configuración (ver _show_next_setup_screen).
 ALL_DEVICES = ("heart_rate", "neurosky", "camera")
 
-# El script imprime una linea por segundo mientras hay datos (ver
-# test_neurosky.py); si pasan mas de esto sin ninguna linea nueva, algo se
-# colgo (el dispositivo se desconecto, perdio bateria, etc.) -- ver
+# El script imprime una línea por segundo mientras hay datos (ver
+# test_neurosky.py); si pasan más de esto sin ninguna línea nueva, algo se
+# colgo (el dispositivo se desconectó, perdió batería, etc.) -- ver
 # _neurosky_watchdog_tick.
 NEUROSKY_STALE_SECONDS = 8
 
-# Toda la tipografia de la sesion guiada se agranda respecto al resto de
-# la app (pedido explicito: mejor legibilidad durante la sesion). 1.5x,
+# Toda la tipografía de la sesión guiada se agranda respecto al resto de
+# la app (pedido explícito: mejor legibilidad durante la sesión). 1.5x,
 # luego +50% (2.25x), luego -15% sobre eso -> 1.9125x en total.
 FONT_SCALE = 1.9125
 
@@ -120,9 +120,9 @@ def scaled(size: int) -> int:
     return round(size * FONT_SCALE)
 
 
-# Los anchos de wrapeo de texto crecen mas suave que la letra (60% del
+# Los anchos de wrapeo de texto crecen más suave que la letra (60% del
 # aumento) -- si crecieran al mismo ritmo que la fuente, la columna
-# necesitaria ser mas ancha que la pantalla disponible.
+# necesitaría ser más ancha que la pantalla disponible.
 WRAP_SCALE = 1 + (FONT_SCALE - 1) * 0.6
 
 
@@ -144,54 +144,54 @@ class SessionWizard:
         self.stage4_answers: dict[int, ctk.IntVar] = {}
         self._neurosky_process: Optional[subprocess.Popen] = None
         # Ventana aparte ("Datos del Neurosky") con el estado, las lecturas
-        # en vivo y su propio boton de reconexion -- NO es hija de
-        # self.container, asi que _clear() no la destruye al cambiar de
-        # pantalla: queda abierta (y utilizable) durante toda la sesion,
-        # no solo mientras se esta en la pantalla de configuracion.
+        # en vivo y su propio botón de reconexión -- NO es hija de
+        # self.container, así que _clear() no la destruye al cambiar de
+        # pantalla: queda abierta (y utilizable) durante toda la sesión,
+        # no solo mientras se está en la pantalla de configuración.
         self._neurosky_window: Optional[ctk.CTkToplevel] = None
         self._neurosky_terminal: Optional[ctk.CTkTextbox] = None
         self._neurosky_status_label: Optional[ctk.CTkLabel] = None
         self._neurosky_retry_button: Optional[ctk.CTkButton] = None
-        # Marca de tiempo (time.monotonic()) de la ultima linea recibida
+        # Marca de tiempo (time.monotonic()) de la última línea recibida
         # del proceso -- si pasa demasiado sin ninguna, el watchdog asume
-        # que se colgo (ver _neurosky_watchdog_tick / NEUROSKY_STALE_SECONDS).
+        # que se colgó (ver _neurosky_watchdog_tick / NEUROSKY_STALE_SECONDS).
         self._neurosky_last_data_at: Optional[float] = None
         # Evita disparar dos vinculaciones/lanzamientos en paralelo si se
-        # llega a apretar "Reconectar" mas de una vez antes de que el
+        # llega a apretar "Reconectar" más de una vez antes de que el
         # boton alcance a ocultarse (ver _start_neurosky_setup_thread).
         self._neurosky_setup_running = False
-        # True solo si se completaron los 7 desafios de la sesion guiada
-        # (ver _advance_or_finish) -- si se sale antes (por cualquier boton
+        # True solo si se completaron los 7 desafíos de la sesión guiada
+        # (ver _advance_or_finish) -- si se sale antes (por cualquier botón
         # "Salir de la sesión guiada", o cerrando la app de golpe), la
-        # sesion se considera incompleta y se borran los datos del Neurosky
+        # sesión se considera incompleta y se borran los datos del Neurosky
         # capturados hasta ese punto (ver _cleanup_neurosky_interactive /
         # cleanup_incomplete_session).
         self._session_completed = False
-        # Ventana aparte con el enunciado del desafio actual, para
+        # Ventana aparte con el enunciado del desafío actual, para
         # consultarlo mientras se escribe el prompt en la Etapa 3 (ver
         # _show_stage3 / _toggle_statement_window). Igual que la del
-        # Neurosky, NO es hija de self.container, asi que _clear() no la
+        # Neurosky, NO es hija de self.container, así que _clear() no la
         # toca -- se cierra a mano al avanzar a la Etapa 4 o al salir.
         self._statement_window: Optional[ctk.CTkToplevel] = None
 
         # Camera Tracker (Emotion Tracker + Eye Tracker fusionados en un
         # solo proceso, ver tools/camera_tracker.py): se calibra/verifica
-        # despues del Neurosky y antes de la Bienvenida (ver
+        # después del Neurosky y antes de la Bienvenida (ver
         # _show_configure_camera_tracker), y queda corriendo en segundo
-        # plano durante toda la sesion, igual que el Neurosky -- se para
+        # plano durante toda la sesión, igual que el Neurosky -- se para
         # en _exit_guided_session / cleanup_incomplete_session.
         self._camera_process: Optional[subprocess.Popen] = None
-        # (left_x, right_x) que devolvio la calibracion para este
+        # (left_x, right_x) que devolvió la calibración para este
         # participante (ver camera_tracker_launcher.run_calibration) --
-        # None hasta que la calibracion termina con exito.
+        # None hasta que la calibración termina con éxito.
         self._camera_calibration: Optional[tuple[float, float]] = None
         self._camera_setup_running = False
         # Referencias a los widgets de la ventana "Datos de la Cámara"
         # (NO son hijos de self.container, igual que la ventana del
-        # Neurosky) -- se acceden desde hilos de fondo via self.app.after,
-        # asi que pueden quedar apuntando a un widget ya destruido si la
-        # ventana se cierra a mano; cada actualizacion lo maneja con un
-        # try/except que limpia la referencia (mismo patron que
+        # Neurosky) -- se acceden desde hilos de fondo vía self.app.after,
+        # así que pueden quedar apuntando a un widget ya destruido si la
+        # ventana se cierra a mano; cada actualización lo maneja con un
+        # try/except que limpia la referencia (mismo patrón que
         # _log_neurosky/_set_neurosky_status). self._camera_continue_button
         # SI es hijo de self.container (vive en la pantalla, no en la
         # ventana aparte).
@@ -201,7 +201,7 @@ class SessionWizard:
         self._camera_calibrate_button: Optional[ctk.CTkButton] = None
         self._camera_continue_button: Optional[ctk.CTkButton] = None
 
-        # Corte por etapa (ver stage_capture.py): cronometro de inicio/fin
+        # Corte por etapa (ver stage_capture.py): cronómetro de inicio/fin
         # de cada etapa, para recortar por rango de tiempo los CSV
         # continuos de NeuroSky/Emotion/Eye al exportar. `_attempt_number`
         # versiona las etapas 3/4/5 cuando el participante usa "Reintentar
@@ -209,28 +209,28 @@ class SessionWizard:
         # _start_current_game.
         self._stage_timer = StageTimer()
         self._attempt_number = 1
-        # Desafios ya jugados (Etapa 5 terminada) a los que todavia no se
-        # les recorto la frecuencia cardiaca -- self._stage_timer solo
-        # guarda UNA ventana por numero de etapa (se pisa al empezar el
-        # siguiente desafio, ver StageTimer), y la pantalla de importar el
-        # reloj (ver _show_heart_rate_import) NO aparece despues de cada
-        # desafio ("Siguiente juego" sigue de largo sin cortar los
-        # sensores) sino recien en "Guardar progreso"/"Terminar sesion".
+        # Desafíos ya jugados (Etapa 5 terminada) a los que todavía no se
+        # les recortó la frecuencia cardíaca -- self._stage_timer solo
+        # guarda UNA ventana por número de etapa (se pisa al empezar el
+        # siguiente desafío, ver StageTimer), y la pantalla de importar el
+        # reloj (ver _show_heart_rate_import) NO aparece después de cada
+        # desafío ("Siguiente juego" sigue de largo sin cortar los
+        # sensores) sino recién en "Guardar progreso"/"Terminar sesion".
         # Sin este snapshot, un solo export del reloj entregado al final de
-        # una sesion de varios desafios solo alcanzaba a recortarle la
-        # frecuencia cardiaca al ULTIMO (ver _snapshot_pending_heart_rate /
+        # una sesión de varios desafíos solo alcanzaba a recortarle la
+        # frecuencia cardíaca al ÚLTIMO (ver _snapshot_pending_heart_rate /
         # _finish_challenge).
         self._pending_heart_rate_challenges: list[dict] = []
         # Aperturas del enunciado durante la Etapa 3 (ver
         # _toggle_statement_window/_close_statement_window), para el
-        # registro de cuantas veces se abre y cuanto dura cada apertura.
+        # registro de cuántas veces se abre y cuánto dura cada apertura.
         self._statement_log: list[dict] = []
-        # Advertencias de la ultima exportacion por etapa (sensor sin
+        # Advertencias de la última exportación por etapa (sensor sin
         # señal, etc.) -- se muestran como banner inline en la pantalla
         # siguiente (ver _render_pending_warnings), nunca con un
         # messagebox que trabe el avance del participante.
         self._stage_warnings: dict[int, list[str]] = {}
-        # Dispositivos elegidos para esta sesion (ver ALL_DEVICES /
+        # Dispositivos elegidos para esta sesión (ver ALL_DEVICES /
         # App._ask_session_devices) -- start() lo sobreescribe con lo que
         # elija el evaluador; el default de todos habilitados es solo un
         # respaldo por si algo llegara a llamar start() sin pasarlo.
@@ -262,11 +262,11 @@ class SessionWizard:
         ).place(relx=1.0, rely=0.0, anchor="ne", x=-20, y=18)
 
     def _exit_guided_session(self):
-        """Sale de la sesion guiada desde cualquier pantalla. La limpieza
-        del Neurosky (parar el proceso, borrar los datos si la sesion
-        quedo incompleta, y liberar el rfcomm) se dispara en un hilo de
+        """Sale de la sesión guiada desde cualquier pantalla. La limpieza
+        del Neurosky (parar el proceso, borrar los datos si la sesión
+        quedó incompleta, y liberar el rfcomm) se dispara en un hilo de
         fondo -- puede necesitar pedir la contraseña de sudo por una
-        ventana modal, asi que no puede correr en el hilo principal (ver
+        ventana modal, así que no puede correr en el hilo principal (ver
         _cleanup_neurosky_interactive) -- para no trabar la salida.
         """
         self._close_statement_window()
@@ -280,8 +280,8 @@ class SessionWizard:
             ).start()
         # El Camera Tracker se limpia en un hilo aparte, sin tocar el
         # flujo del Neurosky de arriba: para el proceso, borra sus CSV
-        # (emocion + mirada) si la sesion quedo incompleta (esos datos de
-        # una sesion abandonada no sirven para el analisis, mismo
+        # (emoción + mirada) si la sesión quedó incompleta (esos datos de
+        # una sesión abandonada no sirven para el análisis, mismo
         # criterio que el Neurosky) y cierra la ventana "Datos de la
         # Cámara".
         if camera_active:
@@ -291,8 +291,8 @@ class SessionWizard:
 
     def _cleanup_neurosky_interactive(self, delete_data: bool):
         """Corre en un hilo de fondo (ver _exit_guided_session): para el
-        proceso de test_neurosky.py, borra el CSV capturado si la sesion
-        quedo incompleta, y libera el rfcomm (pidiendo la contraseña de
+        proceso de test_neurosky.py, borra el CSV capturado si la sesión
+        quedó incompleta, y libera el rfcomm (pidiendo la contraseña de
         sudo por una ventana modal si hace falta)."""
         self._stop_neurosky_process()
 
@@ -312,8 +312,8 @@ class SessionWizard:
 
     def _cleanup_camera_interactive(self, delete_data: bool):
         """Corre en un hilo de fondo (ver _exit_guided_session): para el
-        Camera Tracker (Emotion + Eye fusionados), borra sus CSV (emocion
-        + mirada) si la sesion quedo incompleta, y cierra la ventana
+        Camera Tracker (Emotion + Eye fusionados), borra sus CSV (emoción
+        + mirada) si la sesión quedó incompleta, y cierra la ventana
         "Datos de la Cámara"."""
         self._stop_camera_process()
         if delete_data:
@@ -322,14 +322,14 @@ class SessionWizard:
 
     def cleanup_incomplete_session(self):
         """Se llama desde App._on_close cuando la ventana se cierra de
-        golpe: si hay una sesion de Neurosky activa, para el proceso, borra
-        los datos capturados (una sesion interrumpida asi SIEMPRE quedo
+        golpe: si hay una sesión de Neurosky activa, para el proceso, borra
+        los datos capturados (una sesión interrumpida así SIEMPRE quedó
         incompleta) e intenta liberar el rfcomm -- sin pedir contraseña por
-        una ventana modal (la app se esta cerrando, no hay tiempo/sentido
+        una ventana modal (la app se está cerrando, no hay tiempo/sentido
         de trabar el cierre esperando eso). Si sudo no tiene una credencial
         cacheada, la liberacion simplemente no se hace: no es grave, el
-        proximo `rfcomm bind` la detecta ya vinculada y no repite el paso.
-        Corre sincronico (nada de esto necesita el hilo de Tk ni tarda mas
+        próximo `rfcomm bind` la detecta ya vinculada y no repite el paso.
+        Corre sincrónico (nada de esto necesita el hilo de Tk ni tarda más
         de un par de segundos) para garantizar que termine antes de que
         App.destroy() se lleve puesta la ventana.
         """
@@ -357,7 +357,7 @@ class SessionWizard:
         ).pack(anchor="w", fill="x", padx=14, pady=10)
 
     def _play_button(self, parent, label: str, launch_fn):
-        """Boton que corre `launch_fn()` (sin argumentos, ver game_patch.py)
+        """Botón que corre `launch_fn()` (sin argumentos, ver game_patch.py)
         en un hilo de fondo -- copiar el juego y arrancar el proceso puede
         tardar un instante -- y muestra el resultado en una etiqueta de
         estado debajo, sin bloquear la interfaz ni forzar al participante a
@@ -404,9 +404,9 @@ class SessionWizard:
         """Arma un layout de 2 columnas (izquierda/derecha) + una fila de
         botones fija abajo, y devuelve (left_scroll, right_scroll, buttons_row).
 
-        La izquierda (enunciado o codigo generado) lleva mas letra corrida
-        que la derecha (opciones de quiz, mas cortas), asi que se le da
-        mas ancho relativo (60/40) en vez de partir la pantalla al medio.
+        La izquierda (enunciado o código generado) lleva más letra corrida
+        que la derecha (opciones de quiz, más cortas), así que se le da
+        más ancho relativo (60/40) en vez de partir la pantalla al medio.
         """
         body = ctk.CTkFrame(parent, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=36, pady=(10, 20))
@@ -476,7 +476,7 @@ class SessionWizard:
     def _require_all_answered(self, button, answers: dict[int, ctk.IntVar]):
         """Deja `button` deshabilitado hasta que se respondan todas las
         preguntas del cuestionario. Si no se generaron preguntas (answers
-        vacio) no bloquea nada, para no dejar al participante trabado."""
+        vacío) no bloquea nada, para no dejar al participante trabado."""
         if not answers:
             return
         enabled_text = button.cget("text")
@@ -522,11 +522,11 @@ class SessionWizard:
         cuestionario, sino prompt + registro del enunciado), y la 1/6 no
         capturan datos.
 
-        Solo recorta los dispositivos habilitados para esta sesion (ver
+        Solo recorta los dispositivos habilitados para esta sesión (ver
         self._enabled_devices / App._ask_session_devices) -- si NeuroSky o
-        la Camara no se usaron, directamente no se le pasa su DataFrame a
-        write_stage_sensor_files (ver ahi por que None -- "no se uso" --
-        es distinto de un CSV vacio)."""
+        la Cámara no se usaron, directamente no se le pasa su DataFrame a
+        write_stage_sensor_files (ver ahí por qué None -- "no se usó" --
+        es distinto de un CSV vacío)."""
         participant = self.app.store.get_active()
         window = self._stage_timer.finish(stage_number)
         if participant is None or self.current_game is None:
@@ -534,7 +534,7 @@ class SessionWizard:
 
         challenge_number = self.game_index + 1
         # Las etapas 3/4/5 se versionan por intento (ver "Reintentar este
-        # desafío"); la 2 nunca se rehace, asi que no lleva subcarpeta.
+        # desafío"); la 2 nunca se rehace, así que no lleva subcarpeta.
         attempt = self._attempt_number if stage_number in (3, 4, 5) else None
         folder = stage_dir(participant, challenge_number, stage_number, attempt=attempt)
 
@@ -576,9 +576,9 @@ class SessionWizard:
 
     def _render_pending_warnings(self, parent):
         """Banner inline (nunca un messagebox bloqueante) con las
-        advertencias de la ultima exportacion de etapa -- p.ej. un sensor
+        advertencias de la última exportación de etapa -- p.ej. un sensor
         sin señal durante esa etapa. Se muestra una sola vez, en la
-        pantalla siguiente a la que disparo la exportacion."""
+        pantalla siguiente a la que disparó la exportación."""
         if not self._stage_warnings:
             return
         all_warnings = [w for warnings in self._stage_warnings.values() for w in warnings]
@@ -615,13 +615,13 @@ class SessionWizard:
         self._show_next_setup_screen(after=None)
 
     def _show_next_setup_screen(self, after: Optional[str]):
-        """Pantallas de configuracion previas a la Bienvenida (reloj ->
-        NeuroSky -> Camara, ver ALL_DEVICES) -- salta las de cualquier
+        """Pantallas de configuración previas a la Bienvenida (reloj ->
+        NeuroSky -> Cámara, ver ALL_DEVICES) -- salta las de cualquier
         dispositivo que el evaluador haya destildado en el modal previo
         (ver self._enabled_devices), sin dejar de lanzar/configurar nada
-        de los que si estan habilitados. `after` es el dispositivo cuya
-        pantalla se acaba de terminar (None al arrancar la sesion, ver
-        start()) -- se llama desde el boton "Listo"/callback de cierre de
+        de los que si están habilitados. `after` es el dispositivo cuya
+        pantalla se acaba de terminar (None al arrancar la sesión, ver
+        start()) -- se llama desde el botón "Listo"/callback de cierre de
         cada una de esas pantallas en vez de encadenarlas directo entre
         si, para que agregar/quitar un dispositivo de ALL_DEVICES no
         requiera tocar cada pantalla."""
@@ -640,7 +640,7 @@ class SessionWizard:
     def _show_configure_watch(self):
         """Pantalla previa a la bienvenida, para el evaluador: dale tiempo
         de dejar el reloj del participante midiendo antes de arrancar la
-        sesion (la vé el evaluador, no el participante)."""
+        sesión (la vé el evaluador, no el participante)."""
         self._clear()
         wrapper = ctk.CTkFrame(self.container, fg_color="transparent")
         wrapper.pack(expand=True)
@@ -690,12 +690,12 @@ class SessionWizard:
     def _show_configure_neurosky(self):
         """Pantalla previa a la bienvenida, para el evaluador: abre la
         ventana aparte "Datos del Neurosky" (ver _open_neurosky_window) y
-        ahi mismo dispara la vinculacion bluetooth + lanzamiento de
+        ahí mismo dispara la vinculación bluetooth + lanzamiento de
         tools/NeuroSky/test_neurosky.py. Esa ventana -- con su propio
-        estado y boton de reconexion -- se queda abierta durante TODA la
-        sesion, no solo en esta pantalla: si el dispositivo se desconecta
-        a mitad de un desafio, se puede reconectar desde ahi sin volver
-        a esta pantalla ni reiniciar la sesion guiada.
+        estado y botón de reconexión -- se queda abierta durante TODA la
+        sesión, no solo en esta pantalla: si el dispositivo se desconecta
+        a mitad de un desafío, se puede reconectar desde ahí sin volver
+        a esta pantalla ni reiniciar la sesión guiada.
         """
         self._clear()
         self._open_neurosky_window()
@@ -788,11 +788,11 @@ class SessionWizard:
         if self._neurosky_process is process:
             self._neurosky_process = None
 
-        # returncode != 0 acá significa que test_neurosky.py salio solo
-        # (se desconecto el bluetooth, se quedo sin bateria, etc.) -- NO
+        # returncode != 0 acá significa que test_neurosky.py salió solo
+        # (se desconectó el bluetooth, se quedó sin batería, etc.) -- NO
         # por el SIGINT de "Salir"/reconectar, que ya limpia
         # self._neurosky_process ANTES de mandar la señal (ver
-        # _stop_neurosky_process), asi que esta rama nunca compite con eso.
+        # _stop_neurosky_process), así que esta rama nunca compite con eso.
         if returncode != 0:
             self._log_neurosky(f"[ERROR] test_neurosky.py terminó con código {returncode}.")
             self._set_neurosky_status(
@@ -820,12 +820,12 @@ class SessionWizard:
     def _neurosky_watchdog_tick(self):
         """Se reagenda solo cada 5s (ver _open_neurosky_window) mientras la
         ventana "Datos del Neurosky" siga abierta -- si el proceso sigue
-        vivo pero hace rato que no manda ninguna linea (el dispositivo se
-        colgo o perdio señal sin que el proceso llegara a caerse), lo
+        vivo pero hace rato que no manda ninguna línea (el dispositivo se
+        colgó o perdió señal sin que el proceso llegara a caerse), lo
         marca en el estado y ofrece reconectar en vez de quedarse mudo sin
-        ninguna explicacion."""
+        ninguna explicación."""
         if self._neurosky_window is None:
-            return  # ventana cerrada (o sesion terminada) -- no hace falta seguir chequeando
+            return  # ventana cerrada (o sesión terminada) -- no hace falta seguir chequeando
 
         process = self._neurosky_process
         if process is not None and process.poll() is None and self._neurosky_last_data_at is not None:
@@ -842,7 +842,7 @@ class SessionWizard:
     def _ask_sudo_password_blocking(self) -> Optional[str]:
         """Se llama desde el hilo de fondo de `_show_configure_neurosky`:
         agenda el modal de contraseña en el hilo de Tk (los widgets de Tk
-        solo se pueden crear/tocar ahi) y bloquea ese hilo de fondo hasta
+        solo se pueden crear/tocar ahí) y bloquea ese hilo de fondo hasta
         que el usuario confirme o cancele."""
         result: dict[str, Optional[str]] = {}
         done = threading.Event()
@@ -856,10 +856,10 @@ class SessionWizard:
             modal.resizable(False, False)
             modal.wait_visibility()
             # La ventana "Datos del Neurosky" es topmost (ver
-            # _open_neurosky_window) -- si este modal no lo fuera tambien,
+            # _open_neurosky_window) -- si este modal no lo fuera también,
             # podria terminar tapado detras suyo mientras igual le retiene
-            # el foco de teclado (grab_set), dando la sensacion de que la
-            # app se congelo.
+            # el foco de teclado (grab_set), dando la sensación de que la
+            # app se congeló.
             modal.attributes("-topmost", True)
             modal.lift()
             modal.focus_force()
@@ -913,13 +913,13 @@ class SessionWizard:
         return result.get("value") or None
 
     def _open_neurosky_window(self):
-        """Ventana APARTE (no un frame dentro de la sesion guiada) con el
-        estado, las lecturas en vivo y su propio boton de reconexion -- se
-        abre una sola vez, al llegar a la pantalla de configuracion, y
-        queda arriba durante el resto de la sesion (no es hija de
-        self.container, asi que _clear() no la toca al cambiar de etapa)
+        """Ventana APARTE (no un frame dentro de la sesión guiada) con el
+        estado, las lecturas en vivo y su propio botón de reconexión -- se
+        abre una sola vez, al llegar a la pantalla de configuración, y
+        queda arriba durante el resto de la sesión (no es hija de
+        self.container, así que _clear() no la toca al cambiar de etapa)
         para poder seguir viendo los datos -- y reconectar si hace falta --
-        mientras el participante resuelve los desafios.
+        mientras el participante resuelve los desafíos.
         """
         self._close_neurosky_window()
 
@@ -927,16 +927,16 @@ class SessionWizard:
         window.title("Datos del Neurosky")
         win_w, win_h = wrap(640), wrap(460)
         # Arriba a la derecha, no centrada -- si quedara centrada sobre la
-        # ventana principal (que arranca maximizada), CUALQUIER click ahi
+        # ventana principal (que arranca maximizada), CUALQUIER click ahí
         # (p.ej. "Listo") reenfoca/levanta la principal y la tapa entera,
-        # dando la impresion de que dejo de recibir datos.
+        # dando la impresión de que dejó de recibir datos.
         margin = scaled(24)
         pos_x = max(self.app.winfo_screenwidth() - win_w - margin, 0)
         pos_y = margin
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible": es una ventana de monitoreo que tiene que
-        # seguir a la vista durante TODA la sesion, sin importar que
+        # seguir a la vista durante TODA la sesión, sin importar que
         # pantalla del wizard este enfocada -- sin esto, la ventana
         # principal la tapa apenas se interactua con ella.
         window.attributes("-topmost", True)
@@ -948,9 +948,9 @@ class SessionWizard:
 
         # header_frame se empaqueta UNA sola vez, fijo arriba de la
         # terminal -- status_label y retry_button viven adentro para que
-        # mostrar/ocultar el boton (pack/pack_forget, ver
+        # mostrar/ocultar el botón (pack/pack_forget, ver
         # _show_neurosky_reconnect) reordene solo DENTRO de este frame y
-        # nunca termine debajo de la terminal (que ya esta empaquetada con
+        # nunca termine debajo de la terminal (que ya está empaquetada con
         # fill="both", expand=True).
         header_frame = ctk.CTkFrame(window, fg_color="transparent")
         header_frame.pack(anchor="w", fill="x", padx=16, pady=(0, 4))
@@ -967,9 +967,9 @@ class SessionWizard:
             fg_color=self.c["BG_CARD_ALT"], hover_color=self.c["BORDER"],
             command=self._start_neurosky_setup_thread,
         )
-        # No se empaqueta todavia: solo aparece si hace falta reconectar
-        # (ver _show_neurosky_reconnect), asi la ventana no queda con un
-        # boton de "arreglar algo" cuando todo esta funcionando bien.
+        # No se empaqueta todavía: solo aparece si hace falta reconectar
+        # (ver _show_neurosky_reconnect), así la ventana no queda con un
+        # botón de "arreglar algo" cuando todo está funcionando bien.
 
         terminal = ctk.CTkTextbox(
             window, fg_color=self.c["BG_CARD_ALT"], wrap="word",
@@ -996,12 +996,12 @@ class SessionWizard:
         self.app.after(5000, self._neurosky_watchdog_tick)
 
     def _close_neurosky_window(self):
-        # window se agarra y las referencias se limpian YA (atomico por el
+        # window se agarra y las referencias se limpian YA (atómico por el
         # GIL, no hace falta el hilo de Tk para esto) -- solo
         # window.destroy() se difiere. Si esto se llama de nuevo (p.ej.
         # _open_neurosky_window abriendo una ventana nueva) antes de que
         # el destroy() diferido corra, tiene que destruir la ventana VIEJA
-        # que ya capturo aca, no la que self._neurosky_window tenga para
+        # que ya capturó acá, no la que self._neurosky_window tenga para
         # entonces.
         window = self._neurosky_window
         self._neurosky_window = None
@@ -1019,8 +1019,8 @@ class SessionWizard:
         self.app.after(0, do)
 
     def _log_neurosky(self, line: str):
-        """Le puede llegar una linea desde el hilo de fondo mucho despues
-        de que el evaluador siguio de largo (la ventana "Datos del
+        """Le puede llegar una línea desde el hilo de fondo mucho después
+        de que el evaluador siguió de largo (la ventana "Datos del
         Neurosky" puede seguir abierta, o el usuario la pudo haber
         cerrado a mano) -- si el widget ya no existe, no hace nada."""
         def do():
@@ -1076,9 +1076,9 @@ class SessionWizard:
             process.terminate()
 
     def _finish_neurosky_setup(self):
-        # A proposito NO se detiene el proceso aca -- el dispositivo se deja
-        # transmitiendo en segundo plano durante toda la sesion guiada; solo
-        # se corta en _exit_guided_session, cuando la sesion termina de
+        # A propósito NO se detiene el proceso acá -- el dispositivo se deja
+        # transmitiendo en segundo plano durante toda la sesión guiada; solo
+        # se corta en _exit_guided_session, cuando la sesión termina de
         # verdad (por cualquier pantalla).
         self._show_next_setup_screen(after="neurosky")
 
@@ -1086,14 +1086,14 @@ class SessionWizard:
     def _show_configure_camera_tracker(self):
         """Pantalla previa a la bienvenida, para el evaluador: abre la
         ventana aparte "Datos de la Cámara" (ver _open_camera_window), con
-        el estado, el log en vivo y el boton "Calibrar" del Camera
-        Tracker -- el proceso UNICO que hace tanto Emotion Tracker como
-        Eye Tracker sobre la misma camara (ver tools/camera_tracker.py:
-        esta webcam, como la mayoria, no admite dos procesos con la
-        camara abierta a la vez, asi que lanzarlos por separado dejaba al
+        el estado, el log en vivo y el botón "Calibrar" del Camera
+        Tracker -- el proceso ÚNICO que hace tanto Emotion Tracker como
+        Eye Tracker sobre la misma cámara (ver tools/camera_tracker.py:
+        esta webcam, como la mayoría, no admite dos procesos con la
+        cámara abierta a la vez, así que lanzarlos por separado dejaba al
         segundo sin poder abrirla). Esa ventana se queda abierta durante
-        TODA la sesion, igual que la del Neurosky: si la camara se
-        desconecta a mitad de un desafio, se puede recalibrar sin volver
+        TODA la sesión, igual que la del Neurosky: si la cámara se
+        desconecta a mitad de un desafío, se puede recalibrar sin volver
         a esta pantalla.
         """
         self._clear()
@@ -1136,10 +1136,10 @@ class SessionWizard:
         self._exit_button(self.container)
 
     def _open_camera_window(self):
-        """Ventana APARTE con el estado, el log en vivo y el boton
+        """Ventana APARTE con el estado, el log en vivo y el botón
         "Calibrar" del Camera Tracker -- se abre una sola vez, al llegar
-        a esta pantalla, y queda arriba durante el resto de la sesion (no
-        es hija de self.container, asi que _clear() no la toca al
+        a esta pantalla, y queda arriba durante el resto de la sesión (no
+        es hija de self.container, así que _clear() no la toca al
         cambiar de etapa), en la esquina inferior derecha -- la del
         Neurosky ya ocupa la superior derecha.
         """
@@ -1154,7 +1154,7 @@ class SessionWizard:
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible" por el mismo motivo que la ventana del
-        # Neurosky: la sesion guiada corre en pantalla completa.
+        # Neurosky: la sesión guiada corre en pantalla completa.
         window.attributes("-topmost", True)
 
         ctk.CTkLabel(
@@ -1229,8 +1229,8 @@ class SessionWizard:
             self._camera_setup_running = False
 
     def _run_camera_calibration(self):
-        # Si ya habia un seguimiento continuo corriendo (una
-        # recalibracion), se para primero -- se relanza mas abajo con los
+        # Si ya había un seguimiento continuo corriendo (una
+        # recalibración), se para primero -- se relanza más abajo con los
         # umbrales nuevos.
         self._stop_camera_process()
         self._set_camera_calibrate_enabled(False)
@@ -1354,8 +1354,8 @@ class SessionWizard:
             process.terminate()
 
     def _finish_camera_tracker_setup(self):
-        # A proposito NO se detiene el proceso aca -- el seguimiento se deja
-        # corriendo en segundo plano durante toda la sesion guiada; solo se
+        # A propósito NO se detiene el proceso acá -- el seguimiento se deja
+        # corriendo en segundo plano durante toda la sesión guiada; solo se
         # corta en _exit_guided_session.
         self._show_next_setup_screen(after="camera")
 
@@ -1455,13 +1455,9 @@ class SessionWizard:
         ctk.CTkLabel(
             body,
             text=(
-                "Antes de leer el problema, juega este juego tal como está ahora, "
-                "SIN el algoritmo del desafío resuelto -- probablemente notes un "
-                "comportamiento roto o incompleto justo en esa parte. Todavía no "
-                "hace falta que entiendas POR QUÉ pasa eso: esto es solo un "
-                "vistazo previo, el entendimiento real viene con el enunciado "
-                "que sigue. El juego se abre en pantalla completa -- presiona "
-                "ESC para salir de él cuando termines de probarlo, y continúa."
+                "Juega este juego tal como está, sin el algoritmo del desafío: "
+                "notarás que algo falla. No necesitas entender por qué todavía. "
+                "El juego se abre en pantalla completa; presiona ESC para salir."
             ),
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13)), text_color=self.c["TEXT_MUTED"],
             wraplength=wrap(900), justify="left",
@@ -1528,10 +1524,10 @@ class SessionWizard:
 
     # ---------------- Ventana del enunciado (Etapa 3) ----------------
     def _toggle_statement_window(self, game, challenge):
-        """Abre (o, si ya esta abierta, simplemente trae al frente) una
-        ventana aparte con el enunciado completo del desafio -- para que
+        """Abre (o, si ya está abierta, simplemente trae al frente) una
+        ventana aparte con el enunciado completo del desafío -- para que
         el participante pueda consultarlo mientras escribe su prompt sin
-        perder de vista lo que ya escribio. No es modal (no bloquea la
+        perder de vista lo que ya escribió. No es modal (no bloquea la
         ventana principal) y se puede mover/redimensionar libremente.
         """
         if self._statement_window is not None:
@@ -1555,9 +1551,9 @@ class SessionWizard:
         pos_y = margin
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
-        # La sesion guiada corre en pantalla completa (ver
-        # App.enter_session_wizard) -- sin esto, esta ventana quedaria
-        # tapada detras (mismo motivo que la ventana del Neurosky).
+        # La sesión guiada corre en pantalla completa (ver
+        # App.enter_session_wizard) -- sin esto, esta ventana quedaría
+        # tapada detrás (mismo motivo que la ventana del Neurosky).
         window.attributes("-topmost", True)
 
         scroll = ctk.CTkScrollableFrame(window, fg_color="transparent")
@@ -1668,7 +1664,7 @@ class SessionWizard:
         """Guarda lo escrito en la Etapa 3 (prompt libre + registro de
         aperturas del enunciado) y, igual que las etapas 2/4/5 (ver
         _export_stage), el recorte de NeuroSky/Emotion/Eye de esta etapa --
-        la frecuencia cardiaca se corta despues, al cargar el reloj (ver
+        la frecuencia cardíaca se corta después, al cargar el reloj (ver
         _snapshot_pending_heart_rate)."""
         participant = self.app.store.get_active()
         window = self._stage_timer.finish(3)
@@ -1932,9 +1928,9 @@ class SessionWizard:
 
     # ---------------- Importar reloj + cierre del desafío ----------------
     def _show_heart_rate_import_or_skip(self, on_done):
-        """Si el reloj no esta habilitado para esta sesion (ver
+        """Si el reloj no está habilitado para esta sesión (ver
         self._enabled_devices / App._ask_session_devices), cierra el
-        desafio directo sin mostrar la pantalla de importacion -- no tiene
+        desafío directo sin mostrar la pantalla de importación -- no tiene
         sentido pedir un dato de un dispositivo que el evaluador ya dijo
         que no se iba a usar."""
         if "heart_rate" in self._enabled_devices:
@@ -1944,8 +1940,8 @@ class SessionWizard:
 
     def _show_heart_rate_import(self, on_done):
         """Pantalla entre la Etapa 6 y el cierre del desafío: el export del
-        reloj recien existe despues de terminar el desafio (el evaluador lo
-        genera ahi), asi que no tiene sentido mezclarlo con la Etapa 6.
+        reloj recién existe después de terminar el desafío (el evaluador lo
+        genera ahí), así que no tiene sentido mezclarlo con la Etapa 6.
 
         "Siguiente juego" NO pasa por acá -- los sensores siguen leyendo en
         vivo sin cortes y el evaluador puede no tener el export del reloj
@@ -1953,7 +1949,7 @@ class SessionWizard:
         el evaluador corta a propósito: "Guardar progreso" (a mitad de
         sesión) y "Terminar sesión guiada" (en el último desafío, donde no
         hay un "siguiente juego" al que seguir leyendo). `on_done` decide
-        que pasa despues de cerrar el desafío (ver _show_stage6)."""
+        que pasa después de cerrar el desafío (ver _show_stage6)."""
         self._clear()
         challenge_number = self.game_index + 1
         self._header(self.container, "IMPORTAR RELOJ", f"Desafío {challenge_number} · Frecuencia cardíaca")
@@ -2001,7 +1997,7 @@ class SessionWizard:
         etapas 2/3/4/5 tal como están AHORA, en una cola a procesar cuando
         finalmente aparezca la pantalla de importar el reloj.
 
-        Por que hace falta: self._stage_timer solo guarda UNA ventana por
+        Por qué hace falta: self._stage_timer solo guarda UNA ventana por
         número de etapa (se pisa al arrancar el siguiente desafío, ver
         StageTimer.start), y esa pantalla NO aparece después de cada
         desafío -- "Siguiente juego" sigue de largo sin cortar los
@@ -2012,8 +2008,8 @@ class SessionWizard:
         sesión de varios desafíos solo alcanzaba a recortarle la
         frecuencia cardíaca al ÚLTIMO -- los anteriores quedaban con la
         etapa 2/3/4/5 ya exportada (NeuroSky/Emotion/Eye) pero sin
-        heart_rate.csv, porque su ventana ya se habia perdido para cuando
-        se pedia el reloj."""
+        heart_rate.csv, porque su ventana ya se había perdido para cuando
+        se pedía el reloj."""
         participant = self.app.store.get_active()
         if participant is None or self.current_game is None:
             return
@@ -2078,7 +2074,7 @@ class SessionWizard:
         for entry in pending:
             challenge_number = entry["challenge_number"]
             if challenge_number in written_challenges:
-                continue  # ya se escribio el manifiesto (con TODOS los intentos) mas abajo
+                continue  # ya se escribió el manifiesto (con TODOS los intentos) más abajo
             written_challenges.add(challenge_number)
 
             stage_status: dict = {}

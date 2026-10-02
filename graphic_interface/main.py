@@ -1,4 +1,4 @@
-"""Punto de entrada del panel grafico del experimento (lanzador + participantes)."""
+"""Punto de entrada del panel gráfico del experimento (lanzador + participantes)."""
 
 import sys
 from pathlib import Path

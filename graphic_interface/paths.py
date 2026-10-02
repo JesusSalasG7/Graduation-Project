@@ -1,5 +1,5 @@
 """Rutas compartidas del panel, en un solo lugar para que no dependan de
-en que subpaquete (ui/, sensors/, ...) vive cada modulo."""
+en que subpaquete (ui/, sensors/, ...) vive cada módulo."""
 
 from pathlib import Path
 

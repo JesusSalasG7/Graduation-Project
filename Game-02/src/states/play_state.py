@@ -7,12 +7,15 @@ from __future__ import annotations
 
 from typing import Set, Tuple
 
+import math
+
 import pygame
 from gale.state import BaseState
 
 from src.audio import check_sound, start_game_music, stop_music
 from src.logic2048 import GRID_SIZE, Board, TileMovement
 from src.rendering.drawing import cell_rect, draw_panel, draw_text_with_glow, ease_out_cubic, space_background
+from src.rendering.instructions import draw_instructions
 from src.rendering.theme import (
     APPEAR_DURATION,
     BOARD_LEFT,
@@ -37,6 +40,12 @@ DIRECTIONS_BY_ACTION = {
     "move_down": "DOWN",
 }
 
+# Desplazamiento (en píxeles) hacia cada dirección, para el "rebote" que
+# se dibuja cuando el desafío A02 no está implementado (ver
+# MoveResult.bumped): las fichas se asoman hacia ese lado y vuelven.
+BUMP_OFFSETS = {"LEFT": (-1, 0), "RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}
+BUMP_DISTANCE = 14
+
 # ---------------------------------------------------------------------------
 # Animación: duración de cada fase de un movimiento, en segundos.
 
@@ -56,8 +65,13 @@ class PlayState(BaseState):
     dibujo, interpolando entre la posición anterior y la nueva.
     """
 
-    def enter(self, *args, **kwargs) -> None:
+    def enter(self, *args, show_instructions: bool = True, **kwargs) -> None:
         self.board = Board()
+
+        # Instrucciones sobre el tablero: se muestran al empezar (ENTER o
+        # una flecha las cierran) y se reabren con H. Reiniciar con R no
+        # las vuelve a mostrar.
+        self.showing_instructions = show_instructions
 
         self.title_font = pygame.font.SysFont("arial", 48, bold=True)
         self.score_font = pygame.font.SysFont("arial", 28, bold=True)
@@ -73,6 +87,7 @@ class PlayState(BaseState):
         self.current_movements: list[TileMovement] = []
         self.merged_cells: Set[Tuple[int, int]] = set()
         self.new_tile_position: Tuple[int, int] | None = None
+        self.bump_direction: str | None = None
 
         # La música de la partida arranca aquí; también se reinicia desde
         # cero cada vez que "restart" vuelve a llamar a este mismo
@@ -99,7 +114,18 @@ class PlayState(BaseState):
             return
 
         if input_id == "restart":
-            self.enter()
+            self.enter(show_instructions=False)
+            return
+
+        if input_id == "help":
+            self.showing_instructions = not self.showing_instructions
+            return
+
+        if self.showing_instructions:
+            # ENTER o cualquier flecha cierran las instrucciones y
+            # empiezan la partida (la flecha no se gasta como movimiento).
+            if input_id == "confirm" or input_id in DIRECTIONS_BY_ACTION:
+                self.showing_instructions = False
             return
 
         if self.phase != "idle":
@@ -118,6 +144,7 @@ class PlayState(BaseState):
         self.current_movements = result.movements
         self.new_tile_position = result.new_tile_position
         self.merged_cells = {m.target for m in result.movements if m.merged}
+        self.bump_direction = direction if result.bumped else None
 
         self.phase = "sliding"
         self.phase_time = 0.0
@@ -173,6 +200,9 @@ class PlayState(BaseState):
         else:
             self._draw_static_tiles(surface)
 
+        if self.showing_instructions:
+            draw_instructions(surface)
+
     def _draw_header(self, surface: pygame.Surface) -> None:
         draw_text_with_glow(
             surface, self.title_font, "2048", COLOR_TEXT_PRIMARY, COLOR_TITLE_GLOW, (30, 18)
@@ -185,7 +215,7 @@ class PlayState(BaseState):
         surface.blit(score_text, score_rect)
 
         help_text = pygame.font.SysFont("arial", 20).render(
-            "Flechas: mover   R: reiniciar   ESC: salir", True, COLOR_TEXT_MUTED
+            "Flechas: mover   R: reiniciar   H: instrucciones   ESC: salir", True, COLOR_TEXT_MUTED
         )
         surface.blit(help_text, (30, 84))
 
@@ -225,6 +255,14 @@ class PlayState(BaseState):
         progress = min(1.0, self.phase_time / SLIDE_DURATION)
         smooth_progress = ease_out_cubic(progress)
 
+        # Rebote (desafío A02 sin implementar): ninguna ficha viaja, pero
+        # todas se asoman hacia la dirección pedida y regresan.
+        bump_x = bump_y = 0
+        if self.bump_direction is not None:
+            dx, dy = BUMP_OFFSETS[self.bump_direction]
+            push = BUMP_DISTANCE * math.sin(math.pi * progress)
+            bump_x, bump_y = round(dx * push), round(dy * push)
+
         ordered = sorted(self.current_movements, key=lambda m: m.merged)
         for movement in ordered:
             source_row, source_col = movement.source
@@ -233,7 +271,8 @@ class PlayState(BaseState):
             row = source_row + (target_row - source_row) * smooth_progress
             col = source_col + (target_col - source_col) * smooth_progress
 
-            self._draw_tile_in_rect(surface, cell_rect(row, col), movement.source_value)
+            rect = cell_rect(row, col).move(bump_x, bump_y)
+            self._draw_tile_in_rect(surface, rect, movement.source_value)
 
     def _draw_static_tiles(self, surface: pygame.Surface) -> None:
         """

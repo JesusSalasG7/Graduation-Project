@@ -1,34 +1,34 @@
-# Dependencias de tools/ - modulo de tesis "Vibe Coding"
+# Dependencias de tools/ - módulo de tesis "Vibe Coding"
 #
-# Este archivo cubre CUATRO instalaciones (una por seccion), cada una en
+# Este archivo cubre CUATRO instalaciones (una por sección), cada una en
 # su propio venv. Las secciones 1 y 2 son para correr emotion_tracker.py
 # y eye_tracker.py SUELTOS, uno a la vez, a mano (debug/desarrollo) --
 # NO SIRVEN PARA CORRERLOS JUNTOS: confirmado a mano, la webcam de este
-# equipo (como la mayoria de las webcams USB) solo admite un proceso con
-# la camara abierta a la vez, asi que el segundo script en arrancar ni
+# equipo (como la mayoría de las webcams USB) solo admite un proceso con
+# la cámara abierta a la vez, así que el segundo script en arrancar ni
 # siquiera puede abrirla (cap.isOpened() da False). Para usarlos juntos
-# (como hace la sesion guiada) esta camera_tracker.py (seccion 3): fusiona
-# ambos analisis en un solo proceso, sobre una sola apertura de camara.
+# (como hace la sesión guiada) esta camera_tracker.py (sección 3): fusiona
+# ambos análisis en un solo proceso, sobre una sola apertura de cámara.
 #
-# Ademas, mediapipe (eye_tracker.py/camera_tracker.py) depende de
-# opencv-contrib-python, mientras que deepface (emotion_tracker.py/
+# Además, mediapipe (eye_tracker.py/camera_tracker.py) depende de
+# opencv-contrib-python, mientras que emotiefflib (emotion_tracker.py/
 # camera_tracker.py) depende de opencv-python -- ambos paquetes instalan
 # archivos en el mismo directorio cv2/ del venv y se pisan entre si si
 # conviven (confirmado: con los dos instalados juntos, cv2/data/ queda
 # con 2 archivos en vez de los ~20 haarcascades que trae normalmente, y
 # haarcascade_frontalface_default.xml directamente desaparece). No hay
-# conflicto real de version, solo de nombre de paquete: opencv-contrib-
-# python YA INCLUYE todo lo que opencv-python trae (y mas), asi que la
-# seccion 3 instala solo contrib y fuerza deepface/retina-face con
-# --no-deps para que pip no intente instalar tambien opencv-python.
+# conflicto real de versión, solo de nombre de paquete: opencv-contrib-
+# python YA INCLUYE todo lo que opencv-python trae (y más), así que la
+# sección 3 instala solo contrib y fuerza emotiefflib con --no-deps para
+# que pip no intente instalar también opencv-python.
 #
 # IMPORTANTE: por eso mismo, NO instalar con "pip install -r
-# tools/requirements.txt" a secas -- eso instalaria las secciones 1 y 2
-# juntas en el mismo venv y rompe cv2. Seguir los pasos de cada seccion
-# tal cual estan (sed + pip, en ese orden).
+# tools/requirements.txt" a secas -- eso instalaría las secciones 1 y 2
+# juntas en el mismo venv y rompe cv2. Seguir los pasos de cada sección
+# tal cual están (sed + pip, en ese orden).
 #
 # tools/smartwatch/procesar_export.py no necesita nada de este archivo
-# (solo usa la libreria estandar: csv, json, argparse, datetime, pathlib).
+# (solo usa la librería estándar: csv, json, argparse, datetime, pathlib).
 
 
 # ============================================================
@@ -36,29 +36,27 @@
 # ============================================================
 #
 # Este NO usa un venv propio de tools/: se instala en el venv unificado
-# de la raiz del repo (Graduation-Project/.venv), el mismo que usan
-# scipy/librosa (Game-06) y demas dependencias generales del proyecto.
-# Parado en la raiz del repo (no en tools/):
+# de la raíz del repo (Graduation-Project/.venv), el mismo que usan
+# scipy/librosa (Game-06) y demás dependencias generales del proyecto.
+# Parado en la raíz del repo (no en tools/):
 #
 #   sed -n '/# --EMOTION-START--/,/# --EMOTION-END--/p' tools/requirements.txt \
 #     | .venv/bin/pip install -r /dev/stdin
 #   .venv/bin/python tools/emotion_tracker.py
 #
-# tensorflow>=2.19 y sin fijar numpy: las versiones anteriores de TF exigen
-# numpy<2.0, lo cual choca con scipy/librosa (Game-06) que ya viven en el
-# mismo .venv unificado y requieren numpy>=2.0.
+# emotiefflib (reconocimiento de emociones, ver emotion_recognizer.py)
+# corre su modelo con onnxruntime: no necesita PyTorch ni TensorFlow. La
+# primera ejecución descarga el modelo (~16 MB) a ~/.emotiefflib/.
 
 # --EMOTION-START--
 opencv-python==4.10.0.84
-deepface==0.0.93
-tensorflow==2.21.0
-tf-keras==2.21.0
+emotiefflib==1.1.1
 pandas==2.2.2
 # --EMOTION-END--
 
 
 # ============================================================
-# 2) tools/eye_tracker.py - estimacion de direccion de mirada
+# 2) tools/eye_tracker.py - estimación de dirección de mirada
 # ============================================================
 #
 #   python3 -m venv tools/.venv-eyetracker
@@ -68,7 +66,7 @@ pandas==2.2.2
 #
 # mediapipe==1.0.1 usa la nueva Tasks API (FaceLandmarker); la API legacy
 # "solutions" (mp.solutions.face_mesh) fue eliminada a partir de 1.0.0.
-# El modelo face_landmarker.task se descarga automaticamente la primera
+# El modelo face_landmarker.task se descarga automáticamente la primera
 # vez que se ejecuta eye_tracker.py (ver tools/models/, ignorado por git).
 
 # --EYETRACKER-START--
@@ -81,21 +79,23 @@ mediapipe==1.0.1
 # 3) tools/camera_tracker.py - Emotion Tracker + Eye Tracker fusionados
 # ============================================================
 #
-# Usado por la sesion guiada (ver graphic_interface/camera_tracker_
-# launcher.py): un solo proceso, una sola apertura de camara, que hace
-# ambos analisis. Vive en su propio venv, tools/.venv-tracker.
+# Usado por la sesión guiada (ver graphic_interface/camera_tracker_
+# launcher.py): un solo proceso, una sola apertura de cámara, que hace
+# ambos análisis. Vive en su propio venv, tools/.venv-tracker.
 #
-# La receta NO es "pip install -r" a secas: hay que instalar deepface y
-# retina-face con --no-deps para que pip no intente instalar tambien
-# opencv-python (ambos lo declaran como dependencia) -- opencv-contrib-
-# python, instalado primero, ya trae todo lo que necesitan. El aviso de
-# pip sobre "opencv-python requerido pero no instalado" en el paso 2 es
-# esperado e inofensivo (retina-face casi nunca se usa -- el detector
-# por defecto es mtcnn -- y aunque se use, importa cv2 sin le importar
-# que paquete lo proveyo).
+# La receta NO es "pip install -r" a secas: hay que instalar emotiefflib
+# con --no-deps para que pip no intente instalar también opencv-python
+# (lo declara como dependencia) -- opencv-contrib-python, instalado
+# primero, ya trae todo lo que necesita. El aviso de pip sobre
+# "emotiefflib requires opencv-python, which is not installed" es
+# esperado e inofensivo (emotiefflib importa cv2 sin importarle que
+# paquete lo proveyó). El último paso descarga el modelo de emociones
+# (~16 MB, a ~/.emotiefflib/) para que no se descargue en medio de la
+# primera sesion guiada.
 #
 #   python3 -m venv tools/.venv-tracker
 #   tools/.venv-tracker/bin/pip install opencv-contrib-python==4.10.0.84 mediapipe==1.0.1
-#   tools/.venv-tracker/bin/pip install --no-deps deepface==0.0.93 retina-face
-#   tools/.venv-tracker/bin/pip install fire Flask flask-cors gdown gunicorn keras mtcnn numpy pandas==2.2.2 Pillow requests tensorflow==2.21.0 tf-keras==2.21.0 tqdm
+#   tools/.venv-tracker/bin/pip install --no-deps emotiefflib==1.1.1
+#   tools/.venv-tracker/bin/pip install onnx onnxruntime pillow
+#   tools/.venv-tracker/bin/python -c "from emotiefflib.facial_analysis import EmotiEffLibRecognizer as R; R(engine='onnx', model_name='enet_b0_8_va_mtl')"
 #   tools/.venv-tracker/bin/python tools/camera_tracker.py --calibrate

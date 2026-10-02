@@ -11,6 +11,7 @@ from gale.input_handler import InputData
 from gale.state import BaseState
 
 import settings
+from src import text
 
 STORY_LINES: List[str] = [
     "CONEXIÓN ESTABLECIDA...",
@@ -75,7 +76,6 @@ class StoryState(BaseState):
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(settings.COLORS["console_background"])
 
-        font = settings.FONTS["console"]
         color = settings.COLORS["console_text"]
 
         revealed = self._revealed_chars()
@@ -89,9 +89,8 @@ class StoryState(BaseState):
             consumed += len(line)
 
             if line:
-                text = "> " + line[:visible_len]
-                line_surface = font.render(text, True, color)
-                surface.blit(line_surface, (_LEFT_MARGIN, y))
+                visible_text = "> " + line[:visible_len]
+                text.draw_text(surface, "console", visible_text, color, topleft=(_LEFT_MARGIN, y))
 
             y += _LINE_HEIGHT
 

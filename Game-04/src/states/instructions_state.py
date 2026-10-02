@@ -1,12 +1,10 @@
 """
 InstructionsState: static screen shown before StoryState, explaining the
 MECHANICS of the game (what appears each round, the time limit, which
-button answers what, how many rounds) -- on purpose, NOT the actual rule
-that decides a correct answer (see src/signal_check.py). That rule is
-meant to be inferred by playing (see README.md "De qué se trata" and
-Etapa 1 of the guided session, which has the participant play this game
-"broken" before reading the real problem statement), so explaining it
-here up front would defeat that.
+button answers what, how many rounds) and the rule that decides a
+correct answer (palindrome -> stable, anything else -> altered; see
+src/signal_check.py), so the player knows what to look for from the
+very first round.
 
 Unlike StoryState's typewriter effect (which can be skipped mid-way by a
 second key press/click before the player has actually read it), this
@@ -21,6 +19,7 @@ from gale.input_handler import InputData
 from gale.state import BaseState
 
 import settings
+from src import text
 from src.states.play_state import BUTTON_LABEL_ALTERED, BUTTON_LABEL_STABLE
 
 TITLE = "CÓMO JUGAR"
@@ -28,7 +27,8 @@ TITLE = "CÓMO JUGAR"
 INSTRUCTION_LINES: List[str] = [
     "Cada ronda te llega una transmisión: una palabra en pantalla.",
     "Tienes 4 segundos para responder antes de que el tiempo se agote.",
-    "Elige uno de los dos botones según tu criterio.",
+    "Si la palabra es un palíndromo (se lee igual al revés),",
+    f"es {BUTTON_LABEL_STABLE}; si no lo es, es {BUTTON_LABEL_ALTERED}.",
     "Si el tiempo llega a cero sin responder, es Game Over.",
     "Son 8 rondas en total, cada una con una transmisión distinta.",
 ]
@@ -53,13 +53,11 @@ class InstructionsState(BaseState):
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(settings.COLORS["background"])
 
-        title_surface = settings.FONTS["title"].render(TITLE, True, settings.COLORS["accent"])
-        surface.blit(title_surface, title_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=14))
+        text.draw_text(surface, "title", TITLE, settings.COLORS["accent"], centerx=settings.VIRTUAL_WIDTH / 2, top=14)
 
         y = 42
         for line in INSTRUCTION_LINES:
-            line_surface = settings.FONTS["hint"].render(line, True, settings.COLORS["text"])
-            surface.blit(line_surface, line_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=y))
+            text.draw_text(surface, "hint", line, settings.COLORS["text"], centerx=settings.VIRTUAL_WIDTH / 2, top=y)
             y += _LINE_HEIGHT
 
         # Mismos rótulos que va a ver en PlayState (ver PlayState._draw_button
@@ -67,11 +65,12 @@ class InstructionsState(BaseState):
         # clickeables -- para que el jugador los reconozca cuando aparezcan.
         y += _BUTTON_LABEL_GAP
         buttons_line = f"[ {BUTTON_LABEL_STABLE} ]      [ {BUTTON_LABEL_ALTERED} ]"
-        buttons_surface = settings.FONTS["prompt"].render(buttons_line, True, settings.COLORS["border"])
-        surface.blit(buttons_surface, buttons_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=y))
+        text.draw_text(
+            surface, "prompt", buttons_line, settings.COLORS["border"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=y,
+        )
 
-        hint_surface = settings.FONTS["hint"].render(CONTINUE_HINT, True, settings.COLORS["text_dim"])
-        surface.blit(
-            hint_surface,
-            hint_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 12),
+        text.draw_text(
+            surface, "hint", CONTINUE_HINT, settings.COLORS["text_dim"],
+            centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 12,
         )

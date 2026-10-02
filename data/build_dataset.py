@@ -1,32 +1,33 @@
-"""Consolida en un unico CSV todos los datos crudos que la sesion guiada ya
-exporta por participante/desafio/etapa en el Escritorio (ver
+"""Consolida en un único CSV todos los datos crudos que la sesión guiada ya
+exporta por participante/desafío/etapa en el Escritorio (ver
 graphic_interface/storage/stage_capture.py): NeuroSky crudo (bandas EEG,
-atencion/meditacion), Emotion Tracker (emocion dominante + el porcentaje de
-CADA categoria que devuelve DeepFace, ver tools/camera_tracker.py), Eye
+atención/meditación), Emotion Tracker (emoción dominante + el porcentaje de
+CADA categoría + valencia/arousal de EmotiEffLib, ver
+tools/emotion_recognizer.py), Eye
 Tracker (mirada cruda + miradas izquierda/derecha agregadas), frecuencia
-cardiaca del reloj, y el resultado de los cuestionarios -- una fila por
-(participante, desafio, etapa, intento), con listas de lecturas crudas en
+cardíaca del reloj, y el resultado de los cuestionarios -- una fila por
+(participante, desafío, etapa, intento), con listas de lecturas crudas en
 las columnas "*_List" (mismo criterio que el dataset de referencia
 Data_Completa_Editada.csv que se uso como modelo).
 
-No incluye nombre/apellido de los participantes a proposito: ese registro
+No incluye nombre/apellido de los participantes a propósito: ese registro
 vive deliberadamente FUERA del proyecto (ver
 graphic_interface/storage/personal_records.py) para no mezclar datos personales con
-los datos anonimos de la sesion -- este dataset respeta esa misma
-separacion y solo identifica a cada participante por su numero. El nivel de
+los datos anónimos de la sesión -- este dataset respeta esa misma
+separación y solo identifica a cada participante por su número. El nivel de
 experiencia del jugador (Avanzado/Intermedio/Principiante, elegido al
 registrarlo) si se incluye: se lee de graphic_interface/data/participants.json
-y queda vacio si ese participante ya no esta registrado ahi.
+y queda vacío si ese participante ya no está registrado ahí.
 
-Una sesion vieja (grabada antes de agregar el desglose de emociones por
-categoria) simplemente no tiene esas columnas -- quedan vacias en vez de
-romper la generacion del dataset.
+Una sesión vieja (grabada antes de agregar el desglose de emociones por
+categoría) simplemente no tiene esas columnas -- quedan vacías en vez de
+romper la generación del dataset.
 
 Uso:
     python data/build_dataset.py [--out data/dataset_sesiones.csv]
 
-Tambien se puede llamar programaticamente (ver graphic_interface/ui/app.py,
-seccion "Dataset consolidado" de la pestaña Sesion):
+También se puede llamar programáticamente (ver graphic_interface/ui/app.py,
+sección "Dataset consolidado" de la pestaña Sesión):
     from build_dataset import build_dataset, save_dataset
     df = build_dataset()
 """
@@ -51,9 +52,9 @@ from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, list_stage_attempt
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "dataset_sesiones.csv"
 PARTICIPANTS_FILE = GRAPHIC_INTERFACE_DIR / "data" / "participants.json"
 
-# Mismas categorias que devuelve DeepFace.analyze(actions=["emotion"]) --
-# ver tools/camera_tracker.py::DEEPFACE_EMOTION_CATEGORIES.
-EMOTION_CATEGORIES = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+# Mismas categorías que loguea el modelo de EmotiEffLib -- ver
+# tools/emotion_recognizer.py::EMOTION_CATEGORIES.
+EMOTION_CATEGORIES = ["anger", "contempt", "disgust", "fear", "happiness", "neutral", "sadness", "surprise"]
 
 _PARTICIPANT_NUMBER_RE = re.compile(r"_(\d+)$")
 _CHALLENGE_DIR_RE = re.compile(r"^Desafio_(\d+)$")
@@ -89,14 +90,14 @@ def _list_str(values) -> str:
     return str(list(values))
 
 
-def _round_mean(values: "pd.Series"):
+def _round_mean(values: "pd.Series", ndigits: int = 1):
     numeric = pd.to_numeric(values, errors="coerce").dropna()
-    return round(numeric.mean(), 1) if not numeric.empty else ""
+    return round(numeric.mean(), ndigits) if not numeric.empty else ""
 
 
 def _experience_by_participant() -> dict[int, str]:
-    """{numero de participante: nivel de experiencia} a partir del registro
-    anonimo de participants.json (ver graphic_interface/storage/participant_store.py)."""
+    """{número de participante: nivel de experiencia} a partir del registro
+    anónimo de participants.json (ver graphic_interface/storage/participant_store.py)."""
     payload = _read_json_safe(PARTICIPANTS_FILE)
     return {
         p["number"]: p.get("attributes", {}).get("nivel_experiencia", "")
@@ -106,8 +107,8 @@ def _experience_by_participant() -> dict[int, str]:
 
 
 # ============================================================
-# Una funcion por fuente de datos -- cada una devuelve {} si esa fuente no
-# tiene nada que aportar en esta etapa (dispositivo no usado, sesion vieja
+# Una función por fuente de datos -- cada una devuelve {} si esa fuente no
+# tiene nada que aportar en esta etapa (dispositivo no usado, sesión vieja
 # sin esa columna, etc.), nunca lanza.
 # ============================================================
 
@@ -162,9 +163,18 @@ def _emotion_columns(stage_folder: Path) -> dict:
             cols[f"Emotion_Pct_{label}_List"] = _list_str(values.tolist())
             cols[f"Emotion_Pct_{label}_Promedio"] = _round_mean(values)
         else:
-            # Sesion capturada antes de agregar el desglose por categoria.
+            # Sesión capturada antes de agregar el desglose por categoría.
             cols[f"Emotion_Pct_{label}_List"] = ""
             cols[f"Emotion_Pct_{label}_Promedio"] = ""
+    for source_col, label in (("valence", "Valence"), ("arousal", "Arousal")):
+        if source_col in df.columns:
+            values = pd.to_numeric(df[source_col], errors="coerce")
+            cols[f"Emotion_{label}_List"] = _list_str(values.tolist())
+            # valencia/arousal van de -1 a 1: con 1 decimal se perdería casi toda la resolución.
+            cols[f"Emotion_{label}_Promedio"] = _round_mean(values, ndigits=3)
+        else:
+            cols[f"Emotion_{label}_List"] = ""
+            cols[f"Emotion_{label}_Promedio"] = ""
     return cols
 
 
@@ -274,7 +284,7 @@ def _build_row(
 def build_dataset() -> pd.DataFrame:
     """Recorre ~/Escritorio/Sesiones_participantes/ entero y arma el
     dataset consolidado en memoria -- nunca lanza (una carpeta corrupta o
-    incompleta simplemente aporta columnas vacias en esa fila, ver cada
+    incompleta simplemente aporta columnas vacías en esa fila, ver cada
     _*_columns de arriba)."""
     rows = []
     root = sessions_root()

@@ -22,6 +22,7 @@ from typing import Callable, FrozenSet, List, NamedTuple, Optional, Set, Tuple
 import pygame
 import pygame.gfxdraw
 
+from src import text
 from src.rubik_cube import SIZE, RubikCube
 
 Point3D = Tuple[float, float, float]
@@ -356,8 +357,9 @@ def _draw_guide_label(
     pygame.gfxdraw.filled_circle(surface, x, y, GUIDE_LABEL_RADIUS, GUIDE_LABEL_BACKGROUND_COLOR)
     pygame.gfxdraw.aacircle(surface, x, y, GUIDE_LABEL_RADIUS, GUIDE_LABEL_BORDER_COLOR)
 
-    text = font.render(letter, True, GUIDE_LABEL_BORDER_COLOR)
-    surface.blit(text, text.get_rect(center=(x, y)))
+    # Drawn at window resolution (src/text.py), not on the tiny canvas,
+    # so the letter stays sharp; `font` is kept for the call signature.
+    text.render_text(letter, "guide", x, y, GUIDE_LABEL_BORDER_COLOR, anchor="center")
 
 
 def draw_cube_3d(
@@ -369,6 +371,7 @@ def draw_cube_3d(
     scale: float,
     highlight: Optional[Set[Indices]] = None,
     animation: Optional[LayerAnimation] = None,
+    highlight_color: Tuple[int, int, int] = (255, 255, 255),
 ) -> None:
     """
     Draws the whole cube in 3D onto `surface`.
@@ -407,6 +410,7 @@ def draw_cube_3d(
     :param scale: Pixels per cube unit (controls the on-screen size).
     :param highlight: Optional set of `cube.matrix` positions (x, y, z) to highlight (for instance, an A03 search result).
     :param animation: Layer turn in progress to animate (see `LayerAnimation`), or None to draw the cube at rest.
+    :param highlight_color: Border color for the `highlight` cells (PlayState uses one color while the search is scanning and another for its result).
     """
     corner_radius_px = scale * CORNER_RADIUS_FACTOR
 
@@ -459,7 +463,7 @@ def draw_cube_3d(
         pygame.gfxdraw.aapolygon(surface, int_outline, color)
 
         highlighted = highlight is not None and indices in highlight
-        border_color = (255, 255, 255) if highlighted else (18, 18, 22)
+        border_color = highlight_color if highlighted else (18, 18, 22)
         pygame.gfxdraw.aapolygon(surface, int_outline, border_color)
         if highlighted:
             pygame.draw.polygon(surface, border_color, int_outline, 2)

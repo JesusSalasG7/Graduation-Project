@@ -1,11 +1,11 @@
 """
-Modulo C - Combate RPG.
+Módulo C - Combate RPG.
 
 Efectos visuales disparados por CombatManager._apply_match cuando el
 elemento del match tiene uno propio:
     Fuego         -> Fireball: proyectil que vuela del atacante al
                      objetivo y termina en un estallido.
-    Electricidad  -> LightningBolt: rayo que cae en linea recta sobre
+    Electricidad  -> LightningBolt: rayo que cae en línea recta sobre
                      el objetivo y termina en una chispa.
     Agua          -> WaterSplash: ola que viaja del rival hacia quien
                      se cura (Agua cura al atacante en vez de danar al
@@ -14,15 +14,15 @@ elemento del match tiene uno propio:
     Tierra        -> RockSpikes: picos de roca que erupcionan a los
                      pies del objetivo.
     Aire          -> WindSlash: cuchilla curva que vuela del atacante
-                     al objetivo mas rapido que las demas.
+                     al objetivo más rápido que las demás.
     Hielo         -> IceShard: esquirla de cristal que gira en el aire
-                     y se hace anicos al llegar.
+                     y se hace añicos al llegar.
     Magia         -> ArcaneOrb: orbe con un halo de runas orbitando,
-                     termina en un circulo magico geometrico.
+                     termina en un círculo mágico geométrico.
     Oscuridad     -> VoidPortal: grieta oscura que se abre a los pies
                      del objetivo con zarcillos, y se cierra de nuevo.
 El pixel-art de los ocho (ver tools/generate_effect_sprites.py, misma
-tecnica que tools/generate_character_sprites.py) es 100% original: sin
+técnica que tools/generate_character_sprites.py) es 100% original: sin
 imagenes de stock ni assets externos.
 """
 
@@ -67,7 +67,7 @@ def _ensure_fireball_frames_loaded() -> None:
 
 
 class Fireball:
-    """Un solo disparo: vuela en linea recta del origen al destino y
+    """Un solo disparo: vuela en línea recta del origen al destino y
     termina con un estallido corto antes de marcarse `done`."""
 
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
@@ -203,9 +203,9 @@ def _ensure_wave_frames_loaded() -> None:
 
 
 class WaterSplash:
-    """Una ola: surge desde el rival y viaja en linea recta hasta quien
+    """Una ola: surge desde el rival y viaja en línea recta hasta quien
     se cura, rodando (frames de 'rise') durante el trayecto, y rompe
-    con espuma (frames de 'crest') justo al llegar, cuando la curacion
+    con espuma (frames de 'crest') justo al llegar, cuando la curación
     se aplica."""
 
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
@@ -276,7 +276,7 @@ def _ensure_rock_frames_loaded() -> None:
 class RockSpikes:
     """Picos de roca que erupcionan a los pies del objetivo: crecen
     durante el impulso del ataque y estallan con polvo justo cuando el
-    dano se aplica, antes de desmoronarse. No viaja -- el punto es
+    daño se aplica, antes de desmoronarse. No viaja -- el punto es
     fijo (el objetivo, no el atacante)."""
 
     def __init__(self, target: Tuple[int, int]) -> None:
@@ -336,9 +336,9 @@ def _ensure_wind_frames_loaded() -> None:
 
 
 class WindSlash:
-    """Una cuchilla de viento: vuela en linea recta del atacante al
-    objetivo (mismo tiempo de vuelo que Fireball, pero se percibe mas
-    rapida por ser delgada y dejar lineas de velocidad) y termina en
+    """Una cuchilla de viento: vuela en línea recta del atacante al
+    objetivo (mismo tiempo de vuelo que Fireball, pero se percibe más
+    rápida por ser delgada y dejar líneas de velocidad) y termina en
     un remolino corto antes de marcarse `done`."""
 
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
@@ -401,8 +401,8 @@ def _ensure_ice_frames_loaded() -> None:
 
 class IceShard:
     """Una esquirla de hielo: vuela girando del atacante al objetivo y
-    se hace anicos (fragmentos rigidos, no un estallido redondo) justo
-    cuando el dano se aplica."""
+    se hace añicos (fragmentos rigidos, no un estallido redondo) justo
+    cuando el daño se aplica."""
 
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
         _ensure_ice_frames_loaded()
@@ -463,8 +463,8 @@ def _ensure_arcane_frames_loaded() -> None:
 
 class ArcaneOrb:
     """Un orbe arcano con un halo de runas orbitando: vuela del
-    atacante al objetivo y termina en un circulo magico (doble anillo
-    concentrico) justo cuando el dano se aplica."""
+    atacante al objetivo y termina en un círculo mágico (doble anillo
+    concéntrico) justo cuando el daño se aplica."""
 
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]) -> None:
         _ensure_arcane_frames_loaded()
@@ -528,8 +528,8 @@ def _ensure_void_frames_loaded() -> None:
 class VoidPortal:
     """Una grieta oscura que se abre a los pies del objetivo con
     zarcillos que se estiran hacia arriba: crecen durante el impulso
-    del ataque y, justo cuando el dano se aplica, la grieta se abre al
-    maximo antes de cerrarse de nuevo. No viaja -- el punto es fijo
+    del ataque y, justo cuando el daño se aplica, la grieta se abre al
+    máximo antes de cerrarse de nuevo. No viaja -- el punto es fijo
     (el objetivo, no el atacante)."""
 
     def __init__(self, target: Tuple[int, int]) -> None:

@@ -1,4 +1,4 @@
-"""GUI principal: lanzador de juegos + gestion de participantes."""
+"""GUI principal: lanzador de juegos + gestión de participantes."""
 
 import sys
 import threading
@@ -26,20 +26,20 @@ from ui.statement_view import render_statement
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
 # dataset consolidado de TODO el proyecto, no solo de esta app) -- se
-# agrega al path para poder llamarlo desde la pestaña Sesion (ver
-# App._generate_dataset) sin duplicar esa logica aca. Nombre distinto de
+# agrega al path para poder llamarlo desde la pestaña Sesión (ver
+# App._generate_dataset) sin duplicar esa lógica acá. Nombre distinto de
 # DATA_DIR (graphic_interface/data/ -- participants.json, etc.) a
-# proposito, para no pisarla.
+# propósito, para no pisarla.
 DATASET_MODULE_DIR = PROJECT_ROOT / "data"
 if str(DATASET_MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(DATASET_MODULE_DIR))
 from build_dataset import save_dataset  # noqa: E402
 
-# tkinterdnd2 habilita arrastrar-y-soltar el CSV de frecuencia cardiaca del
+# tkinterdnd2 habilita arrastrar-y-soltar el CSV de frecuencia cardíaca del
 # reloj (ver heart_rate_import.py) -- es una dependencia opcional: si no
-# esta instalada (o el .venv todavia no se reparo, ver repair_environment),
+# está instalada (o el .venv todavía no se reparó, ver repair_environment),
 # la app sigue andando normal, solo sin esa pantalla pudiendo recibir un
-# arrastre real (queda el boton "Seleccionar archivo").
+# arrastre real (queda el botón "Seleccionar archivo").
 try:
     from tkinterdnd2 import TkinterDnD
     _DND_MIXIN = (TkinterDnD.DnDWrapper,)
@@ -65,7 +65,7 @@ BG_SIDEBAR = "#101217"
 BG_CARD = "#1e212a"
 BG_CARD_ALT = "#252834"
 BORDER = "#2c303c"
-TEXT_MUTED = "#9ea3ba"  # mas claro que el original (#8b8fa3): ese no llegaba a
+TEXT_MUTED = "#9ea3ba"  # más claro que el original (#8b8fa3): ese no llegaba a
                         # contraste 4.5:1 (WCAG AA) sobre BG_CARD_ALT
 
 ACCENT = "#5865f2"
@@ -81,7 +81,7 @@ WARNING_HOVER = "#d97f34"
 
 FONT_FAMILY = "Segoe UI"
 
-# Toda la tipografia del panel principal se agranda un 50% (pedido explicito).
+# Toda la tipografía del panel principal se agranda un 50% (pedido explícito).
 FONT_SCALE = 1.5
 
 
@@ -89,9 +89,9 @@ def scaled(size: int) -> int:
     return round(size * FONT_SCALE)
 
 
-# Los anchos de wrapeo y las dimensiones de ventanas/modales crecen mas
+# Los anchos de wrapeo y las dimensiones de ventanas/modales crecen más
 # suave que la letra (60% del aumento) -- si crecieran al mismo ritmo que
-# la fuente, ocuparian mucha mas pantalla de la necesaria.
+# la fuente, ocuparían mucha más pantalla de la necesaria.
 WRAP_SCALE = 1 + (FONT_SCALE - 1) * 0.6
 
 
@@ -100,15 +100,15 @@ def wrap(px: int) -> int:
 
 
 def _enable_linux_wheel_scroll(root: ctk.CTk) -> None:
-    """CTkScrollableFrame solo escucha <MouseWheel>, que en la mayoria de
+    """CTkScrollableFrame solo escucha <MouseWheel>, que en la mayoría de
     los Linux/X11 nunca se dispara -- la rueda del mouse llega como
     <Button-4> (arriba) / <Button-5> (abajo). Sin esto, el scroll con la
     rueda no funciona en NINGUNA CTkScrollableFrame de la app (lista de
-    juegos, enunciado del desafio, preguntas de la sesion guiada, etc.).
+    juegos, enunciado del desafío, preguntas de la sesión guiada, etc.).
 
-    Se registra una sola vez, a nivel de la ventana raiz: bind_all() es
-    global al interprete de Tcl, asi que cubre tambien los CTkToplevel
-    (modales) que se abran despues, sin tener que repetir esto en cada
+    Se registra una sola vez, a nivel de la ventana raíz: bind_all() es
+    global al interprete de Tcl, así que cubre también los CTkToplevel
+    (modales) que se abran después, sin tener que repetir esto en cada
     lugar donde se crea una CTkScrollableFrame.
     """
 
@@ -126,7 +126,7 @@ def _enable_linux_wheel_scroll(root: ctk.CTk) -> None:
         # Igual que el _mouse_wheel_all interno de customtkinter: si
         # yview() ya es (0.0, 1.0), todo el contenido entra en la vista y
         # no hay nada que desplazar -- moverlo igual saca el canvas de
-        # sus limites visibles (contenido "flotando" fuera del marco).
+        # sus límites visibles (contenido "flotando" fuera del marco).
         if target._parent_canvas.yview() != (0.0, 1.0):
             target._parent_canvas.yview_scroll(direction, "units")
 
@@ -140,7 +140,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # dock/barra de tareas de Linux al pasar el mouse (si no, sale "Tk").
         super().__init__(className="Panel Experimental")
         self.title("Panel Experimental")
-        # default=True: tambien lo heredan los modales/ventanas secundarias.
+        # default=True: también lo heredan los modales/ventanas secundarias.
         # Se guarda la referencia -- si el PhotoImage se recolecta, el
         # icono desaparece.
         if APP_ICON_FILE.exists():
@@ -151,8 +151,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.configure(fg_color=BG_APP)
         _enable_linux_wheel_scroll(self)
 
-        # Registra el soporte de arrastrar-y-soltar en esta ventana raiz
-        # (ver heart_rate_import.register_drop_target) -- sin esto ningun
+        # Registra el soporte de arrastrar-y-soltar en esta ventana raíz
+        # (ver heart_rate_import.register_drop_target) -- sin esto ningún
         # widget de la app puede recibir un drop, aunque tkinterdnd2 este
         # instalado. Si falla (Tcl del sistema sin el paquete tkdnd, etc.)
         # la app sigue funcionando, solo sin arrastrar-y-soltar real.
@@ -163,7 +163,7 @@ class App(ctk.CTk, *_DND_MIXIN):
                 self.dnd_available = True
             except Exception:
                 pass
-        # La app arranca ya maximizada (pedido explicito) en vez del tamano
+        # La app arranca ya maximizada (pedido explícito) en vez del tamaño
         # fijo de arriba, que queda solo como base/minsize.
         self.after(0, self._maximize)
 
@@ -196,8 +196,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._build_session_tab()
         self._select_nav("games")
 
-        # Sesion guiada: un frame que ocupa TODA la ventana (sidebar +
-        # contenido) por encima de todo lo demas, oculto hasta que se entra
+        # Sesión guiada: un frame que ocupa TODA la ventana (sidebar +
+        # contenido) por encima de todo lo demás, oculto hasta que se entra
         # explicitamente via enter_session_wizard().
         self.session_wizard_frame = ctk.CTkFrame(self, fg_color=BG_APP)
         self.session_wizard_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
@@ -235,12 +235,12 @@ class App(ctk.CTk, *_DND_MIXIN):
 
     def _begin_session_wizard(self, enabled_devices):
         if enabled_devices is None:
-            return  # se cancelo el modal de dispositivos -- no se entra a la sesion
+            return  # se canceló el modal de dispositivos -- no se entra a la sesión
         # La app entera arranca maximizada (ver __init__); esto solo
         # cubre el caso de que el usuario la haya desmaximizado a mano.
         self._maximize()
-        # Pantalla completa de verdad (sin barra de titulo ni barra de
-        # tareas) durante toda la sesion guiada -- pedido explicito, para
+        # Pantalla completa de verdad (sin barra de título ni barra de
+        # tareas) durante toda la sesión guiada -- pedido explícito, para
         # que el participante solo tenga a la vista el propio asistente y
         # no se distraiga con el resto del escritorio.
         self._set_fullscreen(True)
@@ -248,12 +248,12 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.session_wizard.start(enabled_devices)
 
     def _ask_session_devices(self, on_done):
-        """Modal previo a entrar a la sesion guiada: que dispositivos se
+        """Modal previo a entrar a la sesión guiada: que dispositivos se
         van a usar esta vez -- todos tildados por defecto. Si se destilda
-        alguno, la sesion guiada sigue funcionando igual, solo sin pedir
+        alguno, la sesión guiada sigue funcionando igual, solo sin pedir
         ni procesar los datos de ese dispositivo (ver SessionWizard.
         _enabled_devices / _show_next_setup_screen). `on_done` recibe el
-        set de dispositivos elegidos, o None si se cancelo."""
+        set de dispositivos elegidos, o None si se canceló."""
         modal = ctk.CTkToplevel(self)
         modal.title("Dispositivos de esta sesión")
         modal.geometry(f"{wrap(440)}x{wrap(360)}")
@@ -326,8 +326,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._set_fullscreen(False)
         self.session_wizard_frame.lower()
         self._select_nav("session")
-        # No se restaura ningun tamano "chico": la ventana siempre vive
-        # maximizada, asi que simplemente se deja como esta (evita el bug
+        # No se restaura ningún tamaño "chico": la ventana siempre vive
+        # maximizada, así que simplemente se deja como esta (evita el bug
         # de que forzar state("normal") + geometry la dejaba minimizada).
         self._maximize()
 
@@ -376,13 +376,13 @@ class App(ctk.CTk, *_DND_MIXIN):
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
 
-        # Que backend responde las Etapas 3/4/5 de la sesion guiada
+        # Que backend responde las Etapas 3/4/5 de la sesión guiada
         # (CLI `claude` o API de Gemini, ver ai_backend.py) depende de la
-        # variable de entorno AI_PROVIDER con la que se arranco la app --
-        # sin esto en algun lado visible, no hay forma de saber a simple
-        # vista cual de los dos genero los datos de una sesion. Se calcula
+        # variable de entorno AI_PROVIDER con la que se arrancó la app --
+        # sin esto en algún lado visible, no hay forma de saber a simple
+        # vista cual de los dos genero los datos de una sesión. Se calcula
         # una sola vez al armar el sidebar: AI_PROVIDER no cambia mientras
-        # la app esta corriendo.
+        # la app está corriendo.
         provider_ok = ai_provider_available()
         provider_label = "Gemini" if ai_backend.active_provider() == ai_backend.PROVIDER_GEMINI else "Claude"
         ctk.CTkLabel(
@@ -430,8 +430,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         frames[key].tkraise()
         if key == "session":
             # Recalcula la matriz de "Datos guardados" al entrar a la
-            # pestaña -- lee de disco, asi que refleja lo que se haya
-            # exportado desde la ultima vez que se miro esta vista.
+            # pestaña -- lee de disco, así que refleja lo que se haya
+            # exportado desde la última vez que se miró esta vista.
             self._refresh_session_data_matrix()
 
     # ---------------- Juegos ----------------
@@ -651,8 +651,8 @@ class App(ctk.CTk, *_DND_MIXIN):
             return
 
     def _on_close(self):
-        # Si la app se cierra de golpe con una sesion guiada de Neurosky
-        # todavia activa, la da por incompleta: para el proceso, borra los
+        # Si la app se cierra de golpe con una sesión guiada de Neurosky
+        # todavía activa, la da por incompleta: para el proceso, borra los
         # datos capturados y trata de desvincular el dispositivo antes de
         # que la ventana desaparezca (ver SessionWizard.cleanup_incomplete_session).
         self.session_wizard.cleanup_incomplete_session()
@@ -706,7 +706,7 @@ class App(ctk.CTk, *_DND_MIXIN):
                     append_line("\n>> Ocurrió un error reparando el entorno. Revisa el log.")
                     messagebox.showerror(
                         "Error al reparar",
-                        "No se pudo reinstalar alguna dependencia. Revisa la ventana de log para mas detalles.",
+                        "No se pudo reinstalar alguna dependencia. Revisa la ventana de log para más detalles.",
                     )
                 self._refresh_games()
 
@@ -987,7 +987,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     # ---------------- Sesion ----------------
     def _build_session_tab(self):
         # Scrollable: con la tarjeta de "Dataset consolidado" agregada abajo
-        # de "Datos guardados" ya no entran ambas expandiendose en la altura
+        # de "Datos guardados" ya no entran ambas expandiéndose en la altura
         # fija de la pestaña -- con esto la pestaña entera se puede
         # desplazar en vez de aplastar una tarjeta contra la otra.
         wrapper = ctk.CTkScrollableFrame(self.tab_session, fg_color="transparent")
@@ -1018,10 +1018,10 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.guided_session_button.pack(anchor="w", padx=18, pady=(4, 18))
 
         # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
-        # Matriz de lo que ya se exporto para el participante activo, leyendo
+        # Matriz de lo que ya se exportó para el participante activo, leyendo
         # directo de Sesiones_participantes/Participante_N/Desafio_N/
         # Etapa_N/ (ver stage_capture.py) -- las Etapas 1 y 6 no capturan
-        # datos (ver GUIDED_SESSION_STAGE_ORDER), asi que no se listan.
+        # datos (ver GUIDED_SESSION_STAGE_ORDER), así que no se listan.
         data_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
         data_card.pack(fill="x", pady=(0, 14))
 
@@ -1071,11 +1071,11 @@ class App(ctk.CTk, *_DND_MIXIN):
         h_scrollbar.grid(row=1, column=0, sticky="ew")
 
         # ---------------- Dataset consolidado (ver data/build_dataset.py) ----------------
-        # A diferencia de "Datos guardados" (un desafio, un participante),
+        # A diferencia de "Datos guardados" (un desafío, un participante),
         # esto junta en un solo CSV los datos crudos de TODOS los
         # participantes/desafios/etapas ya exportados -- se genera bajo
-        # demanda (recorre el Escritorio entero) y se previsualiza aca antes
-        # de usarlo para el analisis.
+        # demanda (recorre el Escritorio entero) y se previsualiza acá antes
+        # de usarlo para el análisis.
         dataset_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
         dataset_card.pack(fill="x")
 
@@ -1103,9 +1103,9 @@ class App(ctk.CTk, *_DND_MIXIN):
             command=self._generate_dataset,
         )
         self.dataset_generate_button.pack(side="left")
-        # Deshabilitado hasta la primera generacion exitosa de esta sesion de
+        # Deshabilitado hasta la primera generación exitosa de esta sesión de
         # la app -- la tabla completa se ve en una ventana aparte a pantalla
-        # completa (ver _open_dataset_window), no incrustada aca: con
+        # completa (ver _open_dataset_window), no incrustada acá: con
         # decenas de columnas (listas de lecturas crudas, etc.) una vista
         # incrustada quedaba demasiado chica para detallar nada.
         self.dataset_view_button = ctk.CTkButton(
@@ -1139,8 +1139,8 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _refresh_session_data_matrix(self):
         """Recalcula la matriz de "Datos guardados" del desafío elegido,
         para el participante activo -- lee siempre de disco (nunca de
-        estado en memoria de la sesion guiada), asi que sirve igual si la
-        app se reinicio o si el participante viene de otra sesion. Nunca
+        estado en memoria de la sesión guiada), así que sirve igual si la
+        app se reinició o si el participante viene de otra sesión. Nunca
         rompe la interfaz: si falta la carpeta, un archivo, o el CSV esta
         corrupto, la celda correspondiente queda en "—" (ver
         stage_capture.summarize_stage)."""
@@ -1186,7 +1186,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     # ---------------- Dataset consolidado ----------------
     def _generate_dataset(self):
         """Dispara build_dataset.save_dataset() en un hilo aparte -- recorre
-        TODO ~/Escritorio/Sesiones_participantes/, asi que con muchas
+        TODO ~/Escritorio/Sesiones_participantes/, así que con muchas
         sesiones puede tardar unos segundos y no debe congelar la UI."""
         self.dataset_generate_button.configure(state="disabled", text="Generando...")
         self.dataset_status_label.configure(

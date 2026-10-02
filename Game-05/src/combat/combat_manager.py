@@ -1,14 +1,14 @@
 """
-Modulo C - Combate RPG.
+Módulo C - Combate RPG.
 
-CombatManager conecta los matches del tablero (Modulo A) con los
+CombatManager conecta los matches del tablero (Módulo A) con los
 Character de combate: traduce (elemento, cantidad de fichas) en un
-EffectResult via src.combat.elements, lo anima y lo aplica sobre
-HP/estado, y maneja el turno automatico del enemigo. Tambien dispara
+EffectResult vía src.combat.elements, lo anima y lo aplica sobre
+HP/estado, y maneja el turno automático del enemigo. También dispara
 el efecto visual de cada elemento (ver _EFFECT_FACTORIES y
 src.combat.effects) del atacante al objetivo -- o sobre el propio
 atacante, para Agua, que cura en vez de danar. No conoce Board ni
-PlayState mas alla de lo que le pasan como argumentos.
+PlayState más alla de lo que le pasan como argumentos.
 """
 
 import random
@@ -32,22 +32,22 @@ from src.combat.effects import (
 )
 from src.combat.elements import compute_effect
 
-# Escalado de dificultad: el enemigo no juega el tablero, asi que no
+# Escalado de dificultad: el enemigo no juega el tablero, así que no
 # puede "mejorar" armando combos el mismo. En cambio, cada
-# ENEMY_RAMP_TURNS turnos suyos su ataque simula un match una ficha mas
+# ENEMY_RAMP_TURNS turnos suyos su ataque simula un match una ficha más
 # grande -- el mismo tramo de multiplicador (3/4/5+) que
 # elements.DAMAGE_MULTIPLIER ya le aplica a los matches del jugador --
-# hasta el tope ENEMY_MAX_MATCH (5, el mismo limite de
-# DAMAGE_MULTIPLIER_MAX). Asi el combate se pone mas duro cuanto mas se
+# hasta el tope ENEMY_MAX_MATCH (5, el mismo límite de
+# DAMAGE_MULTIPLIER_MAX). Así el combate se pone más duro cuanto más se
 # alarga en vez de quedarse plano para siempre, y premia resolverlo
-# rapido con Catalisis grandes.
+# rápido con Catálisis grandes.
 ENEMY_RAMP_TURNS = 3
 ENEMY_MAX_MATCH = 5
 
-# El enemigo ya no elige elemento 100% al azar: pesa la eleccion hacia
-# los elementos mas ofensivos (Fuego, Oscuridad, Electricidad -- esta
-# ultima ademas puede aturdir) para que el jugador no pueda contar con
-# que "en promedio" le va a tocar poco dano. Agua pesa poco en
+# El enemigo ya no elige elemento 100% al azar: pesa la elección hacia
+# los elementos más ofensivos (Fuego, Oscuridad, Electricidad -- esta
+# última además puede aturdir) para que el jugador no pueda contar con
+# que "en promedio" le va a tocar poco daño. Agua pesa poco en
 # condiciones normales porque cura al propio enemigo en vez de danar
 # (ver _apply_match/effect.heal), pero por debajo de
 # ENEMY_LOW_HP_RATIO de vida ese peso se dispara para que el enemigo se
@@ -66,8 +66,8 @@ ENEMY_LOW_HP_RATIO = 0.35
 ENEMY_LOW_HP_WATER_WEIGHT = 6
 
 # Cada entrada recibe (atacante, objetivo) y arma el efecto visual con
-# los anchors que le correspondan -- la mayoria vuela atacante->objetivo,
-# pero Agua viaja al reves (cura al atacante) y Electricidad/Tierra/
+# los anchors que le correspondan -- la mayoría vuela atacante->objetivo,
+# pero Agua viaja al revés (cura al atacante) y Electricidad/Tierra/
 # Oscuridad son puntos fijos sobre el objetivo (ver cada clase en
 # src.combat.effects para el porque).
 _EFFECT_FACTORIES = {
@@ -120,9 +120,9 @@ class CombatManager:
             return
 
         # El enemigo no juega el tablero -- elige un elemento de la
-        # misma tabla con un sesgo hacia el dano (ver
-        # _choose_enemy_element) y lo resuelve con un tamano de match
-        # que crece con la duracion del combate (ver
+        # misma tabla con un sesgo hacia el daño (ver
+        # _choose_enemy_element) y lo resuelve con un tamaño de match
+        # que crece con la duración del combate (ver
         # _enemy_match_size).
         kind = self._choose_enemy_element()
         count = self._enemy_match_size()
@@ -130,10 +130,10 @@ class CombatManager:
 
     def _choose_enemy_element(self) -> TileKind:
         """
-        Elige el elemento del proximo ataque del enemigo con pesos
+        Elige el elemento del próximo ataque del enemigo con pesos
         fijos (ENEMY_ELEMENT_WEIGHTS) en vez de puramente al azar, para
-        que en promedio pegue mas fuerte que el jugador con un match
-        parejo. Si el enemigo esta por debajo de ENEMY_LOW_HP_RATIO de
+        que en promedio pegue más fuerte que el jugador con un match
+        parejo. Si el enemigo está por debajo de ENEMY_LOW_HP_RATIO de
         vida, sube mucho el peso de Agua para que se cure en vez de
         seguir atacando a ciegas mientras se muere.
         """
@@ -146,7 +146,7 @@ class CombatManager:
 
     def _enemy_match_size(self) -> int:
         """
-        Cuantas fichas simula el proximo ataque del enemigo, a efectos
+        Cuántas fichas simula el próximo ataque del enemigo, a efectos
         del multiplicador de elements.compute_effect. Empieza en 3
         (turnos 1..ENEMY_RAMP_TURNS) y sube una ficha cada
         ENEMY_RAMP_TURNS turnos, hasta ENEMY_MAX_MATCH.
@@ -165,8 +165,8 @@ class CombatManager:
         on_finish: Optional[Callable[[], None]] = None,
     ) -> None:
         if attacker.stunned:
-            # Aturdido: el match ya limpio fichas y dio puntaje en el
-            # tablero, pero no dispara dano/efecto de combate.
+            # Aturdido: el match ya limpió fichas y dio puntaje en el
+            # tablero, pero no dispara daño/efecto de combate.
             attacker.stunned = False
             if on_finish:
                 on_finish()
@@ -192,6 +192,6 @@ class CombatManager:
         attacker.play_attack(on_finish=_impact)
 
         if on_finish:
-            # Le da tiempo a la animacion de ataque + al parpadeo de
-            # dano del objetivo antes de devolver el control.
+            # Le da tiempo a la animación de ataque + al parpadeo de
+            # daño del objetivo antes de devolver el control.
             Timer.after(0.45, on_finish)

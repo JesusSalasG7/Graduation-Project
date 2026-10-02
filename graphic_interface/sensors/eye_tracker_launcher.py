@@ -1,20 +1,20 @@
-"""Lanzador de tools/eye_tracker.py: calibracion izquierda/derecha por
-participante y arranque del seguimiento continuo con esa calibracion.
+"""Lanzador de tools/eye_tracker.py: calibración izquierda/derecha por
+participante y arranque del seguimiento continuo con esa calibración.
 
 A diferencia del resto de las herramientas (que usan el .venv unificado de
-la raiz del proyecto), eye_tracker.py vive en su propio entorno virtual
+la raíz del proyecto), eye_tracker.py vive en su propio entorno virtual
 (tools/.venv-eyetracker) porque mediapipe necesita opencv-contrib-python,
-que no puede convivir con opencv-python (la que usa emotion_tracker.py via
+que no puede convivir con opencv-python (la que usa emotion_tracker.py vía
 emotiefflib) en el mismo entorno -- ver tools/requirements.txt.
 
 Flujo (ver session_wizard._show_configure_eye_tracker):
     1. run_calibration(...) corre `eye_tracker.py --calibrate`: le pide al
-       participante mirar a la izquierda y despues a la derecha, y
+       participante mirar a la izquierda y después a la derecha, y
        devuelve (left_x, right_x) -- su gaze_x real en cada lado.
-    2. start_eye_tracker(...) lanza el seguimiento continuo pasandole esos
-       dos valores por linea de comandos, para que el corte
+    2. start_eye_tracker(...) lanza el seguimiento continuo pasándole esos
+       dos valores por línea de comandos, para que el corte
        izquierda/derecha quede calibrado a ESE participante en vez de un
-       umbral fijo generico.
+       umbral fijo genérico.
 """
 
 import re
@@ -33,15 +33,15 @@ EYE_LOG_DIR = DATA_DIR / "eye_logs"
 _RESULT_RE = re.compile(r"CALIBRATION_RESULT\s+left_x=([\-0-9.]+)\s+right_x=([\-0-9.]+)")
 _FAILED_RE = re.compile(r"CALIBRATION_FAILED\s+reason=(\S+)")
 
-# La calibracion completa (2 fases + su conteo regresivo, ver
+# La calibración completa (2 fases + su conteo regresivo, ver
 # CALIBRATION_COUNTDOWN_SECONDS/CALIBRATION_RECORD_SECONDS en
 # eye_tracker.py) dura unos 10-12s; este timeout es solo una salvaguarda
-# por si el proceso se cuelga (camara que nunca entrega frames, etc.).
+# por si el proceso se cuelga (cámara que nunca entrega frames, etc.).
 CALIBRATION_TIMEOUT_SECONDS = 60
 
 
 class CalibrationError(Exception):
-    """La calibracion no se pudo completar (sin rostro, ventana cerrada, timeout)."""
+    """La calibración no se pudo completar (sin rostro, ventana cerrada, timeout)."""
 
 
 def eye_tracker_python() -> Path:
@@ -49,20 +49,20 @@ def eye_tracker_python() -> Path:
     if not candidate.exists():
         raise FileNotFoundError(
             f"No se encontró el entorno virtual de eye_tracker en {EYE_TRACKER_VENV_DIR} "
-            "(ver la seccion 2 de tools/requirements.txt para crearlo)."
+            "(ver la sección 2 de tools/requirements.txt para crearlo)."
         )
     return candidate
 
 
 def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tuple[float, float]:
     """Corre `eye_tracker.py --calibrate` hasta que termina, mandando cada
-    linea de salida a `on_output` (para poder mostrarla en vivo). Bloquea
+    línea de salida a `on_output` (para poder mostrarla en vivo). Bloquea
     al hilo que la llama -- se espera que se dispare desde un hilo de
     fondo, nunca desde el hilo de Tk (ver session_wizard).
 
     Devuelve (left_x, right_x). Lanza CalibrationError si el proceso
-    termina sin imprimir CALIBRATION_RESULT (no se detecto un rostro
-    durante alguna fase, se cerro la ventana, timeout, o la camara no
+    termina sin imprimir CALIBRATION_RESULT (no se detectó un rostro
+    durante alguna fase, se cerró la ventana, timeout, o la cámara no
     se pudo abrir).
     """
     if not EYE_TRACKER_SCRIPT.exists():
@@ -103,7 +103,7 @@ def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tu
         return result
     if failure_reason:
         raise CalibrationError(f"No se detectó un rostro mirando hacia: {failure_reason}.")
-    raise CalibrationError("La calibracion se interrumpio antes de terminar.")
+    raise CalibrationError("La calibración se interrumpió antes de terminar.")
 
 
 def eye_log_file(participant: dict) -> Path:
@@ -111,11 +111,11 @@ def eye_log_file(participant: dict) -> Path:
 
 
 def delete_eye_data(participant: Optional[dict]) -> None:
-    """Borra el CSV de mirada capturado para `participant` en esta sesion
-    -- se usa cuando la sesion guiada se abandona sin terminar los
-    desafios (mismo criterio que game_launcher.delete_emotion_data /
-    neurosky_launcher.delete_neurosky_data): datos de una sesion
-    incompleta no sirven para el analisis."""
+    """Borra el CSV de mirada capturado para `participant` en esta sesión
+    -- se usa cuando la sesión guiada se abandona sin terminar los
+    desafíos (mismo criterio que game_launcher.delete_emotion_data /
+    neurosky_launcher.delete_neurosky_data): datos de una sesión
+    incompleta no sirven para el análisis."""
     if not participant:
         return
     try:
@@ -129,10 +129,10 @@ def start_eye_tracker(
 ) -> subprocess.Popen:
     """Lanza el seguimiento continuo de eye_tracker.py con los umbrales
     calibrados de run_calibration(), con su salida como pipe de texto
-    linea a linea (igual que start_neurosky_test/start_emotion_tracker)
+    línea a línea (igual que start_neurosky_test/start_emotion_tracker)
     para poder mostrarla en vivo.
 
-    Si hay un participante activo, sus lecturas se registran ademas en un
+    Si hay un participante activo, sus lecturas se registran además en un
     CSV propio (graphic_interface/data/eye_logs/<NOMBRE_APELLIDO>.csv).
     """
     if not EYE_TRACKER_SCRIPT.exists():

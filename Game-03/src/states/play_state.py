@@ -37,6 +37,7 @@ from gale.input_handler import (
 )
 from gale.state import BaseState
 
+from src import text
 from src.rubik_cube import Position, RubikCube, ALL_MOVES, inverse_move, layers_for_move
 from src.view_3d import LayerAnimation, draw_cube_3d, draw_face_guide
 
@@ -112,6 +113,33 @@ SEARCH_BUTTON_BORDER_COLOR = pygame.Color(170, 170, 178)
 SEARCH_BLOCK_ORIGIN: Tuple[int, int, int] = (0, 0, 0)
 SEARCH_BLOCK_SIZE = 2
 
+# Search animation (see `_search_for_block`): before showing the A03
+# result, the 8 possible positions of a 2x2x2 block inside the 3x3x3
+# cube (one per cube corner) are visited one by one -- highlighted in
+# SEARCH_SCAN_COLOR while the camera turns to face that corner -- so
+# the player can see what "sliding the block across every valid
+# position" means. Only then is the real algorithm's answer shown.
+SEARCH_STEP_DURATION = 0.55  # seconds spent on each candidate position
+SEARCH_CAMERA_TURN_DURATION = 0.35  # part of each step spent turning the camera
+SEARCH_SCAN_COLOR = (255, 200, 0)
+SEARCH_FOUND_COLOR = (60, 230, 110)
+
+# Bottom message panel (search progress/result), drawn as crisp text.
+MESSAGE_MAX_WIDTH = 330
+MESSAGE_BOTTOM_MARGIN = 6
+MESSAGE_PADDING = 4
+MESSAGE_LINE_HEIGHT = 11
+MESSAGE_BG_COLOR = pygame.Color(24, 26, 33)
+MESSAGE_SCAN_TEXT_COLOR = (255, 214, 90)
+MESSAGE_FOUND_TEXT_COLOR = (120, 240, 150)
+MESSAGE_NOT_FOUND_TEXT_COLOR = (255, 140, 140)
+
+# Tooltip shown under a button while the mouse hovers it.
+TOOLTIP_BG_COLOR = pygame.Color(24, 26, 33)
+TOOLTIP_TEXT_COLOR = (235, 235, 240)
+TOOLTIP_PADDING = 3
+TOOLTIP_GAP = 3
+
 # --- "Undo"/"Redo" buttons (undo.png/redo.png), next to "Search":
 # step back and forward through the moves actually applied to the
 # cube (see `_undo_stack`/`_redo_stack`, `_undo`, `_redo`).
@@ -169,6 +197,21 @@ _CAMERA_ACTION_DOWN = "camera_down"
 _CAMERA_ACTIONS = frozenset(
     {_CAMERA_ACTION_LEFT, _CAMERA_ACTION_RIGHT, _CAMERA_ACTION_UP, _CAMERA_ACTION_DOWN}
 )
+
+
+def _wrap(message: str, font_key: str, max_width: int) -> List[str]:
+    lines: List[str] = []
+    current = ""
+    for word in message.split():
+        candidate = f"{current} {word}".strip()
+        if current and text.text_size(candidate, font_key)[0] > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
 
 
 @dataclass
@@ -294,6 +337,19 @@ class PlayState(BaseState):
         self._search_button_rect.left = self._eye_button_rect.right + GAP_BETWEEN_EYE_AND_SEARCH_BUTTONS
         self._search_button_rect.top = self._eye_button_rect.top
 
+        # Search animation (see SEARCH_STEP_DURATION): candidate
+        # positions still being visited, and the message shown for it.
+        self._search_candidates: List[Position] = []
+        self._search_step = 0
+        self._search_step_elapsed = 0.0
+        self._search_highlight_color: Tuple[int, int, int] = SEARCH_SCAN_COLOR
+        self._search_message: Optional[str] = None
+        self._search_message_color: Tuple[int, int, int] = MESSAGE_SCAN_TEXT_COLOR
+        # Camera tween toward a corner: (from_yaw, from_pitch, to_yaw,
+        # to_pitch, elapsed, duration), or None. Dragging/arrow keys
+        # cancel it (see `_rotate_view`/`_rotate_camera_continuously`).
+        self._camera_tween: Optional[List[float]] = None
+
         # --- "Undo"/"Redo" buttons -------------------------------------------
         # Moves actually applied to `self.cube` (oldest first); `_undo`
         # pops from here, applies the inverse, and pushes the original
@@ -328,7 +384,6 @@ class PlayState(BaseState):
         self._redo_button_rect.top = self._undo_button_rect.top
 
         # --- Scramble timer ---------------------------------------------
-        self._timer_font = settings.FONTS["timer"]
         self._timer_pending_start = False  # True while waiting for the Auto-triggered scramble to finish
         self._timer_started = False  # True once the timer has actually started counting, see `_continue_move_queue`
         self._timer_running = False  # counting right now, see `_advance_timer`
@@ -398,6 +453,9 @@ class PlayState(BaseState):
         if self._move_in_progress is not None:
             return
 
+        # A move cancels a search animation still in progress.
+        self._search_candidates = []
+        self._search_message = None
         # Once the cube starts changing again, the last search result
         # no longer describes its current state -- clear it so the
         # button and the 3D highlight don't show stale information.
@@ -534,7 +592,62 @@ class PlayState(BaseState):
 
     # --- "Search" button (A03) ----------------------------------------------
 
+    @staticmethod
+    def _block_positions(origin: Position) -> FrozenSet[Position]:
+        origin_x, origin_y, origin_z = origin
+        return frozenset(
+            (origin_x + i, origin_y + j, origin_z + k)
+            for i in range(SEARCH_BLOCK_SIZE)
+            for j in range(SEARCH_BLOCK_SIZE)
+            for k in range(SEARCH_BLOCK_SIZE)
+        )
+
     def _search_for_block(self) -> None:
+        """
+        Starts the search animation: visits, one by one, every position
+        a 2x2x2 block can take inside the 3x3x3 cube (see
+        SEARCH_STEP_DURATION and `_advance_search`), then runs the A03
+        challenge (`_finish_search`). Ignored while a move is animating
+        or a search is already running.
+        """
+        if self._move_in_progress is not None or self._move_queue or self._search_candidates:
+            return
+
+        positions = len(self.cube.matrix) - SEARCH_BLOCK_SIZE + 1
+        self._search_candidates = [
+            (x, y, z) for x in range(positions) for y in range(positions) for z in range(positions)
+        ]
+        self._search_step = 0
+        self._search_found = None
+        self._begin_search_step()
+
+    def _begin_search_step(self) -> None:
+        origin = self._search_candidates[self._search_step]
+        self._search_step_elapsed = 0.0
+        self._search_highlight = self._block_positions(origin)
+        self._search_highlight_color = SEARCH_SCAN_COLOR
+        self._search_message = (
+            f"Buscando el bloque objetivo: revisando la posición {origin} "
+            f"({self._search_step + 1} de {len(self._search_candidates)})"
+        )
+        self._search_message_color = MESSAGE_SCAN_TEXT_COLOR
+        self._turn_camera_to_block(origin, SEARCH_CAMERA_TURN_DURATION)
+
+    def _advance_search(self, dt: float) -> None:
+        if not self._search_candidates:
+            return
+
+        self._search_step_elapsed += dt
+        if self._search_step_elapsed < SEARCH_STEP_DURATION:
+            return
+
+        self._search_step += 1
+        if self._search_step < len(self._search_candidates):
+            self._begin_search_step()
+        else:
+            self._finish_search()
+
+    def _finish_search(self) -> None:
         """
         Runs the A03 challenge (`RubikCube.search_3d_pattern`, see
         `src/algorithm.py::find_3d_pattern`) against the cube's
@@ -542,26 +655,60 @@ class PlayState(BaseState):
         2x2x2 corner block captured from the solved cube in `enter`.
 
         If found, highlights the 8 positions of the matching block in
-        the 3D view (see `render`'s call to `draw_cube_3d`); if not,
-        clears the highlight. Either way, `_search_found` drives a
-        quick color cue on the button itself (see
-        `_draw_search_button`).
+        the 3D view (see `render`'s call to `draw_cube_3d`) and turns
+        the camera to face it; if not, clears the highlight. Either
+        way, `_search_found` drives a quick color cue on the button
+        itself (see `_draw_search_button`) and a message explains it.
         """
+        self._search_candidates = []
         origin = self.cube.search_3d_pattern(self._target_pattern)
 
         if origin is None:
             self._search_highlight = None
             self._search_found = False
+            self._search_message = (
+                "No se encontró el bloque objetivo: sus 8 piezas no están juntas "
+                "en ninguna de las 8 posiciones."
+            )
+            self._search_message_color = MESSAGE_NOT_FOUND_TEXT_COLOR
             return
 
-        origin_x, origin_y, origin_z = origin
-        self._search_highlight = frozenset(
-            (origin_x + i, origin_y + j, origin_z + k)
-            for i in range(SEARCH_BLOCK_SIZE)
-            for j in range(SEARCH_BLOCK_SIZE)
-            for k in range(SEARCH_BLOCK_SIZE)
-        )
+        self._search_highlight = self._block_positions(origin)
+        self._search_highlight_color = SEARCH_FOUND_COLOR
         self._search_found = True
+        self._search_message = (
+            f"¡Encontrado en la posición {tuple(origin)}! Las 8 piezas del bloque "
+            "objetivo siguen juntas."
+        )
+        self._search_message_color = MESSAGE_FOUND_TEXT_COLOR
+        self._turn_camera_to_block(tuple(origin), SEARCH_CAMERA_TURN_DURATION)
+
+    def _turn_camera_to_block(self, origin: Position, duration: float) -> None:
+        """
+        Eases the camera until the cube corner that the 2x2x2 block at
+        `origin` sits on points straight at the viewer. That corner's
+        direction is (2*o - 1) per axis (index 0 is the -1 side, index
+        1 reaches the +1 side); yaw/pitch are solved so rotate_point
+        maps it onto +Z, where the camera looks from.
+        """
+        dx, dy, dz = (2 * o - 1 for o in origin)
+        target_yaw = math.atan2(-dx, dz)
+        target_pitch = math.atan2(dy, math.hypot(dx, dz))
+        # Shortest way around, so the camera never spins a full turn.
+        delta = (target_yaw - self.yaw + math.pi) % (2 * math.pi) - math.pi
+        self._camera_tween = [self.yaw, self.pitch, self.yaw + delta, target_pitch, 0.0, duration]
+
+    def _advance_camera_tween(self, dt: float) -> None:
+        if self._camera_tween is None:
+            return
+
+        from_yaw, from_pitch, to_yaw, to_pitch, elapsed, duration = self._camera_tween
+        elapsed += dt
+        t = min(1.0, elapsed / duration)
+        eased = 1.0 - (1.0 - t) ** 3
+        self.yaw = from_yaw + (to_yaw - from_yaw) * eased
+        self.pitch = from_pitch + (to_pitch - from_pitch) * eased
+        self._camera_tween = None if t >= 1.0 else [from_yaw, from_pitch, to_yaw, to_pitch, elapsed, duration]
 
     # --- Scramble timer ------------------------------------------------------
 
@@ -583,15 +730,11 @@ class PlayState(BaseState):
         if not self._shuffling and self.cube.is_solved():
             self._timer_running = False
 
-    def _render_pixel_text(self, font: pygame.font.Font, text: str, color, scale: int) -> pygame.Surface:
-        """Same blocky/pixel-art rendering MenuState/InstructionsState use, kept local so this state doesn't depend on them."""
-        small = font.render(text, False, color)
-        size = (max(1, small.get_width() * scale), max(1, small.get_height() * scale))
-        return pygame.transform.scale(small, size)
-
     def _rotate_camera_continuously(self, dt: float) -> None:
         """Applies, based on which arrows are currently held, this frame's rotation (see `_camera_keys_held`)."""
         step = KEYBOARD_ROTATION_SPEED * dt
+        if any(self._camera_keys_held.values()):
+            self._camera_tween = None  # the player takes over the camera
 
         if self._camera_keys_held[_CAMERA_ACTION_LEFT]:
             self.yaw -= step
@@ -612,6 +755,7 @@ class PlayState(BaseState):
         )
 
     def _rotate_view(self, dx: float, dy: float) -> None:
+        self._camera_tween = None  # the player takes over the camera
         self.yaw += dx * DRAG_SENSITIVITY
         self.pitch += dy * DRAG_SENSITIVITY
         self.pitch = max(-MAX_PITCH, min(MAX_PITCH, self.pitch))
@@ -663,6 +807,8 @@ class PlayState(BaseState):
 
     def update(self, dt: float) -> None:
         self._rotate_camera_continuously(dt)
+        self._advance_camera_tween(dt)
+        self._advance_search(dt)
         self._advance_move_in_progress(dt)
         self._advance_timer(dt)
 
@@ -773,7 +919,7 @@ class PlayState(BaseState):
     def _draw_timer(self, surface: pygame.Surface) -> None:
         """
         Bottom-right "LCD" panel showing the scramble timer, blocky
-        pixel-art digits (see `_render_pixel_text`). Only called once
+        pixel-art digits (see `text.pixel_label`). Only called once
         `_timer_started` is True (see `render`) -- it stays off-screen
         entirely until "Auto" is pressed for the first time. Text/border
         color double as a state cue: bright green while counting
@@ -783,7 +929,7 @@ class PlayState(BaseState):
         label = f"{minutes:02d}:{seconds:02d}"
 
         text_color = TIMER_RUNNING_TEXT_COLOR if self._timer_running else TIMER_SOLVED_TEXT_COLOR
-        digits = self._render_pixel_text(self._timer_font, label, text_color, TIMER_TEXT_SCALE)
+        digits = text.pixel_label(label, text_color, TIMER_TEXT_SCALE)
 
         panel_width = digits.get_width() + TIMER_PANEL_PADDING_X * 2
         panel_height = digits.get_height() + TIMER_PANEL_PADDING_Y * 2
@@ -795,7 +941,7 @@ class PlayState(BaseState):
 
         pygame.draw.rect(surface, TIMER_BG_COLOR, panel_rect, border_radius=6)
         pygame.draw.rect(surface, border_color, panel_rect, width=1, border_radius=6)
-        surface.blit(digits, digits.get_rect(center=panel_rect.center))
+        digits.draw(*panel_rect.center)
 
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(COLOR_BG)
@@ -820,6 +966,7 @@ class PlayState(BaseState):
             scale=CUBE_SCALE,
             highlight=self._search_highlight,
             animation=animation,
+            highlight_color=self._search_highlight_color,
         )
 
         if self._face_guide_active:
@@ -842,3 +989,46 @@ class PlayState(BaseState):
 
         if self._timer_started:
             self._draw_timer(surface)
+
+        self._draw_search_message(surface)
+        self._draw_tooltip(surface)
+
+    def _draw_search_message(self, surface: pygame.Surface) -> None:
+        if not self._search_message:
+            return
+
+        lines = _wrap(self._search_message, "body", MESSAGE_MAX_WIDTH)
+        width = max(text.text_size(line, "body")[0] for line in lines) + 2 * MESSAGE_PADDING
+        height = len(lines) * MESSAGE_LINE_HEIGHT + 2 * MESSAGE_PADDING
+        panel = pygame.Rect(0, 0, width, height)
+        panel.centerx = settings.VIRTUAL_WIDTH // 2
+        panel.bottom = settings.VIRTUAL_HEIGHT - MESSAGE_BOTTOM_MARGIN
+
+        pygame.draw.rect(surface, MESSAGE_BG_COLOR, panel, border_radius=5)
+        pygame.draw.rect(surface, self._search_message_color, panel, width=1, border_radius=5)
+        for index, line in enumerate(lines):
+            text.render_text(
+                line, "body", panel.centerx, panel.top + MESSAGE_PADDING + index * MESSAGE_LINE_HEIGHT,
+                self._search_message_color, anchor="midtop",
+            )
+
+    def _draw_tooltip(self, surface: pygame.Surface) -> None:
+        """Short description under the button the mouse is over."""
+        if self.dragging or self._last_mouse_pos is None:
+            return
+
+        for rect, label in (
+            (self._shuffle_button_rect, "Mezclar: 20 movimientos al azar"),
+            (self._auto_button_rect, "Mezclar y medir el tiempo hasta resolverlo"),
+            (self._eye_button_rect, "Mostrar u ocultar la letra de cada cara"),
+            (self._search_button_rect, "Buscar el 2x2x2"),
+            (self._undo_button_rect, "Deshacer el último movimiento"),
+            (self._redo_button_rect, "Rehacer"),
+        ):
+            if not rect.collidepoint(self._last_mouse_pos):
+                continue
+            width, height = text.text_size(label, "small")
+            box = pygame.Rect(rect.left, rect.bottom + TOOLTIP_GAP, width + 2 * TOOLTIP_PADDING, height + 2 * TOOLTIP_PADDING)
+            pygame.draw.rect(surface, TOOLTIP_BG_COLOR, box, border_radius=4)
+            text.render_text(label, "small", box.left + TOOLTIP_PADDING, box.top + TOOLTIP_PADDING, TOOLTIP_TEXT_COLOR)
+            return
