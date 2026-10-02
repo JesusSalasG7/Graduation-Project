@@ -1,10 +1,10 @@
-"""Banco estatico de preguntas de seleccion multiple sobre el ENUNCIADO de
-cada desafio (Etapa 1 de la sesion guiada).
+"""Banco estático de preguntas de selección multiple sobre el ENUNCIADO de
+cada desafío (Etapa 1 de la sesión guiada).
 
-A diferencia de las preguntas sobre la solucion (que dependen del codigo que
-genera cada participante y por eso se generan dinamicamente, ver
+A diferencia de las preguntas sobre la solución (que dependen del código que
+genera cada participante y por eso se generan dinámicamente, ver
 challenge_solver.py), el enunciado es el mismo para todos los participantes,
-asi que estas preguntas estan escritas a mano una sola vez por juego -- 7
+así que estas preguntas están escritas a mano una sola vez por juego -- 7
 preguntas de dificultad moderada, verificadas contra el enunciado real de
 challenges.py.
 """

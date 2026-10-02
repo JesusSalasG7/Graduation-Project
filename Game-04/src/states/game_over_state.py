@@ -13,6 +13,7 @@ from gale.input_handler import InputData
 from gale.state import BaseState
 
 import settings
+from src import text
 
 EXPLOSION_DURATION = 1.2  # seconds the particle animation plays for
 EXPLOSION_PARTICLE_COUNT = 48
@@ -94,20 +95,17 @@ class GameOverState(BaseState):
                     pygame.draw.circle(surface, particle.color, (particle.x, particle.y), radius)
             return
 
-        title_surface = settings.FONTS["game_over_title"].render(GAME_OVER_TITLE, True, settings.COLORS["error"])
-        surface.blit(
-            title_surface,
-            title_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, centery=settings.VIRTUAL_HEIGHT / 2 - 20),
+        text.draw_text(
+            surface, "game_over_title", GAME_OVER_TITLE, settings.COLORS["error"],
+            centerx=settings.VIRTUAL_WIDTH / 2, centery=settings.VIRTUAL_HEIGHT / 2 - 20,
         )
 
-        subtitle_surface = settings.FONTS["hint"].render(GAME_OVER_SUBTITLE, True, settings.COLORS["text_dim"])
-        surface.blit(
-            subtitle_surface,
-            subtitle_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, centery=settings.VIRTUAL_HEIGHT / 2 + 16),
+        text.draw_text(
+            surface, "hint", GAME_OVER_SUBTITLE, settings.COLORS["text_dim"],
+            centerx=settings.VIRTUAL_WIDTH / 2, centery=settings.VIRTUAL_HEIGHT / 2 + 16,
         )
 
-        hint_surface = settings.FONTS["hint"].render(GAME_OVER_RESTART_HINT, True, settings.COLORS["text_dim"])
-        surface.blit(
-            hint_surface,
-            hint_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 10),
+        text.draw_text(
+            surface, "hint", GAME_OVER_RESTART_HINT, settings.COLORS["text_dim"],
+            centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 10,
         )

@@ -1,9 +1,9 @@
-# Dependencia de la GUI (tkinter y json son de la libreria estandar)
+# Dependencia de la GUI (tkinter y json son de la librería estándar)
 customtkinter==5.2.2
 
-# Arrastrar y soltar el CSV de frecuencia cardiaca del reloj en la sesion
+# Arrastrar y soltar el CSV de frecuencia cardíaca del reloj en la sesión
 # guiada (ver heart_rate_import.py). Si no se puede instalar/registrar en
-# algun equipo, la pantalla cae sola al boton "Seleccionar archivo".
+# algún equipo, la pantalla cae sola al botón "Seleccionar archivo".
 tkinterdnd2==0.4.2
 
 # Recorte y resumen por etapa de los CSV en vivo (NeuroSky/Emotion/Eye/
@@ -15,7 +15,7 @@ pandas==2.2.2
 # el .venv unificado, ver venv_python() en game_launcher.py) habla con el
 # MindWave Mobile por puerto serial/rfcomm -- sin este paquete, "Reparar
 # entorno" deja el resto de la app funcionando pero NeuroSky falla con
-# "Falta la libreria 'pyserial'" recien al intentar conectarlo.
+# "Falta la libreria 'pyserial'" recién al intentar conectarlo.
 pyserial==3.5
 
 # El prompt aislado de la Etapa 2 (ver isolated_prompt.py) usa por defecto
@@ -25,6 +25,6 @@ pyserial==3.5
 # Backend alternativo (ver ai_backend.py): con AI_PROVIDER=gemini +
 # GEMINI_API_KEY, la misma llamada se hace por REST contra la API de
 # Gemini en vez del CLI `claude` -- se usa `requests` en lugar del SDK
-# oficial de Google para no sumar una dependencia mas de las que ya trae
+# oficial de Google para no sumar una dependencia más de las que ya trae
 # este archivo.
 requests==2.32.3

@@ -91,29 +91,28 @@ SOUNDS = {}
 # FONTS = {
 #     'small': pygame.font.Font(BASE_DIR / "assets"  / "fonts" / "font.ttf", 8)
 # }
-FONTS = {
-    # Font for the face-guide letters (U/D/L/R/F/B) -- see
-    # PlayState._draw_eye_button and view_3d.draw_face_guide.
-    # Font(None, ...) uses pygame's default font, no .ttf file of our
-    # own is needed.
-    "guide": pygame.font.Font(None, 15),
-    # Small font rendered without antialiasing at MenuState/
-    # InstructionsState's title/button sizes, then upscaled with
-    # nearest-neighbor scaling for a blocky "pixel art" look -- see
-    # MenuState._pixel_text / _pixel_text_rainbow.
-    "pixel_title": pygame.font.Font(None, 19),
-    "pixel_button": pygame.font.Font(None, 14),
-    # Plain (antialiased) body font for InstructionsState's control
-    # list -- legible at small size, no pixel-scaling trick needed.
-    "body": pygame.font.Font(None, 14),
-    "body_bold": pygame.font.Font(None, 14),
-    # Digits for PlayState's scramble timer, rendered blocky/pixel-art
-    # style (see PlayState._render_pixel_text) same trick as
-    # "pixel_title"/"pixel_button" above.
-    "timer": pygame.font.Font(None, 18),
+# (size on the 480x270 virtual canvas, bold). Font(None, ...) uses
+# pygame's default font, no .ttf file of our own is needed.
+FONT_SPECS = {
+    # Face-guide letters (U/D/L/R/F/B) -- see view_3d.draw_face_guide.
+    "guide": (15, True),
+    # Plain (antialiased) text: InstructionsState's rows, PlayState's
+    # button tooltips and search messages.
+    "body": (14, False),
+    "body_bold": (14, True),
+    "small": (12, False),
 }
-FONTS["guide"].set_bold(True)
-FONTS["pixel_title"].set_bold(True)
-FONTS["pixel_button"].set_bold(True)
-FONTS["body_bold"].set_bold(True)
-FONTS["timer"].set_bold(True)
+# Virtual-size fonts, used for measuring/laying out text and for the
+# pixel-art labels drawn on the canvas. Plain text is drawn through
+# src/text.py instead, which rebuilds these at window resolution so it
+# stays sharp after the canvas gets upscaled.
+FONTS = {}
+for _key, (_size, _bold) in FONT_SPECS.items():
+    FONTS[_key] = pygame.font.Font(None, _size)
+    FONTS[_key].set_bold(_bold)
+
+# Blocky pixel-art labels (menu/instructions titles and buttons, the
+# scramble timer): a real pixel font at its native 8px grid, rendered
+# without antialiasing and enlarged by src/text.py's PixelLabel.
+PIXEL_FONT_PATH = BASE_DIR / "assets" / "fonts" / "PressStart2P-Regular.ttf"
+FONTS["pixel"] = pygame.font.Font(str(PIXEL_FONT_PATH), 8)

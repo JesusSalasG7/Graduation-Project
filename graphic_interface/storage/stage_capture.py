@@ -1,11 +1,11 @@
-"""Corte por etapa de la sesion guiada: nombrado de carpetas en el
+"""Corte por etapa de la sesión guiada: nombrado de carpetas en el
 Escritorio, recorte por rango de tiempo (pandas) de los CSV continuos que
-ya escriben NeuroSky y el Camera Tracker (Emotion + Eye), agregacion de
-miradas izquierda/derecha, y escritores de los archivos por etapa/desafio.
+ya escriben NeuroSky y el Camera Tracker (Emotion + Eye), agregación de
+miradas izquierda/derecha, y escritores de los archivos por etapa/desafío.
 
 Estos CSV se capturan en subprocesos externos que corren durante TODA la
-sesion guiada (ver neurosky_launcher.py / camera_tracker_launcher.py) --
-este modulo no toca esos procesos, solo relee los archivos que ya estan en
+sesión guiada (ver neurosky_launcher.py / camera_tracker_launcher.py) --
+este módulo no toca esos procesos, solo relee los archivos que ya están en
 disco y los recorta por el rango [inicio, fin] de cada etapa.
 """
 
@@ -23,9 +23,9 @@ from content.quiz import QuizQuestion
 
 SESSIONS_DIR_NAME = "Sesiones_participantes"
 
-# Unicas etapas que capturan datos (ver session_wizard._export_stage /
-# _save_stage3_files) -- la 1 y la 6 son solo transicion/demostracion, sin
-# nada que exportar. Orden en el que ocurren durante la sesion.
+# Únicas etapas que capturan datos (ver session_wizard._export_stage /
+# _save_stage3_files) -- la 1 y la 6 son solo transición/demostración, sin
+# nada que exportar. Orden en el que ocurren durante la sesión.
 GUIDED_SESSION_STAGE_ORDER = [2, 3, 4, 5]
 
 # Carpetas viejas "Nombre_Apellido_N" (ver _migrate_legacy_participant_folder).
@@ -33,8 +33,8 @@ _LEGACY_FOLDER_RE = re.compile(r"[A-Za-z0-9-]+(?:_[A-Za-z0-9-]+)*_\d+")
 
 
 def participant_folder_name(participant: dict) -> str:
-    """"Participante_N" -- a proposito SIN nombre/apellido: estas carpetas
-    tienen los datos biometricos de la sesion, y el nombre real vive solo
+    """"Participante_N" -- a propósito SIN nombre/apellido: estas carpetas
+    tienen los datos biométricos de la sesión, y el nombre real vive solo
     en el registro personal fuera del proyecto (ver personal_records.py)."""
     return f"Participante_{participant['number']}"
 
@@ -42,7 +42,7 @@ def participant_folder_name(participant: dict) -> str:
 def _migrate_legacy_participant_folder(number: int) -> None:
     """Sesiones grabadas antes del cambio a "Participante_N" quedaron en
     "Nombre_Apellido_N" -- se renombran la primera vez que se accede a
-    ese participante, para no dejar dos carpetas del mismo numero."""
+    ese participante, para no dejar dos carpetas del mismo número."""
     root = sessions_root()
     target = root / f"Participante_{number}"
     if target.exists() or not root.is_dir():
@@ -74,14 +74,14 @@ def challenge_dir_readonly(participant: dict, challenge_number: int) -> Path:
     """Igual que challenge_dir pero sin crear ninguna carpeta -- para
     lecturas (p.ej. la matriz de datos guardados en la pestaña Sesión, ver
     app.py) que no deben dejar rastro en disco por el solo hecho de
-    mirar un desafío que todavia no tiene datos."""
+    mirar un desafío que todavía no tiene datos."""
     _migrate_legacy_participant_folder(participant["number"])
     return sessions_root() / participant_folder_name(participant) / f"Desafio_{challenge_number}"
 
 
 def list_stage_attempts(challenge_folder: Path, stage_number: int) -> list[int]:
-    """Numeros de intento ya exportados para esta etapa (ver stage_dir),
-    ordenados -- vacio si la etapa nunca se re-hizo (o no tiene datos)."""
+    """Números de intento ya exportados para esta etapa (ver stage_dir),
+    ordenados -- vacío si la etapa nunca se re-hizo (o no tiene datos)."""
     stage_folder = challenge_folder / f"Etapa_{stage_number}"
     if not stage_folder.is_dir():
         return []
@@ -97,9 +97,9 @@ def list_stage_attempts(challenge_folder: Path, stage_number: int) -> list[int]:
 
 def resolve_stage_folder(challenge_folder: Path, stage_number: int, attempt: Optional[int] = None) -> Optional[Path]:
     """Encuentra, para lectura (ventana de resumen), la carpeta de una etapa
-    ya exportada -- resuelve al ultimo intento por defecto si la etapa esta
-    versionada, o a la carpeta directa si nunca se reintento. None si no hay
-    nada exportado todavia."""
+    ya exportada -- resuelve al último intento por defecto si la etapa está
+    versionada, o a la carpeta directa si nunca se reintentó. None si no hay
+    nada exportado todavía."""
     stage_folder = challenge_folder / f"Etapa_{stage_number}"
     attempts = list_stage_attempts(challenge_folder, stage_number)
     if attempts:
@@ -110,10 +110,10 @@ def resolve_stage_folder(challenge_folder: Path, stage_number: int, attempt: Opt
 
 def stage_dir(participant: dict, challenge_number: int, stage_number: int, attempt: Optional[int] = None) -> Path:
     """Carpeta de una etapa. Las etapas 3/4/5 se re-hacen si el participante
-    reintenta el desafio (ver session_wizard._show_stage4/5/6 "Reintentar
-    este desafio"): si se pasa `attempt` (> 1, o siempre para no perder el
+    reintenta el desafío (ver session_wizard._show_stage4/5/6 "Reintentar
+    este desafío"): si se pasa `attempt` (> 1, o siempre para no perder el
     primer intento) se versiona en una subcarpeta "intento_N" en vez de
-    pisar la exportacion anterior."""
+    pisar la exportación anterior."""
     base = challenge_dir(participant, challenge_number) / f"Etapa_{stage_number}"
     if attempt is not None:
         base = base / f"intento_{attempt}"
@@ -146,9 +146,9 @@ class StageTimer:
     def finish(self, stage: int) -> StageWindow:
         window = self._windows.get(stage)
         if window is None:
-            # No se llamo a start() (p.ej. se entro a la etapa por otro
+            # No se llamó a start() (p.ej. se entró a la etapa por otro
             # camino) -- se usa el instante actual como inicio y fin, mejor
-            # una ventana de 0 segundos que reventar la exportacion.
+            # una ventana de 0 segundos que reventar la exportación.
             now = datetime.now()
             window = StageWindow(stage=stage, started_at=now, ended_at=now)
             self._windows[stage] = window
@@ -209,12 +209,12 @@ def _slice_by_timestamp_column(
     return sliced, warnings
 
 
-# Categorias que loguea tools/emotion_recognizer.py.EmotionAnalyzer (una
-# columna "pct_<categoria>" por cada una, mas valence/arousal, ver
-# EMOTION_CSV_FIELDNAMES ahi) -- duplicada aca (en vez de importar desde
-# tools/) porque ese modulo carga opencv/onnxruntime/emotiefflib, pesado
-# para lo unico que hace falta aca: los nombres de columna para construir
-# un DataFrame vacio cuando falta el CSV.
+# Categorías que loguea tools/emotion_recognizer.py.EmotionAnalyzer (una
+# columna "pct_<categoria>" por cada una, más valence/arousal, ver
+# EMOTION_CSV_FIELDNAMES ahí) -- duplicada acá (en vez de importar desde
+# tools/) porque ese módulo carga opencv/onnxruntime/emotiefflib, pesado
+# para lo único que hace falta acá: los nombres de columna para construir
+# un DataFrame vacío cuando falta el CSV.
 EMOTION_CATEGORIES = ["anger", "contempt", "disgust", "fear", "happiness", "neutral", "sadness", "surprise"]
 
 
@@ -243,10 +243,10 @@ HEART_RATE_COLUMNS = [
 ]
 
 # Las etapas 2/4/5 duran segundos, pero el reloj -salvo que se active
-# medicion continua- suele tomar una lectura puntual cada varios minutos.
+# medición continua- suele tomar una lectura puntual cada varios minutos.
 # Es casi seguro que ninguna caiga justo dentro de la ventana de la etapa,
-# asi que en vez de dejar la etapa sin ningun dato se admite la lectura
-# puntual mas cercana (antes o despues) si esta a menos de esta tolerancia.
+# así que en vez de dejar la etapa sin ningún dato se admite la lectura
+# puntual más cercana (antes o después) si está a menos de esta tolerancia.
 HEART_RATE_FALLBACK_TOLERANCE = timedelta(minutes=30)
 
 
@@ -258,7 +258,7 @@ def _parse_utc_offset(offset_text: str) -> timedelta:
     com.samsung.health.heart_rate.time_offset) -- para poder pasar los
     timestamps epoch (UTC) de los JSON de binning (ver
     _expand_binning_json) a la misma hora local "naive" que ya usan las
-    demas columnas de este CSV. Si el texto no matchea el formato
+    demás columnas de este CSV. Si el texto no matchea el formato
     esperado, no desplaza nada (mejor una hora posiblemente incorrecta en
     UTC que reventar el recorte)."""
     match = _UTC_OFFSET_RE.match((offset_text or "").strip())
@@ -277,14 +277,14 @@ _BINNING_EXPANDED_COLUMNS = [
 
 
 def _expand_binning_json(row: "pd.Series", jsons_dir: Path) -> pd.DataFrame:
-    """Una fila agregada por hora del CSV plano (`binning_data` no vacio)
-    solo trae el promedio/max/min de esa hora -- la medicion real,
+    """Una fila agregada por hora del CSV plano (`binning_data` no vacío)
+    solo trae el promedio/max/min de esa hora -- la medición real,
     minuto a minuto, vive en un JSON aparte (nombrado por esa misma
     columna) que Samsung Health exporta en
     "jsons/com.samsung.shealth.tracker.heart_rate/<primera_letra>/
     <nombre>.json" DENTRO de la carpeta completa del export (no viene con
     el CSV suelto, ver heart_rate_import.HEART_RATE_JSON_SUBDIR). Si ese
-    JSON no esta disponible o no se puede leer, esta fila simplemente no
+    JSON no está disponible o no se puede leer, esta fila simplemente no
     aporta lecturas (no es un error -- ver el aviso de "datos agregados
     por hora" en slice_heart_rate)."""
     filename = str(row.get("com.samsung.health.heart_rate.binning_data", "")).strip()
@@ -317,12 +317,12 @@ def _expand_binning_json(row: "pd.Series", jsons_dir: Path) -> pd.DataFrame:
 def slice_heart_rate(
     csv_path: Path, start: datetime, end: datetime, jsons_dir: Optional[Path] = None,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Recorta la frecuencia cardiaca del reloj para la ventana [start, end]
+    """Recorta la frecuencia cardíaca del reloj para la ventana [start, end]
     de una etapa, combinando dos fuentes del CSV plano de Samsung Health
     ("com.samsung.shealth.tracker.heart_rate.*.csv", ver
     heart_rate_import.py):
 
-    - Lecturas puntuales (`binning_data` vacio): chequeos sueltos del
+    - Lecturas puntuales (`binning_data` vacío): chequeos sueltos del
       reloj, espaciados minutos u horas.
     - Lecturas agregadas por hora (`binning_data` con un nombre de JSON):
       si se pasa `jsons_dir` (la carpeta "jsons/com.samsung.shealth.
@@ -331,10 +331,10 @@ def slice_heart_rate(
       minuto a minuto que trae su JSON de respaldo (ver
       _expand_binning_json) -- esto es lo que efectivamente produce la
       "medicion continua" del reloj. Sin `jsons_dir` (o si el JSON no
-      esta disponible), esas filas se ignoran, igual que antes.
+      está disponible), esas filas se ignoran, igual que antes.
 
     Si ninguna lectura (puntual o expandida) cae dentro de [start, end],
-    recurre a la mas cercana dentro de HEART_RATE_FALLBACK_TOLERANCE (ver
+    recurre a la más cercana dentro de HEART_RATE_FALLBACK_TOLERANCE (ver
     esa constante) y la marca con la columna `is_fallback_reading` para que
     quien la muestre (ver stage_capture._summarize_heart_rate) deje en claro
     que es aproximada."""
@@ -342,9 +342,9 @@ def slice_heart_rate(
         return _empty_result(HEART_RATE_COLUMNS, "Frecuencia cardíaca: no se encontró el archivo del reloj.")
     try:
         # index_col=False es necesario: cada fila trae una coma final (un
-        # 22do campo vacio) mientras que la cabecera solo declara 21
+        # 22do campo vacío) mientras que la cabecera solo declara 21
         # columnas -- sin esto pandas asume que la primera columna es un
-        # indice y desplaza el resto, corrompiendo todas las columnas.
+        # índice y desplaza el resto, corrompiendo todas las columnas.
         df = pd.read_csv(csv_path, skiprows=1, encoding="utf-8-sig", index_col=False)
     except (pd.errors.EmptyDataError, OSError):
         return _empty_result(HEART_RATE_COLUMNS, "Frecuencia cardíaca: el archivo está vacío o no se pudo leer.")
@@ -410,20 +410,20 @@ def slice_heart_rate(
 
 
 # ============================================================
-# Agregacion de miradas izquierda/derecha
+# Agregación de miradas izquierda/derecha
 # ============================================================
 
 def aggregate_eye_looks(eye_df: pd.DataFrame) -> pd.DataFrame:
     """Agrupa filas consecutivas con el mismo `gaze_direction` en "miradas":
-    cuantas veces el participante miro a cada lado y cuanto duro cada una.
+    cuántas veces el participante miró a cada lado y cuánto duró cada una.
 
     El CSV crudo (ver tools/camera_tracker.py::GazeEstimator.report) ya trae
-    la direccion izquierda/derecha por fila (con debounce), pero no esta
-    agregacion -- se calcula aca, no en la captura en vivo.
+    la dirección izquierda/derecha por fila (con debounce), pero no esta
+    agregación -- se calcula acá, no en la captura en vivo.
 
-    Nota de precision: `timestamp` tiene resolucion de 1 segundo (sin
-    fraccion), asi que una "mirada" de un solo frame puede reportar 0
-    segundos de duracion aunque haya durado una fraccion de segundo real.
+    Nota de precisión: `timestamp` tiene resolución de 1 segundo (sin
+    fracción), así que una "mirada" de un solo frame puede reportar 0
+    segundos de duración aunque haya durado una fracción de segundo real.
     """
     columns = ["direction", "start_ts", "end_ts", "duration_seconds", "sample_count"]
     if eye_df.empty or "gaze_direction" not in eye_df.columns:
@@ -459,9 +459,9 @@ def write_stage_sensor_files(
     eye_df: Optional[pd.DataFrame] = None, heart_df: Optional[pd.DataFrame] = None,
 ) -> None:
     """Cada DataFrame es opcional -- None significa que ese dispositivo no
-    se uso en esta sesion (ver SessionWizard._enabled_devices), no que
-    falto el dato: en ese caso directamente no se escribe el CSV
-    correspondiente, en vez de uno vacio, para no confundir "no se uso"
+    se usó en esta sesión (ver SessionWizard._enabled_devices), no que
+    faltó el dato: en ese caso directamente no se escribe el CSV
+    correspondiente, en vez de uno vacío, para no confundir "no se uso"
     con "se uso pero no se encontro nada" (ver stage_capture.
     summarize_stage / _summarize_csv_rows, que ya tratan un archivo
     ausente como EMPTY_CELL)."""
@@ -502,9 +502,9 @@ def write_cuestionario_txt(stage_folder: Path, questions: list[QuizQuestion], an
 
 
 def write_stage3_files(stage_folder: Path, prompt_text: str, statement_log: list[dict]) -> None:
-    """Etapa 3: el prompt libre que escribio el participante
-    (`escrito_etapa3.txt`, hoy solo vivia en memoria) y el registro de
-    cuantas veces abrio el enunciado del desafio y cuanto duro cada
+    """Etapa 3: el prompt libre que escribió el participante
+    (`escrito_etapa3.txt`, hoy solo vivía en memoria) y el registro de
+    cuántas veces abrió el enunciado del desafío y cuánto duró cada
     apertura (`registro_enunciado.csv`)."""
     (stage_folder / "escrito_etapa3.txt").write_text(prompt_text, encoding="utf-8")
 
@@ -521,7 +521,7 @@ def write_stage3_files(stage_folder: Path, prompt_text: str, statement_log: list
 def write_sync_timeline(stage_folder: Path, window: StageWindow, per_source_info: dict) -> None:
     """sync_timeline.json: vincula por tiempo las distintas fuentes de esta
     etapa -- rango de la etapa y, por fuente, cantidad de filas / primer y
-    ultimo timestamp / advertencias, para poder alinearlas despues sin
+    último timestamp / advertencias, para poder alinearlas después sin
     rehacer el recorte."""
     payload = {
         "stage": window.stage,
@@ -565,7 +565,7 @@ def write_session_index(participant_folder: Path, completed_challenges: list[int
 def available_challenges(participant_folder: Path) -> list[int]:
     """Desafíos con algo para mostrar (manifiesto propio o, a falta de eso,
     cualquier carpeta Etapa_* con contenido -- un desafío cerrado con
-    "Siguiente juego" nunca pasa por la pantalla del reloj, asi que nunca
+    "Siguiente juego" nunca pasa por la pantalla del reloj, así que nunca
     tiene resumen_desafio.json, pero sus etapas ya tienen datos reales
     exportados en disco, ver _export_stage en session_wizard.py)."""
     session_index = participant_folder / "resumen_sesion.json"
@@ -601,7 +601,7 @@ EMPTY_CELL = "—"
 
 def _summarize_csv_rows(path: Path) -> str:
     """"N lecturas" para un CSV crudo (NeuroSky/Emotion) -- EMPTY_CELL si
-    no existe, esta vacio, o no se puede leer (nunca lanza)."""
+    no existe, está vacío, o no se puede leer (nunca lanza)."""
     if not path.exists():
         return EMPTY_CELL
     try:
@@ -637,12 +637,12 @@ def _summarize_eye_looks(path: Path) -> str:
 def _summarize_heart_rate(path: Path) -> str:
     """"HH:MM:SS–HH:MM:SS (~X bpm prom.)" a partir de heart_rate.csv (ya
     recortado por slice_heart_rate) -- prioriza el promedio de bpm sobre la
-    cantidad de lecturas (poco util para el evaluador); si no hay valores
-    de bpm utilizables cae a "N lecturas" para no dejar la celda vacia. Si
-    la unica lectura disponible es la mas cercana fuera de la ventana de la
+    cantidad de lecturas (poco útil para el evaluador); si no hay valores
+    de bpm utilizables cae a "N lecturas" para no dejar la celda vacía. Si
+    la única lectura disponible es la más cercana fuera de la ventana de la
     etapa (columna `is_fallback_reading`, ver HEART_RATE_FALLBACK_
     TOLERANCE), lo marca con "(aprox., fuera de la etapa)" para que no se
-    lea como una medicion exacta durante la etapa."""
+    lea como una medición exacta durante la etapa."""
     if not path.exists():
         return EMPTY_CELL
     try:
@@ -675,7 +675,7 @@ def _summarize_heart_rate(path: Path) -> str:
 
 
 def _summarize_cuestionario(path: Path) -> str:
-    """"N/M correctas" contando las lineas "¿Correcto?: Si/No" que ya
+    """"N/M correctas" contando las líneas "¿Correcto?: Si/No" que ya
     escribe write_cuestionario_txt."""
     if not path.exists():
         return EMPTY_CELL
@@ -707,7 +707,7 @@ def _summarize_enunciado(path: Path) -> str:
 def summarize_stage(challenge_folder: Path, stage: int, attempt: Optional[int] = None) -> dict:
     """Resumen (listo para mostrar) de una etapa ya exportada, para la
     matriz de la pestaña "Sesión" -- nunca lanza: una etapa sin datos
-    (sesion en curso, o el participante todavia no llego ahi) devuelve
+    (sesión en curso, o el participante todavía no llegó ahí) devuelve
     todas las columnas en EMPTY_CELL, no rompe la interfaz.
 
     Las columnas de sensores aplican a las etapas 2/3/4/5; la de

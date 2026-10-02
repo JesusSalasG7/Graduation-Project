@@ -14,6 +14,7 @@ import settings
 from src import scoring
 from src.entities.falling_letter import FallingLetter
 from src.rendering.note import Note
+from src.rendering import pixel_text
 from src.rendering.pixel_text import render_text
 from src.world import ActiveWord, World
 
@@ -148,12 +149,16 @@ class TypingRenderer:
         if combo < settings.COMBO_WATERMARK_MIN_COMBO:
             return
 
-        text_surface = settings.FONTS["combo_watermark"].render(
-            str(combo), True, settings.COMBO_WATERMARK_COLOR
+        render_text(
+            surface,
+            str(combo),
+            settings.FONTS["combo_watermark"],
+            settings.VIRTUAL_WIDTH // 2,
+            (settings.FALL_START_Y + settings.HIT_ZONE_Y) // 2,
+            settings.COMBO_WATERMARK_COLOR,
+            center=True,
+            alpha=settings.COMBO_WATERMARK_ALPHA,
         )
-        text_surface.set_alpha(settings.COMBO_WATERMARK_ALPHA)
-        center = (settings.VIRTUAL_WIDTH // 2, (settings.FALL_START_Y + settings.HIT_ZONE_Y) // 2)
-        surface.blit(text_surface, text_surface.get_rect(center=center))
 
     def _beat_pulse_strength(self) -> float:
         """
@@ -273,10 +278,16 @@ class TypingRenderer:
             color = settings.JUDGEMENT_COLORS[popup["judgement"]]
             label = settings.JUDGEMENT_LABELS[popup["judgement"]]
 
-            popup_surface = settings.FONTS["popup"].render(label, True, color)
-            popup_surface.set_alpha(alpha)
-            rect = popup_surface.get_rect(center=(popup["x"], settings.HIT_ZONE_Y - 34 + rise))
-            surface.blit(popup_surface, rect)
+            render_text(
+                surface,
+                label,
+                settings.FONTS["popup"],
+                popup["x"],
+                settings.HIT_ZONE_Y - 34 + rise,
+                color,
+                center=True,
+                alpha=alpha,
+            )
 
         self._popups = still_active
 
@@ -378,6 +389,9 @@ class TypingRenderer:
         overlay = pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT), pygame.SRCALPHA)
         overlay.fill((*settings.BACKGROUND_COLOR[:3], 215))
         surface.blit(overlay, (0, 0))
+        # Mismo velo sobre el texto del juego que ya se encoló (HUD,
+        # palabra, letras), que se dibuja aparte a resolución de ventana.
+        pixel_text.overlay((*settings.BACKGROUND_COLOR[:3], 215))
 
         render_text(
             surface,

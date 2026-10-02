@@ -14,10 +14,11 @@ from typing import Any, Dict, Tuple
 import pygame
 
 from gale.input_handler import InputData
-from gale.text import render_text
 
 import settings
+from src import text as text_layer
 from src.levels import LEVELS
+from src.text import render_text
 
 
 class VictoryState:
@@ -65,6 +66,9 @@ class VictoryState:
         backdrop_color = settings.OVERLAY_BACKDROP_COLOR
         backdrop.fill((backdrop_color.r, backdrop_color.g, backdrop_color.b, 170))
         surface.blit(backdrop, (0, 0))
+        # Mismo oscurecimiento sobre el texto del HUD, que se dibuja
+        # aparte a resolución de ventana (ver src/text.py).
+        text_layer.overlay((backdrop_color.r, backdrop_color.g, backdrop_color.b, 170))
 
         center_x = settings.VIRTUAL_WIDTH // 2
         center_y = settings.VIRTUAL_HEIGHT // 2

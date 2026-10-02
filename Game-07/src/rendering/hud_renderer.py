@@ -5,9 +5,8 @@ simulation is paused or running.
 """
 import pygame
 
-from gale.text import render_text
-
 import settings
+from src.text import render_text
 
 
 def render_hud(

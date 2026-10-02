@@ -15,6 +15,7 @@ from gale.input_handler import (
     KEY_LEFT,
     KEY_RIGHT,
     KEY_r,
+    KEY_h,
     KEY_RETURN,
     KEY_KP_ENTER,
     KEY_ESCAPE,
@@ -33,6 +34,7 @@ class Game2048(Game):
         InputHandler.set_keyboard_action(KEY_LEFT, "move_left")
         InputHandler.set_keyboard_action(KEY_RIGHT, "move_right")
         InputHandler.set_keyboard_action(KEY_r, "restart")
+        InputHandler.set_keyboard_action(KEY_h, "help")
         InputHandler.set_keyboard_action(KEY_ESCAPE, "quit")
 
         # ENTER (principal o del teclado numérico) confirma en la portada.

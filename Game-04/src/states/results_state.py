@@ -11,6 +11,7 @@ from gale.input_handler import InputData
 from gale.state import BaseState
 
 import settings
+from src import text
 
 RESULTS_TITLE = "RESULTADOS DE LA TRANSMISIÓN"
 RESULTS_RESTART_HINT = "R = reiniciar transmisión      ESC = salir"
@@ -46,26 +47,26 @@ class ResultsState(BaseState):
     def render(self, surface: pygame.Surface) -> None:
         surface.fill(settings.COLORS["background"])
 
-        title_surface = settings.FONTS["results_title"].render(RESULTS_TITLE, True, settings.COLORS["accent"])
-        surface.blit(title_surface, title_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=12))
+        text.draw_text(
+            surface, "results_title", RESULTS_TITLE, settings.COLORS["accent"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=12,
+        )
 
         total_time_s = self.total_time_ms / 1000
-        time_surface = settings.FONTS["stats"].render(f"TIEMPO TOTAL: {total_time_s:.1f}s", True, settings.COLORS["text"])
-        surface.blit(time_surface, time_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, top=_TOTAL_TIME_TOP))
+        text.draw_text(
+            surface, "stats", f"TIEMPO TOTAL: {total_time_s:.1f}s", settings.COLORS["text"],
+            centerx=settings.VIRTUAL_WIDTH / 2, top=_TOTAL_TIME_TOP,
+        )
 
         for index, entry in enumerate(self.game_log):
             row, column = divmod(index, _GRID_COLUMNS)
             color = settings.COLORS["success"] if entry.get("is_correct") else settings.COLORS["error"]
-            word_surface = settings.FONTS["stats"].render(entry["string"], True, color)
-            surface.blit(
-                word_surface,
-                word_surface.get_rect(
-                    centerx=_COLUMN_CENTERS[column],
-                    top=_ROW_TOP + row * _ROW_SPACING,
-                ),
+            text.draw_text(
+                surface, "stats", entry["string"], color,
+                centerx=_COLUMN_CENTERS[column], top=_ROW_TOP + row * _ROW_SPACING,
             )
 
-        hint_surface = settings.FONTS["hint"].render(RESULTS_RESTART_HINT, True, settings.COLORS["text_dim"])
-        surface.blit(
-            hint_surface, hint_surface.get_rect(centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 10)
+        text.draw_text(
+            surface, "hint", RESULTS_RESTART_HINT, settings.COLORS["text_dim"],
+            centerx=settings.VIRTUAL_WIDTH / 2, bottom=settings.VIRTUAL_HEIGHT - 10,
         )

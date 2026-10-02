@@ -1,10 +1,10 @@
-"""Catalogo de desafios por juego: enunciado que se le presenta al participante
-en la Etapa 1 de la sesion guiada.
+"""Catalogo de desafíos por juego: enunciado que se le presenta al participante
+en la Etapa 1 de la sesión guiada.
 
-Cada uno de los 7 juegos tiene un desafio algoritmico central (una funcion
+Cada uno de los 7 juegos tiene un desafío algorítmico central (una función
 en `src/algorithm.py`, `src/world.py`, `src/logic2048.py`, etc.) que el
 participante debe completar en base a su propio prompt (ver
-challenge_solver.py). Este modulo guarda, para cada juego, el enunciado
+challenge_solver.py). Este módulo guarda, para cada juego, el enunciado
 completo tal como se le presenta.
 """
 
@@ -14,13 +14,13 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Challenge:
     game: str  # nombre de la carpeta, ej. "Game-01"
-    challenge_id: str  # identificador corto del desafio, ej. "A01"
-    title: str  # titulo descriptivo del desafio
-    location: str  # archivo/funcion donde se resuelve
-    statement: str  # enunciado del desafio tal como se le presenta al participante
-    broken_symptom: str  # que probar/observar en la Etapa 1 (juego SIN la solucion) para notar la falla
-    signature: str  # firma exacta de la funcion/metodo a implementar
-    requirements: list[str]  # lista de requisitos exactos que debe cumplir la solucion
+    challenge_id: str  # identificador corto del desafío, ej. "A01"
+    title: str  # título descriptivo del desafío
+    location: str  # archivo/función donde se resuelve
+    statement: str  # enunciado del desafío tal como se le presenta al participante
+    broken_symptom: str  # que probar/observar en la Etapa 1 (juego SIN la solución) para notar la falla
+    signature: str  # firma exacta de la función/método a implementar
+    requirements: list[str]  # lista de requisitos exactos que debe cumplir la solución
     examples: str  # ejemplos/casos de prueba concretos, formateados como bloque de texto
 
 
@@ -37,7 +37,7 @@ CHALLENGES: dict[str, Challenge] = {
             "juego tiene un valor entero al azar (food_field.apples, atributo "
             ".value: -5, 5 o 15). Hay que implementar World.count_apples_in_range() "
             "para que devuelva cuántas manzanas del tablero tienen su valor dentro "
-            "del rango activo (limites inclusive), reutilizando el metodo ya "
+            "del rango activo (límites inclusive), reutilizando el método ya "
             "existente World._apple_passes_filter(value) para decidir si cada "
             "manzana individual pasa el filtro. Este conteo alimenta dos cosas: el "
             "indicador en pantalla \"En rango: N/Total\", y un BONO DE PUNTOS "
@@ -93,10 +93,11 @@ CHALLENGES: dict[str, Challenge] = {
             "por ejemplo 2x2x2, que se busca dentro de ese estado.)"
         ),
         broken_symptom=(
-            "Toca el botón \"Buscar\" en distintos momentos (recién "
-            "empezado, después de mezclar) y fíjate si realmente resalta "
-            "el bloque 2x2x2 objetivo en el cubo 3D cuando ese patrón está "
-            "presente, o si nunca encuentra nada."
+            "Toca el botón \"Buscar\" (la lupa) recién empezado, con el cubo "
+            "resuelto: verás cómo revisa una por una las 8 esquinas del cubo "
+            "(en amarillo). Fíjate en el resultado final: con el cubo resuelto "
+            "debería encontrar el bloque 2x2x2 objetivo y resaltarlo en verde, "
+            "¿lo encuentra o dice que no está?"
         ),
         signature=(
             "Matrix3D = List[List[List[int]]]\n\n"
@@ -154,7 +155,7 @@ CHALLENGES: dict[str, Challenge] = {
             "Cadena de un solo carácter debe devolver True.",
             "Comparación carácter por carácter, incluyendo mayúsculas/minúsculas y cualquier "
             "espacio o símbolo tal cual vienen en text, sin normalizar nada.",
-            "No debe usar librerías externas ni pygame/gale, es lógica pura sobre un string.",
+            "No debe usar bibliotecas externas ni pygame/gale, es lógica pura sobre un string.",
         ],
         examples=(
             "- Estables (True): RADAR, RECONOCER, SOMETEMOS, ANILINA, ROTOR, SALAS, SOMOS, SERES.\n"
@@ -259,8 +260,9 @@ CHALLENGES: dict[str, Challenge] = {
         ),
         broken_symptom=(
             "Prueba mover el tablero con las flechas -- fíjate si las "
-            "fichas realmente se deslizan, se fusionan al chocar dos "
-            "iguales, o si aparece una ficha nueva después de mover."
+            "fichas realmente se deslizan hasta el borde y se fusionan al "
+            "chocar dos iguales, o si solo \"rebotan\" en su lugar mientras "
+            "siguen apareciendo fichas nuevas hasta llenar el tablero."
         ),
         signature=(
             "def _compress_and_merge(\n"
@@ -278,8 +280,8 @@ CHALLENGES: dict[str, Challenge] = {
             "Debe devolver una tupla (linea_resultante, puntos_obtenidos, hubo_cambio, "
             "desplazamientos): los puntos son la suma de los valores nuevos creados por "
             "cada fusión, hubo_cambio es False si el resultado es idéntico a la entrada, y "
-            "desplazamientos trae un registro por cada ficha original (indice de origen, "
-            "indice de destino, valor, si se fusiono).",
+            "desplazamientos trae un registro por cada ficha original (índice de origen, "
+            "índice de destino, valor, si se fusionó).",
             "No debe mutar la lista `line` recibida.",
         ],
         examples=(

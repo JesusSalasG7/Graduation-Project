@@ -8,6 +8,7 @@ from gale.game import Game
 from gale.input_handler import InputData, InputListener
 from gale.state import StateMachine
 
+from src import text
 from src.states.game_over_state import GameOverState
 from src.states.instructions_state import InstructionsState
 from src.states.play_state import PlayState
@@ -42,3 +43,20 @@ class MirrorCodeGame(Game, InputListener):
 
     def render(self, surface: pygame.Surface) -> None:
         self.state_machine.render(surface)
+
+    def _Game__render(self) -> None:
+        # Overrides gale's private Game.__render (the loop calls it as
+        # self.__render(), i.e. self._Game__render()): same steps, plus
+        # drawing the text queued by src/text.draw_text straight onto
+        # the window AFTER the virtual canvas is upscaled, so it stays
+        # sharp instead of being scaled up with everything else.
+        text.begin_frame()
+        self.render_surface.fill((0, 0, 0))
+        self.render(self.render_surface)
+        self.screen.blit(pygame.transform.scale(self.render_surface, self.screen.get_size()), (0, 0))
+        text.flush(
+            self.screen,
+            self.screen.get_width() / self.virtual_width,
+            self.screen.get_height() / self.virtual_height,
+        )
+        pygame.display.update()

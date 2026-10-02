@@ -397,15 +397,23 @@ SPRITES = {
 # holds up on a machine without Consolas/Courier New.
 FONT_FAMILY = "consolas,couriernew,dejavusansmono,monospace"
 
+# (size on the virtual canvas, bold). FONTS holds them at virtual size
+# (used for measuring/laying out text); src/rendering/pixel_text.py
+# rebuilds each one at window resolution when actually drawing, so the
+# letters stay sharp instead of being upscaled with the canvas.
+FONT_SPECS = {
+    "hud": (12, False),
+    "note": (13, True),
+    "letter": (18, True),
+    "queue": (10, False),
+    "menu": (15, False),
+    "title": (28, True),
+    "popup": (13, True),
+    "combo_watermark": (64, True),
+}
 FONTS = {
-    "hud": pygame.font.SysFont(FONT_FAMILY, 12),
-    "note": pygame.font.SysFont(FONT_FAMILY, 13, bold=True),
-    "letter": pygame.font.SysFont(FONT_FAMILY, 18, bold=True),
-    "queue": pygame.font.SysFont(FONT_FAMILY, 10),
-    "menu": pygame.font.SysFont(FONT_FAMILY, 15),
-    "title": pygame.font.SysFont(FONT_FAMILY, 28, bold=True),
-    "popup": pygame.font.SysFont(FONT_FAMILY, 13, bold=True),
-    "combo_watermark": pygame.font.SysFont(FONT_FAMILY, 64, bold=True),
+    key: pygame.font.SysFont(FONT_FAMILY, size, bold=bold)
+    for key, (size, bold) in FONT_SPECS.items()
 }
 
 # --- Input -------------------------------------------------------------

@@ -4,11 +4,11 @@ CLI `claude` (por defecto, sin API key propia -- ver README, sección
 "Requisitos previos") o API de Gemini (Google AI Studio), si se configura
 AI_PROVIDER=gemini + GEMINI_API_KEY.
 
-Este modulo NO decide nada de negocio (system prompt,
+Este módulo NO decide nada de negocio (system prompt,
 contenido del JSON Schema de las preguntas): eso sigue viviendo en
 isolated_prompt.py / challenge_solver.py, que llaman a run_isolated_prompt /
-run_json_schema_prompt de aca sin saber que proveedor responde en realidad.
-Asi, agregar un tercer proveedor a futuro no toca la logica de las
+run_json_schema_prompt de acá sin saber que proveedor responde en realidad.
+Así, agregar un tercer proveedor a futuro no toca la lógica de las
 Etapas 2/3/4/5.
 """
 
@@ -29,9 +29,9 @@ PROVIDER_GEMINI = "gemini"
 
 GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 GEMINI_MODEL_ENV = "GEMINI_MODEL"
-# gemini-2.5-flash quedo deprecado para cuentas nuevas (la API devuelve 404
+# gemini-2.5-flash quedó deprecado para cuentas nuevas (la API devuelve 404
 # y recomienda este reemplazo) -- si Google vuelve a rotar el modelo
-# recomendado, se puede pisar sin tocar codigo con la variable de entorno
+# recomendado, se puede pisar sin tocar código con la variable de entorno
 # GEMINI_MODEL.
 DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -41,13 +41,13 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 class AIResult:
     ok: bool
     text: str = ""
-    payload: Optional[dict] = None  # solo si se pidio json_schema -- ya parseado
+    payload: Optional[dict] = None  # solo si se pidió json_schema -- ya parseado
     error: str = ""
 
 
 def active_provider() -> str:
-    """"claude" (default) o "gemini", segun la variable de entorno
-    AI_PROVIDER -- cualquier otro valor (o ausente, o vacia) cae a "claude"
+    """"claude" (default) o "gemini", según la variable de entorno
+    AI_PROVIDER -- cualquier otro valor (o ausente, o vacía) cae a "claude"
     para no romper instalaciones existentes que nunca configuraron nada."""
     value = os.environ.get(AI_PROVIDER_ENV, "").strip().lower()
     return PROVIDER_GEMINI if value == PROVIDER_GEMINI else PROVIDER_CLAUDE
@@ -55,8 +55,8 @@ def active_provider() -> str:
 
 def provider_available() -> bool:
     """True si el backend actualmente seleccionado (ver active_provider)
-    esta listo para usarse: CLI 'claude' en el PATH, o GEMINI_API_KEY
-    configurada. Se usa para avisar ANTES de arrancar la sesion guiada
+    está listo para usarse: CLI 'claude' en el PATH, o GEMINI_API_KEY
+    configurada. Se usa para avisar ANTES de arrancar la sesión guiada
     (ver app.py.enter_session_wizard), no al invocar la IA."""
     if active_provider() == PROVIDER_GEMINI:
         return bool(os.environ.get(GEMINI_API_KEY_ENV, "").strip())
@@ -64,8 +64,8 @@ def provider_available() -> bool:
 
 
 def provider_unavailable_reason() -> str:
-    """Explica por que provider_available() dio False, para mostrarlo en
-    el aviso previo a la sesion guiada."""
+    """Explica por qué provider_available() dio False, para mostrarlo en
+    el aviso previo a la sesión guiada."""
     if active_provider() == PROVIDER_GEMINI:
         return (
             f"AI_PROVIDER=gemini está activo pero no se encontró la variable de "
@@ -177,16 +177,16 @@ def run_isolated_prompt(
 ) -> AIResult:
     """Llamada aislada de texto libre (Etapa 2 -- ver isolated_prompt.py
     para el aislamiento real: system prompt
-    restrictivo, sin tools, carpeta de trabajo vacia). `cwd` solo aplica al
+    restrictivo, sin tools, carpeta de trabajo vacía). `cwd` solo aplica al
     backend 'claude' (aislamiento de filesystem); Gemini es una llamada de
-    API pura, sin acceso a filesystem en ningun caso."""
+    API pura, sin acceso a filesystem en ningún caso."""
     if active_provider() == PROVIDER_GEMINI:
         return _gemini_request(prompt, system_prompt, timeout, json_schema=None)
     return _claude_cli_request(prompt, system_prompt, model, timeout, json_schema=None, cwd=cwd)
 
 
 def run_json_schema_prompt(prompt: str, json_schema: dict, model: str, timeout: int) -> AIResult:
-    """Llamada de generacion de cuestionarios (Etapas 3/4/5 -- ver
+    """Llamada de generación de cuestionarios (Etapas 3/4/5 -- ver
     challenge_solver.py) restringida a un JSON Schema. `AIResult.payload`
     ya viene parseado (dict), listo para leer sin volver a hacer
     json.loads."""

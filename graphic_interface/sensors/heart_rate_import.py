@@ -1,21 +1,21 @@
-"""Pantalla de importacion de la frecuencia cardiaca del reloj (Samsung
-Health), arrastrada por el evaluador una vez por desafio.
+"""Pantalla de importación de la frecuencia cardíaca del reloj (Samsung
+Health), arrastrada por el evaluador una vez por desafío.
 
 Se pide la CARPETA COMPLETA que exporta Samsung Health ("Descargar mis
 datos personales", tipicamente "samsunghealth_<usuario>_<fecha>/"), no un
 CSV suelto: el CSV plano ("com.samsung.shealth.tracker.heart_rate.
-<numero>.csv") solo trae las lecturas puntuales sueltas y, para las horas
-con medicion continua, un promedio/max/min por hora -- el detalle real
-minuto a minuto de esa medicion continua vive en JSON aparte, dentro de
+<número>.csv") solo trae las lecturas puntuales sueltas y, para las horas
+con medición continua, un promedio/max/min por hora -- el detalle real
+minuto a minuto de esa medición continua vive en JSON aparte, dentro de
 "jsons/com.samsung.shealth.tracker.heart_rate/" (ver
 HEART_RATE_JSON_SUBDIR), que solo viene con la carpeta completa. Pedir
-solo el CSV (como se hacia antes) pierde justo los datos de medicion
+solo el CSV (como se hacia antes) pierde justo los datos de medición
 continua y deja solo los chequeos puntuales, espaciados minutos u horas
 (ver stage_capture.slice_heart_rate).
 
-No existia ningun drag & drop en el proyecto antes de esto -- se usa
-tkinterdnd2 (ver register_drop_target) con un boton "Seleccionar carpeta"
-de respaldo si esa libreria no esta disponible o falla en este equipo,
+No existía ningún drag & drop en el proyecto antes de esto -- se usa
+tkinterdnd2 (ver register_drop_target) con un botón "Seleccionar carpeta"
+de respaldo si esa librería no está disponible o falla en este equipo,
 para que el flujo nunca quede bloqueado por un problema de esa dependencia
 opcional.
 """
@@ -41,13 +41,13 @@ HEART_RATE_FILENAME_RE = re.compile(r"^com\.samsung\.shealth\.tracker\.heart_rat
 EXPECTED_HEADER_PREFIX = "com.samsung.shealth.tracker.heart_rate,"
 EXPECTED_COLUMN_HINT = "com.samsung.health.heart_rate.heart_rate"
 
-# Carpeta, relativa a la raiz del export de Samsung Health, con el detalle
-# minuto a minuto de las horas con medicion continua (ver
+# Carpeta, relativa a la raíz del export de Samsung Health, con el detalle
+# minuto a minuto de las horas con medición continua (ver
 # stage_capture._expand_binning_json) -- no viene si solo se copia el CSV
 # suelto.
 HEART_RATE_JSON_SUBDIR = Path("jsons") / "com.samsung.shealth.tracker.heart_rate"
 
-# Nombre de la subcarpeta donde se copian esos JSON dentro del desafio,
+# Nombre de la subcarpeta donde se copian esos JSON dentro del desafío,
 # para trazabilidad (ver import_heart_rate_for_challenge/
 # reimport_heart_rate_for_challenge) -- separado del CSV crudo para dejar
 # en claro que es el respaldo de las filas agregadas por hora, no del
@@ -60,7 +60,7 @@ class HeartRateValidationError(Exception):
 
 
 def validate_heart_rate_file(path: Path) -> None:
-    """Valida un CSV de frecuencia cardiaca ya localizado (ver
+    """Valida un CSV de frecuencia cardíaca ya localizado (ver
     find_heart_rate_csv) -- nombre y cabecera esperados."""
     if not HEART_RATE_FILENAME_RE.match(path.name):
         raise HeartRateValidationError(
@@ -86,9 +86,9 @@ def validate_heart_rate_file(path: Path) -> None:
 
 
 def find_heart_rate_csv(export_folder: Path) -> Path:
-    """Busca DENTRO (no recursivo -- asi lo deja Samsung Health) de
-    `export_folder` el CSV plano de frecuencia cardiaca. Lanza
-    HeartRateValidationError si no hay ninguno o hay mas de uno."""
+    """Busca DENTRO (no recursivo -- así lo deja Samsung Health) de
+    `export_folder` el CSV plano de frecuencia cardíaca. Lanza
+    HeartRateValidationError si no hay ninguno o hay más de uno."""
     matches = sorted(
         p for p in export_folder.iterdir() if p.is_file() and HEART_RATE_FILENAME_RE.match(p.name)
     )
@@ -108,7 +108,7 @@ def find_heart_rate_csv(export_folder: Path) -> Path:
 
 def validate_heart_rate_export_folder(export_folder: Path) -> Path:
     """Valida la carpeta completa del export de Samsung Health: que sea una
-    carpeta y que tenga adentro un CSV de frecuencia cardiaca valido.
+    carpeta y que tenga adentro un CSV de frecuencia cardíaca valido.
     Devuelve la ruta a ese CSV (ver find_heart_rate_csv)."""
     if not export_folder.is_dir():
         raise HeartRateValidationError(
@@ -122,17 +122,17 @@ def validate_heart_rate_export_folder(export_folder: Path) -> Path:
 
 def heart_rate_json_dir(export_folder: Path) -> Optional[Path]:
     """La subcarpeta "jsons/.../heart_rate/" de este export, o None si no
-    esta presente (export viejo, o se copio solo el CSV) -- en ese caso
-    slice_heart_rate simplemente no expande las horas de medicion continua
+    está presente (export viejo, o se copió solo el CSV) -- en ese caso
+    slice_heart_rate simplemente no expande las horas de medición continua
     y se queda con las lecturas puntuales sueltas, igual que antes."""
     candidate = export_folder / HEART_RATE_JSON_SUBDIR
     return candidate if candidate.is_dir() else None
 
 
 def _copy_heart_rate_traceability(export_folder: Path, csv_path: Path, challenge_folder: Path) -> None:
-    """Copia a la carpeta del desafio, para trazabilidad, el CSV crudo y --
-    si esta disponible -- los JSON de binning que respaldan sus horas de
-    medicion continua (ver heart_rate_json_dir). Todo best-effort: una
+    """Copia a la carpeta del desafío, para trazabilidad, el CSV crudo y --
+    si está disponible -- los JSON de binning que respaldan sus horas de
+    medición continua (ver heart_rate_json_dir). Todo best-effort: una
     copia fallida no debe frenar el recorte por etapa."""
     try:
         shutil.copy2(csv_path, challenge_folder / csv_path.name)
@@ -152,9 +152,9 @@ def _copy_heart_rate_traceability(export_folder: Path, csv_path: Path, challenge
 def import_heart_rate_for_challenge(
     export_folder: Path, challenge_folder: Path, stage_folders: dict[int, Path], stage_windows: dict,
 ) -> dict[int, list[str]]:
-    """Copia el CSV crudo (y los JSON de medicion continua, si estan) a la
-    carpeta del desafio (trazabilidad) y recorta un heart_rate.csv por
-    cada etapa 2/3/4/5 usando la ventana de tiempo de esa etapa (del ultimo
+    """Copia el CSV crudo (y los JSON de medición continua, si están) a la
+    carpeta del desafío (trazabilidad) y recorta un heart_rate.csv por
+    cada etapa 2/3/4/5 usando la ventana de tiempo de esa etapa (del último
     intento, ver stage_capture.stage_dir). `export_folder` es la carpeta
     COMPLETA que exporta Samsung Health (ver validate_heart_rate_export_
     folder), no el CSV suelto.
@@ -182,26 +182,26 @@ def import_heart_rate_for_challenge(
 def reimport_heart_rate_for_challenge(
     participant_number: int, challenge_number: int, export_folder: Path,
 ) -> dict[int, list[str]]:
-    """Reprocesa la frecuencia cardiaca de un desafio YA CERRADO (Etapas
+    """Reprocesa la frecuencia cardíaca de un desafío YA CERRADO (Etapas
     2/3/4/5 ya exportadas), a partir de la carpeta completa del export de
-    Samsung Health -- la misma que se cargo durante la sesion, o una
-    nueva/corregida -- sin depender de que la sesion guiada siga
+    Samsung Health -- la misma que se cargó durante la sesión, o una
+    nueva/corregida -- sin depender de que la sesión guiada siga
     corriendo: la ventana de tiempo de cada etapa se reconstruye desde
     sync_timeline.json (ver stage_capture.write_sync_timeline), no de
     StageTimer en memoria.
 
-    Sirve tanto para cargar el reloj de un desafio que se salteo (ver
+    Sirve tanto para cargar el reloj de un desafío que se salteó (ver
     "Siguiente juego" en session_wizard.py, que nunca pasa por la
-    pantalla de importacion) como para volver a cortar con una version
-    mas nueva de slice_heart_rate (p.ej. HEART_RATE_FALLBACK_TOLERANCE, o
-    el soporte de medicion continua via JSON de binning) sobre datos que
-    ya se habian procesado con una version anterior.
+    pantalla de importación) como para volver a cortar con una versión
+    más nueva de slice_heart_rate (p.ej. HEART_RATE_FALLBACK_TOLERANCE, o
+    el soporte de medición continua vía JSON de binning) sobre datos que
+    ya se habían procesado con una versión anterior.
 
-    Uso desde linea de comandos, para cualquier participante/desafio: ver
+    Uso desde línea de comandos, para cualquier participante/desafío: ver
     scripts/reimport_heart_rate.py.
 
     Devuelve {etapa: [advertencias]} como import_heart_rate_for_challenge,
-    y ademas reescribe resumen_desafio.json con esas advertencias (el
+    y además reescribe resumen_desafio.json con esas advertencias (el
     resto del manifiesto se conserva).
     """
     csv_path = validate_heart_rate_export_folder(export_folder)
@@ -248,7 +248,7 @@ def reimport_heart_rate_for_challenge(
 def _update_challenge_manifest_heart_rate(
     challenge_folder: Path, participant: dict, challenge_number: int, warnings_by_stage: dict[int, list[str]],
 ) -> None:
-    """Actualiza solo la parte de frecuencia cardiaca de resumen_desafio.json,
+    """Actualiza solo la parte de frecuencia cardíaca de resumen_desafio.json,
     conservando cualquier otra clave que ya tuviera ese manifiesto."""
     manifest_path = challenge_folder / "resumen_desafio.json"
     stage_status: dict = {}
@@ -258,7 +258,7 @@ def _update_challenge_manifest_heart_rate(
         except (json.JSONDecodeError, OSError):
             stage_status = {}
 
-    stage_status.pop("heart_rate", None)  # ya no aplica "omitido por el evaluador" si se reimporto
+    stage_status.pop("heart_rate", None)  # ya no aplica "omitido por el evaluador" si se reimportó
     stage_status["heart_rate_warnings"] = {
         str(stage): warnings for stage, warnings in warnings_by_stage.items() if warnings
     }
@@ -267,9 +267,9 @@ def _update_challenge_manifest_heart_rate(
 
 def register_drop_target(widget, on_drop_path: Callable[[str], None]) -> bool:
     """Intenta registrar `widget` como zona de destino de arrastrar-y-soltar
-    con tkinterdnd2. Devuelve False (sin lanzar excepcion) si la libreria no
-    esta instalada o el registro falla por cualquier motivo -- la pantalla
-    debe seguir funcionando solo con el boton "Seleccionar archivo"."""
+    con tkinterdnd2. Devuelve False (sin lanzar excepción) si la librería no
+    está instalada o el registro falla por cualquier motivo -- la pantalla
+    debe seguir funcionando solo con el botón "Seleccionar archivo"."""
     try:
         from tkinterdnd2 import DND_FILES
     except ImportError:
@@ -297,11 +297,11 @@ def register_drop_target(widget, on_drop_path: Callable[[str], None]) -> bool:
 
 class HeartRateDropFrame(ctk.CTkFrame):
     """Zona para cargar la carpeta completa del export de Samsung Health
-    (frecuencia cardiaca del reloj): arrastrar y soltar (si esta
-    disponible) o boton "Seleccionar carpeta" de respaldo, con error
+    (frecuencia cardíaca del reloj): arrastrar y soltar (si está
+    disponible) o botón "Seleccionar carpeta" de respaldo, con error
     inline (nunca un messagebox bloqueante) si la carpeta no corresponde
     al formato esperado. Pide la carpeta -- no un CSV suelto -- porque el
-    detalle minuto a minuto de la medicion continua vive en JSON aparte
+    detalle minuto a minuto de la medición continua vive en JSON aparte
     dentro de ella (ver HEART_RATE_JSON_SUBDIR)."""
 
     def __init__(

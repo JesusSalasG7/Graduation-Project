@@ -32,26 +32,39 @@ FPS = 60
 # Default pygame font (no external .ttf files needed) at a handful of
 # sizes, one per role -- see src/states/play_state.py and
 # src/states/results_state.py for where each is used.
-FONTS = {
-    "title": pygame.font.Font(None, 18),
-    "prompt": pygame.font.Font(None, 20),
-    "transmission": pygame.font.Font(None, 26),
-    "button": pygame.font.Font(None, 18),
-    "feedback": pygame.font.Font(None, 16),
-    "hint": pygame.font.Font(None, 14),
-    "results_title": pygame.font.Font(None, 20),
-    "stats": pygame.font.Font(None, 16),
+#
+# Each entry is (family, size in virtual pixels, bold): family None means
+# pygame's default font. Kept as specs (not just Font objects) so
+# src/text.py can rebuild the same font at window resolution and draw
+# text crisply instead of upscaling it from the 480x270 canvas.
+FONT_SPECS = {
+    "title": (None, 18, False),
+    "prompt": (None, 20, False),
+    "transmission": (None, 26, False),
+    "button": (None, 18, False),
+    "feedback": (None, 16, False),
+    "hint": (None, 14, False),
+    "results_title": (None, 20, False),
+    "stats": (None, 16, False),
     # Monospace, terminal-styled text for StoryState -- pygame.font.SysFont
     # always returns a usable font, falling back to the default one if none
     # of the requested families is installed, so this never needs an asset
     # file of its own.
-    "console": pygame.font.SysFont("consolas,couriernew,monospace", 13),
+    "console": ("consolas,couriernew,monospace", 13, False),
     # Monospace too, so the digits don't jitter the layout sideways as the
     # per-round countdown changes every frame -- see PlayState.render.
-    "timer": pygame.font.SysFont("consolas,couriernew,monospace", 24),
-    "game_over_title": pygame.font.Font(None, 34),
+    "timer": ("consolas,couriernew,monospace", 24, True),
+    "game_over_title": (None, 34, False),
 }
-FONTS["timer"].set_bold(True)
+
+
+def load_font(family, size: int, bold: bool) -> pygame.font.Font:
+    font = pygame.font.Font(None, size) if family is None else pygame.font.SysFont(family, size)
+    font.set_bold(bold)
+    return font
+
+
+FONTS = {key: load_font(*spec) for key, spec in FONT_SPECS.items()}
 
 # Dark, high-contrast, sci-fi palette shared by every screen.
 COLORS = {

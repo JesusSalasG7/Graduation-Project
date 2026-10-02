@@ -1,16 +1,16 @@
 """
-Modulo C - Combate RPG.
+Módulo C - Combate RPG.
 
 Character: un personaje de combate (jugador o enemigo). Su sprite es
 pixel-art original, autogenerado (ver tools/generate_character_sprites.py,
-misma tecnica que tools/generate_portraits.py) y guardado como una hoja
+misma técnica que tools/generate_portraits.py) y guardado como una hoja
 de 5 frames en assets/graphics/characters/ -- no hay ninguna imagen de
 stock, IP de terceros ni asset "ripeado" involucrado. Character solo
 recorta esos 5 frames y los anima:
-    idle_a/idle_b      -- loop de respiracion (bob en la cabeza/postura)
+    idle_a/idle_b      -- loop de respiración (bob en la cabeza/postura)
     attack_a/attack_b  -- golpe en dos tiempos: impulso y puñetazo/impacto
-    hurt               -- pose de reaccion (guardia baja, cabeza atras),
-                           mostrada junto con el parpadeo rojo al recibir dano
+    hurt               -- pose de reacción (guardia baja, cabeza atrás),
+                           mostrada junto con el parpadeo rojo al recibir daño
 """
 
 from typing import Callable, Optional, Tuple
@@ -49,7 +49,7 @@ class Character:
         self.state = "idle"
         self.hurt_flash = False
         self.stunned = False
-        # Multiplicador para SU proximo ataque -- Tierra/Hielo del
+        # Multiplicador para SU próximo ataque -- Tierra/Hielo del
         # rival lo dejan en 0.5 ("lo ralentizan") hasta que ataque.
         self.next_attack_multiplier = 1.0
 

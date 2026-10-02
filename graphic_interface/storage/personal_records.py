@@ -1,13 +1,13 @@
 """Registro de datos personales de los participantes, guardado FUERA del
-proyecto (en el Escritorio del usuario), separado del registro anonimo
+proyecto (en el Escritorio del usuario), separado del registro anónimo
 de `participants.json`.
 
-El resto de la aplicacion -- y todo archivo versionado del proyecto --
-solo conoce a cada participante por su numero secuencial ("Participante
-N"). Este modulo es la unica pieza que conecta ese numero con un nombre
-real, y guarda ese vinculo fuera de la carpeta del proyecto a proposito,
-para no mezclar datos personales con los datos anonimos de la sesion
-(emociones, frecuencia cardiaca, etc.).
+El resto de la aplicación -- y todo archivo versionado del proyecto --
+solo conoce a cada participante por su número secuencial ("Participante
+N"). Este módulo es la única pieza que conecta ese número con un nombre
+real, y guarda ese vínculo fuera de la carpeta del proyecto a propósito,
+para no mezclar datos personales con los datos anónimos de la sesión
+(emociones, frecuencia cardíaca, etc.).
 """
 
 import csv
@@ -21,9 +21,9 @@ PERSONAL_RECORDS_FILE = PERSONAL_RECORDS_DIR / "participantes.csv"
 def load_personal_record(number: int) -> Optional[tuple[str, str]]:
     """Busca (nombre, apellido) para `number` en el CSV del Escritorio.
 
-    Devuelve None si el archivo no existe o el numero no esta registrado.
+    Devuelve None si el archivo no existe o el número no está registrado.
     Se usa solo para mostrar el nombre en pantalla (p.ej. saludo de
-    bienvenida); nunca se persiste junto a los datos anonimos de sesion.
+    bienvenida); nunca se persiste junto a los datos anónimos de sesión.
     """
     if not PERSONAL_RECORDS_FILE.exists():
         return None
@@ -42,7 +42,7 @@ def load_personal_record(number: int) -> Optional[tuple[str, str]]:
 
 
 def save_personal_record(number: int, nombre: str, apellido: str) -> Path:
-    """Agrega una fila (numero, nombre, apellido) al CSV de participantes
+    """Agrega una fila (número, nombre, apellido) al CSV de participantes
     del Escritorio, creando la carpeta/archivo con encabezado si hace falta.
 
     Devuelve la ruta del CSV.

@@ -392,9 +392,9 @@ class RubikCube:
         :param target_submatrix: The 3D block of piece ids to be located inside the cube.
         :returns: The (x, y, z) position where the match starts inside the cube, or None if it was not found.
         """
-        # El desafio A03 sin implementar lanza NotImplementedError (el
+        # El desafío A03 sin implementar lanza NotImplementedError (el
         # TODO real); esto se trata como "no encontrado" en vez de
-        # romper la busqueda.
+        # romper la búsqueda.
         try:
             result = find_3d_pattern(self.matrix, target_submatrix)
         except Exception:

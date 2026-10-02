@@ -1,34 +1,32 @@
 """
 Camera Tracker - Emotion Tracker + Eye Tracker fusionados en UN SOLO
-proceso que abre la camara UNA sola vez.
+proceso que abre la cámara UNA sola vez.
 
-Por que existe: la webcam de este equipo (y la mayoria de las webcams USB
-baratas) solo admite un unico proceso con la camara abierta a la vez --
+Por qué existe: la webcam de este equipo (y la mayoría de las webcams USB
+baratas) solo admite un único proceso con la cámara abierta a la vez --
 confirmado a mano: lanzar emotion_tracker.py y eye_tracker.py como dos
 procesos separados hace que el SEGUNDO en arrancar ni siquiera pueda abrir
-la camara (`cap.isOpened()` da False), sin importar el orden. Este script
-hace ambos analisis -- emocion dominante via DeepFace, direccion de
-mirada izquierda/derecha via MediaPipe -- sobre los mismos frames
-capturados por un unico cv2.VideoCapture, evitando la pelea por el
+la cámara (`cap.isOpened()` da False), sin importar el orden. Este script
+hace ambos análisis -- emoción vía EmotiEffLib (ver emotion_recognizer.py),
+dirección de mirada izquierda/derecha vía MediaPipe -- sobre los mismos frames
+capturados por un único cv2.VideoCapture, evitando la pelea por el
 dispositivo.
 
-Vive en su propio entorno virtual, tools/.venv-tracker (ver la seccion 3
-de tools/requirements.txt): mediapipe y deepface SI pueden convivir en un
-mismo venv, siempre que se instale unicamente opencv-contrib-python (y
-NUNCA ademas opencv-python) -- opencv-contrib-python ya incluye todo lo
-que deepface necesita de cv2 (cv2.data.haarcascades, etc.), asi que basta
-instalar deepface/retina-face con --no-deps para que pip no intente
-instalar tambien opencv-python (que pisaria los archivos de cv2/ del
-venv y rompe el import, como documentaba el intento original de tener
-emotion_tracker.py y eye_tracker.py en un solo venv).
+Vive en su propio entorno virtual, tools/.venv-tracker (ver la sección 3
+de tools/requirements.txt): mediapipe y emotiefflib SI pueden convivir en
+un mismo venv, siempre que se instale únicamente opencv-contrib-python (y
+NUNCA además opencv-python) -- opencv-contrib-python ya incluye todo lo
+que emotiefflib necesita de cv2, así que basta instalar emotiefflib con
+--no-deps para que pip no intente instalar también opencv-python (que
+pisaría los archivos de cv2/ del venv y rompe el import).
 
 Modos:
-    --calibrate            Corre solo la calibracion izquierda/derecha del
+    --calibrate            Corre solo la calibración izquierda/derecha del
                             Eye Tracker (ver run_calibration en
-                            eye_tracker.py, misma logica) e imprime
-                            CALIBRATION_RESULT/CALIBRATION_FAILED. No usa
-                            DeepFace en este modo (mas rapido, no hace
-                            falta para calibrar).
+                            eye_tracker.py, misma lógica) e imprime
+                            CALIBRATION_RESULT/CALIBRATION_FAILED. No carga
+                            el modelo de emociones en este modo (más
+                            rápido, no hace falta para calibrar).
     (sin --calibrate)      Seguimiento continuo: Eye Tracker (con
                             --left-x/--right-x si vienen calibrados) +
                             Emotion Tracker, cada uno con su propio CSV.
@@ -43,7 +41,6 @@ Uso:
 
 import argparse
 import csv
-import threading
 import time
 import urllib.request
 from datetime import datetime
@@ -56,115 +53,36 @@ import numpy as np
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
 
-from deepface import DeepFace
+from emotion_recognizer import EmotionAnalyzer, crop_face
 
 # ============================================================
-# Emotion Tracker (misma logica que emotion_tracker.py)
+# Emotion Tracker (EmotiEffLib, ver emotion_recognizer.py)
 # ============================================================
 
 DEFAULT_EMOTION_INTERVAL = 30  # analizar 1 de cada N fotogramas (~1 segundo a 30 fps)
 FACE_CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-# Categorias exactas que devuelve DeepFace.analyze(actions=["emotion"]) en
-# result["emotion"] -- se loguea el porcentaje de CADA una (no solo la
-# dominante) para que el dataset consolidado (ver data/build_dataset.py)
-# pueda reconstruir la distribucion completa de emociones por lectura, no
-# solo cual gano.
-DEEPFACE_EMOTION_CATEGORIES = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
-EMOTION_CSV_FIELDNAMES = [
-    "timestamp", "participant_id", "participant_name", "session_label",
-    "emotion", "confidence",
-    *(f"pct_{category}" for category in DEEPFACE_EMOTION_CATEGORIES),
-]
-DEFAULT_DETECTOR_BACKEND = "mtcnn"
-DETECTOR_BACKEND_CHOICES = ["opencv", "mtcnn", "retinaface"]
 
 
-class EmotionAnalyzer:
-    """Ejecuta DeepFace en un hilo aparte para no bloquear el loop de video."""
-
-    def __init__(
-        self,
-        log_file: Optional[Path] = None,
-        participant_id: str = "",
-        participant_name: str = "",
-        session_label: str = "",
-        detector_backend: str = DEFAULT_DETECTOR_BACKEND,
-        min_confidence: float = 0.0,
-    ):
-        self._lock = threading.Lock()
-        self._busy = False
-        self.log_file = log_file
-        self.participant_id = participant_id
-        self.participant_name = participant_name
-        self.session_label = session_label
-        self.detector_backend = detector_backend
-        self.min_confidence = min_confidence
-        if self.log_file:
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
-            if not self.log_file.exists():
-                with open(self.log_file, "w", newline="", encoding="utf-8") as f:
-                    csv.DictWriter(f, fieldnames=EMOTION_CSV_FIELDNAMES).writeheader()
-
-    def analyze_async(self, frame):
-        if self._busy:
-            return  # ya hay un analisis en curso, se descarta este frame
-        with self._lock:
-            self._busy = True
-        frame_copy = frame.copy()
-        thread = threading.Thread(target=self._analyze, args=(frame_copy,), daemon=True)
-        thread.start()
-
-    def _log_row(self, timestamp: str, emotion: str, confidence: float, all_emotions: Optional[dict] = None):
-        if not self.log_file:
-            return
-        row = {
-            "timestamp": timestamp,
-            "participant_id": self.participant_id,
-            "participant_name": self.participant_name,
-            "session_label": self.session_label,
-            "emotion": emotion,
-            "confidence": f"{confidence:.1f}",
-        }
-        all_emotions = all_emotions or {}
-        for category in DEEPFACE_EMOTION_CATEGORIES:
-            row[f"pct_{category}"] = f"{all_emotions.get(category, 0.0):.1f}"
-        with open(self.log_file, "a", newline="", encoding="utf-8") as f:
-            csv.DictWriter(f, fieldnames=EMOTION_CSV_FIELDNAMES).writerow(row)
-
-    def _analyze(self, frame):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            result = DeepFace.analyze(
-                frame,
-                actions=["emotion"],
-                enforce_detection=True,
-                detector_backend=self.detector_backend,
-                silent=True,
-            )
-            if isinstance(result, list):
-                result = result[0]
-            all_emotions = result.get("emotion", {})
-            emotion = result.get("dominant_emotion", "desconocida")
-            confidence = all_emotions.get(emotion, 0.0)
-
-            if confidence < self.min_confidence:
-                print(
-                    f"[{timestamp}] Emoción incierta "
-                    f"(mejor candidata: {emotion} con {confidence:.1f}%, por debajo del umbral)"
-                )
-                self._log_row(timestamp, "incierta", confidence, all_emotions)
-            else:
-                print(f"[{timestamp}] Emoción detectada: {emotion} ({confidence:.1f}%)")
-                self._log_row(timestamp, emotion, confidence, all_emotions)
-        except Exception as exc:  # DeepFace puede fallar si no hay rostro claro
-            print(f"[{timestamp}] No se pudo analizar la emoción: {exc}")
-        finally:
-            with self._lock:
-                self._busy = False
+def _emotion_face_crop(frame, detected, faces):
+    """Recorte del rostro para EmotiEffLib (que no detecta caras): la caja
+    que encierra los landmarks de MediaPipe si los hubo en este frame, si
+    no la cara más grande que encontró Haar, y si ninguno encontró nada,
+    None."""
+    height, width = frame.shape[:2]
+    if detected is not None:
+        landmarks = detected[0]
+        xs = [lm.x * width for lm in landmarks]
+        ys = [lm.y * height for lm in landmarks]
+        box = (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+    elif len(faces) > 0:
+        box = max(faces, key=lambda f: f[2] * f[3])
+    else:
+        return None
+    return crop_face(frame, box)
 
 
 # ============================================================
-# Eye Tracker (misma logica que eye_tracker.py)
+# Eye Tracker (misma lógica que eye_tracker.py)
 # ============================================================
 
 DEFAULT_EYE_INTERVAL = 10  # registrar 1 de cada N fotogramas analizados
@@ -176,7 +94,7 @@ EYE_CSV_FIELDNAMES = [
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 MODEL_PATH = Path(__file__).parent / "models" / "face_landmarker.task"
 
-# Indices de landmarks del Face Landmarker de MediaPipe (478 puntos: 468
+# Índices de landmarks del Face Landmarker de MediaPipe (478 puntos: 468
 # del rostro + 10 de iris; misma topologia que el antiguo Face Mesh con
 # refine_landmarks=True).
 RIGHT_IRIS = [469, 470, 471, 472]
@@ -186,18 +104,18 @@ LEFT_EYE_CORNERS = (362, 263)   # esquina interna / externa del ojo izquierdo
 RIGHT_EYE_TOP_BOTTOM = (159, 145)  # parpado superior / inferior, ojo derecho
 LEFT_EYE_TOP_BOTTOM = (386, 374)   # parpado superior / inferior, ojo izquierdo
 
-# Umbrales heuristicos sobre la posicion relativa del iris dentro del ojo
-# (solo alimentan la anotacion "direccion detallada" de la ventana de
+# Umbrales heurísticos sobre la posición relativa del iris dentro del ojo
+# (solo alimentan la anotación "direccion detallada" de la ventana de
 # mirada -- lo que realmente se reporta/registra es SideTracker.side).
 HORIZONTAL_LOW, HORIZONTAL_HIGH = 0.42, 0.58
 VERTICAL_LOW, VERTICAL_HIGH = 0.35, 0.65
 
 SIDE_NAMES = ["izquierda", "derecha"]
 SIDE_DEBOUNCE_FRAMES = 3  # frames seguidos del otro lado antes de aceptar el cambio
-DEFAULT_SIDE_MIDPOINT = 0.5  # sin calibracion por participante (ver --left-x/--right-x)
+DEFAULT_SIDE_MIDPOINT = 0.5  # sin calibración por participante (ver --left-x/--right-x)
 
-# Calibracion izquierda/derecha por participante (ver --calibrate): cada
-# fase dura esto, mas un conteo regresivo antes de empezar a grabar para
+# Calibración izquierda/derecha por participante (ver --calibrate): cada
+# fase dura esto, más un conteo regresivo antes de empezar a grabar para
 # darle tiempo al participante de girar la cabeza/ojos.
 CALIBRATION_COUNTDOWN_SECONDS = 2.0
 CALIBRATION_RECORD_SECONDS = 3.0
@@ -261,7 +179,7 @@ def _classify_direction(gaze_x: float, gaze_y: float) -> str:
 
 
 class GazeEstimator:
-    """Estima la direccion de mirada a partir de los landmarks del Face Landmarker."""
+    """Estima la dirección de mirada a partir de los landmarks del Face Landmarker."""
 
     def __init__(
         self,
@@ -294,8 +212,8 @@ class GazeEstimator:
         return gaze_x, gaze_y, direction, right_iris, left_iris
 
     def report(self, gaze_x: float, gaze_y: float, side: str):
-        """`side` es la decision binaria izquierda/derecha (con debounce,
-        ver SideTracker) -- lo unico que hace falta saber del estudio."""
+        """`side` es la decisión binaria izquierda/derecha (con debounce,
+        ver SideTracker) -- lo único que hace falta saber del estudio."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] Mirada detectada: {side} (x={gaze_x:.2f}, y={gaze_y:.2f})")
         if self.log_file:
@@ -316,7 +234,7 @@ class SideTracker:
     para no alternar por ruido de un solo frame justo en el medio.
 
     `midpoint` es el punto de corte entre "izquierda" y "derecha": por
-    defecto 0.5 (el centro geometrico del ojo), pero se puede calibrar por
+    defecto 0.5 (el centro geométrico del ojo), pero se puede calibrar por
     participante con --left-x/--right-x, para que el corte quede centrado
     en SU rango real de movimiento de ojos en vez de asumir que todos
     miran exactamente igual.
@@ -349,7 +267,7 @@ class SideTracker:
 
 
 def _detect_screen_size(default=(1280, 720)):
-    """Intenta obtener la resolucion de la pantalla via tkinter (stdlib)."""
+    """Intenta obtener la resolución de la pantalla vía tkinter (stdlib)."""
     try:
         import tkinter
 
@@ -399,8 +317,8 @@ def _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris):
         cv2.circle(frame, (int(cx), int(cy)), 2, (0, 255, 255), -1)
 
 
-# Respaldo para rostros chicos (participante lejos de la camara o poca
-# luz): el detector interno del Face Landmarker esta pensado para rostros
+# Respaldo para rostros chicos (participante lejos de la cámara o poca
+# luz): el detector interno del Face Landmarker está pensado para rostros
 # cercanos y a 640x480 pierde uno de ~70 px, aunque el Haar cascade si lo
 # encuentra. En ese caso se recorta la zona del rostro que marca Haar y se
 # vuelve a correr el Landmarker sobre el recorte (en modo IMAGE, aparte,
@@ -420,7 +338,7 @@ class _Landmark:
 def _landmarks_from_face_crop(frame, model_path: Path):
     """Landmarks (normalizados al frame completo) buscando primero el
     rostro con Haar y corriendo el Landmarker sobre ese recorte -- None si
-    tampoco asi se encuentra."""
+    tampoco así se encuentra."""
     global _fallback_cascade, _fallback_landmarker
     if _fallback_cascade is None:
         _fallback_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
@@ -462,7 +380,7 @@ def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float,
     """Corre el Face Landmarker sobre `frame` y, si detecta un rostro,
     devuelve (landmarks, gaze_x, gaze_y, direction, right_iris, left_iris);
     si no detecta ninguno (ni siquiera con el respaldo de recorte, ver
-    _landmarks_from_face_crop), devuelve None. Logica compartida por el
+    _landmarks_from_face_crop), devuelve None. Lógica compartida por el
     loop principal y por run_calibration.
     """
     height, width = frame.shape[:2]
@@ -481,8 +399,8 @@ def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float,
 
 
 def run_calibration(cap, landmarker, mirror: bool, model_path: Path = MODEL_PATH) -> Optional[tuple]:
-    """Rutina de calibracion izquierda/derecha por participante -- identica
-    a eye_tracker.py::run_calibration. No usa DeepFace: la calibracion es
+    """Rutina de calibración izquierda/derecha por participante -- idéntica
+    a eye_tracker.py::run_calibration. No usa el modelo de emociones: la calibración es
     corta y solo necesita la mirada.
 
     Imprime por stdout el resultado en un formato fijo que el lanzador
@@ -491,9 +409,9 @@ def run_calibration(cap, landmarker, mirror: bool, model_path: Path = MODEL_PATH
         CALIBRATION_FAILED reason=<motivo>
     """
     estimator = GazeEstimator()
-    # Sin tilde a proposito: con Qt, getWindowProperty no encuentra una
+    # Sin tilde a propósito: con Qt, getWindowProperty no encuentra una
     # ventana cuyo nombre tiene caracteres no ASCII (devuelve 0) y la
-    # calibracion se cortaba al primer frame como si se hubiera cerrado.
+    # calibración se cortaba al primer frame como si se hubiera cerrado.
     window_name = "Camera Tracker - Calibracion"
     start_time = time.monotonic()
 
@@ -570,14 +488,14 @@ def run_calibration(cap, landmarker, mirror: bool, model_path: Path = MODEL_PATH
 
 def main():
     parser = argparse.ArgumentParser(description="Camera Tracker (Emotion Tracker + Eye Tracker fusionados)")
-    parser.add_argument("--camera", type=int, default=0, help="Indice de la cámara (default: 0)")
+    parser.add_argument("--camera", type=int, default=0, help="Índice de la cámara (default: 0)")
     parser.add_argument(
         "--mirror", action="store_true",
         help="Voltea el frame horizontalmente (vista espejo) antes de mostrarlo/estimar la mirada",
     )
     parser.add_argument("--participant-id", default="", help="ID del participante activo (opcional)")
     parser.add_argument("--participant-name", default="", help="Nombre del participante activo (opcional)")
-    parser.add_argument("--session-label", default="", help="Etiqueta de la sesion, ej. nombre del juego")
+    parser.add_argument("--session-label", default="", help="Etiqueta de la sesión, ej. nombre del juego")
 
     # Eye Tracker
     parser.add_argument(
@@ -592,7 +510,7 @@ def main():
     parser.add_argument(
         "--calibrate", action="store_true",
         help=(
-            "Corre solo la calibracion izquierda/derecha del Eye Tracker (sin Emotion "
+            "Corre solo la calibración izquierda/derecha del Eye Tracker (sin Emotion "
             "Tracker) e imprime CALIBRATION_RESULT/CALIBRATION_FAILED."
         ),
     )
@@ -610,11 +528,7 @@ def main():
         "--emotion-interval", type=int, default=DEFAULT_EMOTION_INTERVAL,
         help=f"Analizar la emoción cada N frames (default: {DEFAULT_EMOTION_INTERVAL})",
     )
-    parser.add_argument("--emotion-log-file", default=None, help="CSV donde registrar cada emocion (opcional)")
-    parser.add_argument(
-        "--detector-backend", default=DEFAULT_DETECTOR_BACKEND, choices=DETECTOR_BACKEND_CHOICES,
-        help=f"Detector de rostro para el analisis de emocion (default: {DEFAULT_DETECTOR_BACKEND}).",
-    )
+    parser.add_argument("--emotion-log-file", default=None, help="CSV donde registrar cada emoción (opcional)")
     parser.add_argument(
         "--min-confidence", type=float, default=0.0,
         help="Umbral de confianza (0-100) por debajo del cual se reporta 'incierta' (default: 0, sin filtro)",
@@ -654,7 +568,6 @@ def main():
         participant_id=args.participant_id,
         participant_name=args.participant_name,
         session_label=args.session_label,
-        detector_backend=args.detector_backend,
         min_confidence=args.min_confidence,
     )
     face_cascade = cv2.CascadeClassifier(FACE_CASCADE_PATH)
@@ -699,12 +612,25 @@ def main():
 
             frame_count += 1
 
-            # La deteccion siempre corre sobre el frame "crudo" (sin
+            # La detección siempre corre sobre el frame "crudo" (sin
             # espejo): si se voltea antes, izquierda/derecha quedan
             # invertidas respecto a la mirada real. El volteo (--mirror)
-            # se aplica solo al final, unicamente para la ventana de
-            # video, despues de dibujar los overlays sobre el frame crudo.
+            # se aplica solo al final, únicamente para la ventana de
+            # video, después de dibujar los overlays sobre el frame crudo.
             detected = _detect_gaze(landmarker, eye_estimator, frame, start_time, model_path)
+
+            # Detección de rostro (Haar cascade, liviana) para el recuadro
+            # verde y como respaldo del recorte de emoción cuando MediaPipe
+            # no encontró landmarks (son dos detectores distintos sobre el
+            # mismo frame).
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+
+            # El recorte para la emoción se toma antes de dibujar los
+            # overlays, para que el modelo no vea el iris ni el recuadro.
+            if frame_count % args.emotion_interval == 0:
+                emotion_analyzer.analyze_async(_emotion_face_crop(frame, detected, faces))
+
             if detected is not None:
                 landmarks, gaze_x, gaze_y, direction, right_iris, left_iris = detected
                 height, width = frame.shape[:2]
@@ -718,17 +644,8 @@ def main():
                 if frame_count % args.eye_interval == 0:
                     eye_estimator.report(gaze_x, gaze_y, side)
 
-            # Deteccion de rostro (Haar cascade, liviana) para el recuadro
-            # verde + disparo del analisis de emocion -- independiente de
-            # si MediaPipe encontro landmarks arriba (son dos detectores
-            # distintos sobre el mismo frame).
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
             for (x, y, w, h) in faces:
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-            if frame_count % args.emotion_interval == 0:
-                emotion_analyzer.analyze_async(frame)
 
             if args.mirror:
                 frame = cv2.flip(frame, 1)

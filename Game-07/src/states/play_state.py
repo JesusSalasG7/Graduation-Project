@@ -12,6 +12,9 @@ Controls:
     R            -- clear every player-placed cell (pre-simulation only).
     ENTER        -- restart the level from scratch.
     ESC          -- back to the level menu.
+    G            -- pause and open the how-to-play guide.
+    I            -- pause and show this level's briefing again (it is
+                    also shown automatically on entering the level).
 """
 from typing import Any, Dict, Tuple
 
@@ -36,6 +39,9 @@ class PlayState(BaseState):
     def enter(self, *args: Tuple[Any], level_index: int = 0, **kwargs: Dict[str, Any]) -> None:
         self.level_index = level_index
         self._load_level()
+        # Instrucciones detalladas del nivel antes de empezar a jugarlo
+        # (solo al entrar: reiniciar con ENTER no las vuelve a mostrar).
+        self.game.show_level_intro(level_index)
 
     def _load_level(self) -> None:
         level = LEVELS[self.level_index]
@@ -76,6 +82,18 @@ class PlayState(BaseState):
         if input_id == "confirm":
             if input_data.pressed:
                 self._load_level()
+            return
+
+        if input_id == "open_guide":
+            if input_data.pressed:
+                self._set_running(False)
+                self.game.show_guide()
+            return
+
+        if input_id == "level_info":
+            if input_data.pressed:
+                self._set_running(False)
+                self.game.show_level_intro(self.level_index)
             return
 
         if input_id == "toggle_pause":

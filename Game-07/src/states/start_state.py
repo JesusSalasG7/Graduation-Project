@@ -1,6 +1,7 @@
 """
 StartState: title screen and level selection. Navigate with UP/DOWN,
-ENTER to play the highlighted level, ESC to quit.
+ENTER to play the highlighted level, G to open the how-to-play guide,
+ESC to quit.
 """
 from typing import Any, Dict, List, Tuple
 
@@ -8,16 +9,16 @@ import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState
-from gale.text import render_text
 
 import settings
 from src.levels import LEVELS
+from src.text import render_text
 
-# render_text() no envuelve texto (dibuja todo en una sola linea, ver
-# gale.text) -- la descripcion mas larga del catalogo (El Planeador, ver
+# render_text() no envuelve texto (dibuja todo en una sola línea, ver
+# gale.text) -- la descripción más larga del catalogo (El Planeador, ver
 # src/levels.py) mide ~848px con la fuente "hud" contra un canvas de
 # 624px, así que centrada quedaba 112px fuera de cada borde: invisible,
-# no solo recortada. _wrap_description evita eso partiendola en lineas
+# no solo recortada. _wrap_description evita eso partiéndola en líneas
 # que sí entran en pantalla.
 _DESCRIPTION_MAX_WIDTH = settings.VIRTUAL_WIDTH - 60
 _DESCRIPTION_LINE_HEIGHT = 16
@@ -50,8 +51,8 @@ class StartState(BaseState):
         self.selected_index = 0
         # Envuelto una sola vez (no cambia entre frames) para las
         # descripciones de TODOS los niveles, no solo el seleccionado --
-        # asi la fila reserva siempre el mismo alto (el del nivel con mas
-        # lineas) y la lista no salta de lugar al cambiar la seleccion.
+        # así la fila reserva siempre el mismo alto (el del nivel con más
+        # líneas) y la lista no salta de lugar al cambiar la selección.
         self._wrapped_descriptions = [
             _wrap_description(level.description, settings.FONTS["hud"], _DESCRIPTION_MAX_WIDTH)
             for level in LEVELS
@@ -68,6 +69,8 @@ class StartState(BaseState):
             self.selected_index = (self.selected_index + 1) % len(LEVELS)
         elif input_id == "confirm":
             self.state_machine.change("play", level_index=self.selected_index)
+        elif input_id == "open_guide":
+            self.game.show_guide()
         elif input_id == "back":
             self.game.quit()
 
@@ -112,14 +115,14 @@ class StartState(BaseState):
                         settings.HUD_TEXT_COLOR,
                         center=True,
                     )
-            # Alto fijo por fila (siempre el del nivel con mas lineas de
-            # descripcion, no solo el seleccionado) para que la lista no
-            # salte de lugar al cambiar de seleccion.
+            # Alto fijo por fila (siempre el del nivel con más líneas de
+            # descripción, no solo el seleccionado) para que la lista no
+            # salte de lugar al cambiar de selección.
             y += 18 + self._max_description_lines * _DESCRIPTION_LINE_HEIGHT + 12
 
         render_text(
             surface,
-            "Flechas: navegar   ENTER: jugar   ESC: salir",
+            "Flechas: navegar   ENTER: jugar   G: guía   ESC: salir",
             settings.FONTS["hud"],
             settings.VIRTUAL_WIDTH // 2,
             settings.VIRTUAL_HEIGHT - 20,

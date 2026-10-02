@@ -1,8 +1,8 @@
 """
-Modulo C - Combate RPG.
+Módulo C - Combate RPG.
 
-Configuracion pura de los 8 elementos: cuanto dano/curacion hace cada
-uno y que efecto adicional aplica. No depende de pygame ni sabe nada de
+Configuración pura de los 8 elementos: cuánto daño/curación hace cada
+uno y qué efecto adicional aplica. No depende de pygame ni sabe nada de
 Character/CombatManager -- solo traduce (elemento, cantidad de fichas)
 en un EffectResult que CombatManager sabe aplicar.
 """
@@ -13,10 +13,10 @@ from dataclasses import dataclass
 
 from src.board.tile import TileKind
 
-# Cuantas fichas tuvo el match -> multiplicador sobre el dano/curacion
+# Cuántas fichas tuvo el match -> multiplicador sobre el daño/curación
 # base del elemento (3 = base, 4 = combo, 5+ = combo grande).
 DAMAGE_MULTIPLIER = {3: 1.0, 4: 1.5}
-DAMAGE_MULTIPLIER_MAX = 2.0  # aplica para 5 o mas fichas
+DAMAGE_MULTIPLIER_MAX = 2.0  # aplica para 5 o más fichas
 
 
 def _multiplier_for(count: int) -> float:
@@ -42,9 +42,9 @@ class EffectResult:
 
 
 # Cada entrada define el nombre en pantalla, el color de su destello, y
-# una funcion que recibe el multiplicador de combo ya resuelto y
+# una función que recibe el multiplicador de combo ya resuelto y
 # devuelve el EffectResult. Los porcentajes de probabilidad (aturdir,
-# critico) se tiran aca mismo con random.random().
+# crítico) se tiran acá mismo con random.random().
 ELEMENTS = {
     TileKind.FIRE: {
         "name": "Fuego",

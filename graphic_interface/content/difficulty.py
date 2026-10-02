@@ -1,8 +1,8 @@
 """Orden de dificultad de los 7 juegos, para la vista "Ver juegos en dificultad"
 de la GUI.
 
-El ranking se basa en la complejidad del desafio algoritmico central de cada
-juego, no en lo dificil que sea JUGAR cada uno.
+El ranking se basa en la complejidad del desafío algorítmico central de cada
+juego, no en lo difícil que sea JUGAR cada uno.
 """
 
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 class DifficultyInfo:
     rank: int  # 1 = mas facil, 7 = mas dificil
     tier: str  # etiqueta corta para la UI
-    reason: str  # por que ocupa ese puesto, en una linea
+    reason: str  # por qué ocupa ese puesto, en una línea
 
 
 DIFFICULTY: dict[str, DifficultyInfo] = {
@@ -22,7 +22,7 @@ DIFFICULTY: dict[str, DifficultyInfo] = {
     ),
     "Game-04": DifficultyInfo(
         2, "Fácil",
-        "Invertir un string y compararlo con el original, sin ningun helper previo.",
+        "Invertir un string y compararlo con el original, sin ningún helper previo.",
     ),
     "Game-05": DifficultyInfo(
         3, "Media",
@@ -42,7 +42,7 @@ DIFFICULTY: dict[str, DifficultyInfo] = {
     ),
     "Game-03": DifficultyInfo(
         7, "Muy alta",
-        "Busqueda de un patron por fuerza bruta en 3 ejes (como una sopa de letras en 3D).",
+        "Búsqueda de un patrón por fuerza bruta en 3 ejes (como una sopa de letras en 3D).",
     ),
 }
 

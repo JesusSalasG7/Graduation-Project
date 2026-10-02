@@ -1,24 +1,24 @@
 """
-Eye Tracker - Estimacion de direccion de mirada del desarrollador.
+Eye Tracker - Estimación de dirección de mirada del desarrollador.
 
 Captura video en tiempo real desde la webcam y usa el Face Landmarker de
 MediaPipe (Tasks API, con landmarks de iris) para localizar ambos ojos y
-estimar hacia donde esta mirando el participante (izquierda/centro/derecha,
-arriba/centro/abajo). Es una estimacion heuristica sin calibracion por
+estimar hacia dónde está mirando el participante (izquierda/centro/derecha,
+arriba/centro/abajo). Es una estimación heurística sin calibración por
 usuario: dibuja el contorno de los ojos y el centro del iris sobre el
-video, e informa por terminal y opcionalmente por CSV la direccion
-detectada cada N fotogramas. Ademas abre una segunda ventana dividida en
-2 mitades (izquierda/derecha) y, al salir con 'q', imprime cuanto tiempo
+video, e informa por terminal y opcionalmente por CSV la dirección
+detectada cada N fotogramas. Además abre una segunda ventana dividida en
+2 mitades (izquierda/derecha) y, al salir con 'q', imprime cuánto tiempo
 se paso mirando cada una.
 
-La primera ejecucion descarga automaticamente el modelo
+La primera ejecución descarga automáticamente el modelo
 "face_landmarker.task" (~3.7 MB) de Google y lo guarda en
 tools/models/, para no tener que commitear un binario al repositorio.
 
 IMPORTANTE: este script vive en un entorno virtual separado
-(tools/.venv-eyetracker, ver la seccion 2 de tools/requirements.txt) porque
+(tools/.venv-eyetracker, ver la sección 2 de tools/requirements.txt) porque
 mediapipe requiere opencv-contrib-python, que no puede convivir con
-opencv-python (dependencia de deepface, usado por emotion_tracker.py) en
+opencv-python (dependencia de emotiefflib, usado por emotion_tracker.py) en
 el mismo entorno: ambos paquetes instalan archivos en el mismo directorio
 cv2/ y se pisan entre si, dejando cv2 roto.
 
@@ -52,7 +52,7 @@ CSV_FIELDNAMES = [
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 MODEL_PATH = Path(__file__).parent / "models" / "face_landmarker.task"
 
-# Indices de landmarks del Face Landmarker de MediaPipe (478 puntos: 468
+# Índices de landmarks del Face Landmarker de MediaPipe (478 puntos: 468
 # del rostro + 10 de iris; misma topologia que el antiguo Face Mesh con
 # refine_landmarks=True).
 RIGHT_IRIS = [469, 470, 471, 472]
@@ -62,7 +62,7 @@ LEFT_EYE_CORNERS = (362, 263)   # esquina interna / externa del ojo izquierdo
 RIGHT_EYE_TOP_BOTTOM = (159, 145)  # parpado superior / inferior, ojo derecho
 LEFT_EYE_TOP_BOTTOM = (386, 374)   # parpado superior / inferior, ojo izquierdo
 
-# Umbrales heuristicos sobre la posicion relativa del iris dentro del ojo.
+# Umbrales heurísticos sobre la posición relativa del iris dentro del ojo.
 HORIZONTAL_LOW, HORIZONTAL_HIGH = 0.42, 0.58
 VERTICAL_LOW, VERTICAL_HIGH = 0.35, 0.65
 
@@ -125,7 +125,7 @@ def _classify_direction(gaze_x: float, gaze_y: float) -> str:
 
 
 class GazeEstimator:
-    """Estima la direccion de mirada a partir de los landmarks del Face Landmarker."""
+    """Estima la dirección de mirada a partir de los landmarks del Face Landmarker."""
 
     def __init__(
         self,
@@ -158,8 +158,8 @@ class GazeEstimator:
         return gaze_x, gaze_y, direction, right_iris, left_iris
 
     def report(self, gaze_x: float, gaze_y: float, side: str):
-        """`side` es la decision binaria izquierda/derecha (con debounce,
-        ver SideTracker) -- lo unico que hace falta saber del estudio."""
+        """`side` es la decisión binaria izquierda/derecha (con debounce,
+        ver SideTracker) -- lo único que hace falta saber del estudio."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] Mirada detectada: {side} (x={gaze_x:.2f}, y={gaze_y:.2f})")
         if self.log_file:
@@ -176,7 +176,7 @@ class GazeEstimator:
 
 
 def _detect_screen_size(default=(1280, 720)):
-    """Intenta obtener la resolucion de la pantalla via tkinter (stdlib)."""
+    """Intenta obtener la resolución de la pantalla vía tkinter (stdlib)."""
     try:
         import tkinter
 
@@ -191,10 +191,10 @@ def _detect_screen_size(default=(1280, 720)):
 
 SIDE_NAMES = ["izquierda", "derecha"]
 SIDE_DEBOUNCE_FRAMES = 3  # frames seguidos del otro lado antes de aceptar el cambio
-DEFAULT_SIDE_MIDPOINT = 0.5  # sin calibracion por participante (ver --left-x/--right-x)
+DEFAULT_SIDE_MIDPOINT = 0.5  # sin calibración por participante (ver --left-x/--right-x)
 
-# Calibracion izquierda/derecha por participante (ver --calibrate): cada
-# fase dura esto, mas un conteo regresivo antes de empezar a grabar para
+# Calibración izquierda/derecha por participante (ver --calibrate): cada
+# fase dura esto, más un conteo regresivo antes de empezar a grabar para
 # darle tiempo al participante de girar la cabeza/ojos.
 CALIBRATION_COUNTDOWN_SECONDS = 2.0
 CALIBRATION_RECORD_SECONDS = 3.0
@@ -205,7 +205,7 @@ class SideTracker:
     para no alternar por ruido de un solo frame justo en el medio.
 
     `midpoint` es el punto de corte entre "izquierda" y "derecha": por
-    defecto 0.5 (el centro geometrico del ojo), pero se puede calibrar por
+    defecto 0.5 (el centro geométrico del ojo), pero se puede calibrar por
     participante con --left-x/--right-x (ver _calibrated_midpoint), para
     que el corte quede centrado en SU rango real de movimiento de ojos en
     vez de asumir que todos miran exactamente igual.
@@ -277,7 +277,7 @@ def _draw_eye_overlay(frame, landmarks, width, height, right_iris, left_iris):
 def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float):
     """Corre el Face Landmarker sobre `frame` y, si detecta un rostro,
     devuelve (landmarks, gaze_x, gaze_y, direction, right_iris, left_iris);
-    si no detecta ninguno, devuelve None. Logica compartida por el loop
+    si no detecta ninguno, devuelve None. Lógica compartida por el loop
     principal y por run_calibration, para no mantenerla duplicada.
     """
     height, width = frame.shape[:2]
@@ -293,15 +293,15 @@ def _detect_gaze(landmarker, estimator: GazeEstimator, frame, start_time: float)
 
 
 def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
-    """Rutina de calibracion izquierda/derecha por participante: le pide
-    (por turnos) mirar hacia la izquierda y despues hacia la derecha,
-    con un conteo regresivo de preparacion antes de cada fase, graba su
+    """Rutina de calibración izquierda/derecha por participante: le pide
+    (por turnos) mirar hacia la izquierda y después hacia la derecha,
+    con un conteo regresivo de preparación antes de cada fase, graba su
     gaze_x promedio durante CALIBRATION_RECORD_SECONDS en cada una, y
     devuelve (left_x, right_x).
 
-    Devuelve None si en algun momento no se detecto ningun rostro
-    durante toda una fase de grabacion (no hay con que calibrar), o si
-    se cerro la ventana / se presiono 'q' a mitad de la calibracion.
+    Devuelve None si en algún momento no se detectó ningún rostro
+    durante toda una fase de grabación (no hay con que calibrar), o si
+    se cerró la ventana / se presionó 'q' a mitad de la calibración.
 
     Imprime por stdout el resultado en un formato fijo que el lanzador
     (graphic_interface/sensors/eye_tracker_launcher.py) sabe parsear:
@@ -309,7 +309,7 @@ def run_calibration(cap, landmarker, mirror: bool) -> Optional[tuple]:
         CALIBRATION_FAILED reason=<motivo>
     """
     estimator = GazeEstimator()
-    # Sin tilde a proposito (ver camera_tracker.run_calibration).
+    # Sin tilde a propósito (ver camera_tracker.run_calibration).
     window_name = "Eye Tracker - Calibracion"
     start_time = time.monotonic()
 
@@ -388,17 +388,17 @@ def main():
         default=DEFAULT_LOG_INTERVAL,
         help=f"Registrar la mirada cada N frames (default: {DEFAULT_LOG_INTERVAL})",
     )
-    parser.add_argument("--camera", type=int, default=0, help="Indice de la cámara (default: 0)")
+    parser.add_argument("--camera", type=int, default=0, help="Índice de la cámara (default: 0)")
     parser.add_argument(
         "--mirror", action="store_true",
         help="Voltea el frame horizontalmente (vista espejo) antes de estimar la mirada",
     )
     parser.add_argument("--participant-id", default="", help="ID del participante activo (opcional)")
     parser.add_argument("--participant-name", default="", help="Nombre del participante activo (opcional)")
-    parser.add_argument("--session-label", default="", help="Etiqueta de la sesion, ej. nombre del juego")
+    parser.add_argument("--session-label", default="", help="Etiqueta de la sesión, ej. nombre del juego")
     parser.add_argument(
         "--log-file", default=None,
-        help="Ruta de un CSV donde ademas se registra cada lectura (opcional)",
+        help="Ruta de un CSV donde además se registra cada lectura (opcional)",
     )
     parser.add_argument(
         "--model-path", default=None,
@@ -407,10 +407,10 @@ def main():
     parser.add_argument(
         "--calibrate", action="store_true",
         help=(
-            "Corre una calibracion corta izquierda/derecha en vez del "
+            "Corre una calibración corta izquierda/derecha en vez del "
             "seguimiento continuo: le pide al participante mirar hacia "
             "cada lado, imprime CALIBRATION_RESULT left_x=.. right_x=.. "
-            "(o CALIBRATION_FAILED si no se detecto un rostro) y termina."
+            "(o CALIBRATION_FAILED si no se detectó un rostro) y termina."
         ),
     )
     parser.add_argument(
@@ -491,11 +491,11 @@ def main():
             frame_count += 1
             height, width = frame.shape[:2]
 
-            # La deteccion siempre corre sobre el frame "crudo" (sin
+            # La detección siempre corre sobre el frame "crudo" (sin
             # espejo): si se voltea antes, izquierda/derecha quedan
             # invertidas respecto a la mirada real. El volteo (--mirror)
-            # se aplica solo al final, unicamente para la ventana de
-            # video, despues de dibujar el overlay sobre el frame crudo.
+            # se aplica solo al final, únicamente para la ventana de
+            # video, después de dibujar el overlay sobre el frame crudo.
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             timestamp_ms = int((time.monotonic() - start_time) * 1000)
@@ -511,12 +511,12 @@ def main():
                 side_canvas = _draw_side_window(screen_width, screen_height, side, direction)
                 cv2.imshow(side_window_name, side_canvas)
 
-                # Se reporta `side` (izquierda/derecha, la misma decision
+                # Se reporta `side` (izquierda/derecha, la misma decisión
                 # binaria con debounce que ya se ve en la ventana de
                 # mirada), no `direction` -- ese es el detalle de 9
                 # valores (con "centro" y arriba/abajo) que solo se usa
-                # como anotacion visual en esa ventana. Lo unico que hace
-                # falta saber, para el estudio, es hacia que lado esta
+                # como anotación visual en esa ventana. Lo único que hace
+                # falta saber, para el estudio, es hacia qué lado está
                 # mirando el participante.
                 if frame_count % args.interval == 0:
                     estimator.report(gaze_x, gaze_y, side)

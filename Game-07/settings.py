@@ -29,7 +29,25 @@ HUD_HEIGHT = 40
 VIRTUAL_WIDTH = GRID_COLUMNS * CELL_SIZE
 VIRTUAL_HEIGHT = HUD_HEIGHT + GRID_ROWS * CELL_SIZE
 
-WINDOW_SCALE = 1.5
+
+def _window_scale() -> float:
+    """
+    Largest scale at which the window still fits the desktop (with room
+    for the taskbar/title bar), never below the old fixed 1.5. The text
+    is drawn at window resolution (src/text.py), so a bigger window means
+    sharper letters; and when the launcher forces FULLSCREEN | SCALED,
+    a window close to the monitor size keeps SDL's final upscale small.
+    """
+    try:
+        pygame.display.init()
+        desktop_width, desktop_height = pygame.display.get_desktop_sizes()[0]
+    except (pygame.error, IndexError):
+        return 1.5
+    fit = min(desktop_width * 0.95 / VIRTUAL_WIDTH, desktop_height * 0.85 / VIRTUAL_HEIGHT)
+    return max(1.5, fit)
+
+
+WINDOW_SCALE = _window_scale()
 WINDOW_WIDTH = int(VIRTUAL_WIDTH * WINDOW_SCALE)
 WINDOW_HEIGHT = int(VIRTUAL_HEIGHT * WINDOW_SCALE)
 
@@ -75,24 +93,36 @@ SOUNDS = {
 
 # --- Fonts -------------------------------------------------------------
 FONT_FAMILY = "consolas,couriernew,dejavusansmono,monospace"
+# (size on the virtual canvas, bold). FONTS holds them at virtual size
+# (used for measuring/wrapping text); src/text.py rebuilds each one at
+# window resolution when actually drawing, so letters stay sharp.
+FONT_SPECS = {
+    "hud": (13, False),
+    "title": (28, True),
+    "menu": (16, False),
+    "banner": (22, True),
+    "toast": (12, True),
+}
 FONTS = {
-    "hud": pygame.font.SysFont(FONT_FAMILY, 13),
-    "title": pygame.font.SysFont(FONT_FAMILY, 28, bold=True),
-    "menu": pygame.font.SysFont(FONT_FAMILY, 16),
-    "banner": pygame.font.SysFont(FONT_FAMILY, 22, bold=True),
-    "toast": pygame.font.SysFont(FONT_FAMILY, 12, bold=True),
+    key: pygame.font.SysFont(FONT_FAMILY, size, bold=bold)
+    for key, (size, bold) in FONT_SPECS.items()
 }
 
 # --- Input --------------------------------------------------------------
 # Action ids are intentionally generic (not tied to a single state):
 # "confirm" selects a level in StartState, restarts it in PlayState, and
 # advances to the next one in VictoryState; "back" backs out of whatever
-# is currently on screen.
+# is currently on screen. "open_guide" (G) opens/closes the how-to-play
+# guide from the level menu or mid-level.
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_ESCAPE, "back")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RETURN, "confirm")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_KP_ENTER, "confirm")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_UP, "nav_up")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_DOWN, "nav_down")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_LEFT, "nav_left")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RIGHT, "nav_right")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_g, "open_guide")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_i, "level_info")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_SPACE, "toggle_pause")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_s, "step_once")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_r, "clear_cells")

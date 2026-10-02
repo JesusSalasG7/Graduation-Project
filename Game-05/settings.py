@@ -20,6 +20,11 @@ input_handler.InputHandler.set_keyboard_action(input_handler.KEY_KP_ENTER, "ente
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RETURN, "enter")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_UP, "up")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_DOWN, "down")
+# Guía de juego (ver src/states/guide_state.py): G la abre desde la
+# portada, y las flechas izquierda/derecha pasan sus páginas.
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_g, "guide")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_LEFT, "left")
+input_handler.InputHandler.set_keyboard_action(input_handler.KEY_RIGHT, "right")
 input_handler.InputHandler.set_mouse_click_action(input_handler.MOUSE_BUTTON_1, "click")
 
 BASE_DIR = Path(__file__).parent
@@ -74,19 +79,19 @@ PLAYER_ANCHOR = PLAYER_PANEL.center
 ENEMY_ANCHOR = ENEMY_PANEL.center
 
 # --- Combat balance -----------------------------------------------------
-# El enemigo tiene mas vida que el jugador: no juega el tablero (ver
-# CombatManager.enemy_turn), asi que su unica forma de ser un rival
-# duro es aguantar mas turnos mientras su ataque escala (ver
+# El enemigo tiene más vida que el jugador: no juega el tablero (ver
+# CombatManager.enemy_turn), así que su única forma de ser un rival
+# duro es aguantar más turnos mientras su ataque escala (ver
 # src.combat.combat_manager.ENEMY_RAMP_TURNS/ENEMY_ELEMENT_WEIGHTS).
 PLAYER_MAX_HP = 100
 ENEMY_MAX_HP = 115
 
-# Limite de tiempo del combate, en segundos: si se agota antes de que
+# Límite de tiempo del combate, en segundos: si se agota antes de que
 # el jugador derrote al enemigo, gana el enemigo (ver
 # PlayState.update/COMBAT_TIME_LIMIT en src/states/play_state.py). Corre
 # en tiempo real desde que arranca el combate, sin importar de quien
-# sea el turno, para meter presion incluso mientras el jugador piensa
-# la proxima jugada.
+# sea el turno, para meter presión incluso mientras el jugador piensa
+# la próxima jugada.
 COMBAT_TIME_LIMIT = 50
 
 CHARACTER_SPRITE_BASE_SIZE = 16  # pixel-art drawn on a 16x16 surface...
@@ -100,11 +105,11 @@ HP_BAR_OFFSET_Y = CHARACTER_SPRITE_SIZE // 2 + 28  # above the sprite's anchor
 # --- Match-3 scoring -------------------------------------------------------
 POINTS_PER_TILE = 10
 CATALYSIS_BONUS = 50
-# Desafio A05 (src/algorithm.py::find_repeated, aplicado en
-# Board.resolve_runs): la Catalisis paga esto por cada elemento que
-# se REPITE (aparece 2 o mas veces) dentro de la fila/columna que
+# Desafío A05 (src/algorithm.py::find_repeated, aplicado en
+# Board.resolve_runs): la Catálisis paga esto por cada elemento que
+# se REPITE (aparece 2 o más veces) dentro de la fila/columna que
 # limpio, para premiar que un mismo elemento "resuene" varias veces
-# en la misma linea, no solo el tamano del match.
+# en la misma línea, no solo el tamaño del match.
 RESONANCE_BONUS_PER_KIND = 15
 
 # --- Tile kinds -------------------------------------------------------
@@ -204,13 +209,13 @@ ELEMENT_SOUNDS = _load_element_sounds()
 # --- Background music ---------------------------------------------------
 # Un solo tema (Bucle_Music.mp3) suena de punta a punta del juego --
 # arranca una vez desde ArcaneTransmutationGame.init() (src/transmutacion_arcana.py)
-# y sigue de fondo sin importar el estado (start/play) o cuantas
+# y sigue de fondo sin importar el estado (start/play) o cuántas
 # partidas se reinicien. Se reproduce con pygame.mixer.music (pensado
 # para streaming de un solo tema largo) en vez de mixer.Sound como
 # ELEMENT_SOUNDS (pensado para efectos cortos que se disparan y
 # superponen entre si) y a menor volumen que esos efectos -- que no
-# fijan volumen propio, es decir quedan al maximo (1.0) -- para que no
-# tape las senales de combate.
+# fijan volumen propio, es decir quedan al máximo (1.0) -- para que no
+# tape las señales de combate.
 BACKGROUND_MUSIC_PATH = AUDIO_DIR / "Bucle_Music.mp3"
 BACKGROUND_MUSIC_VOLUME = 0.4
 
@@ -223,9 +228,20 @@ def play_background_music() -> None:
 
 BACKGROUND_COLOR = (18, 14, 26)
 
-FONTS = {
-    "small": pygame.font.Font(None, 28),
-    "medium": pygame.font.Font(None, 44),
-    "large": pygame.font.Font(None, 80),
-    "huge": pygame.font.Font(None, 112),
+# Tamaño (en píxeles virtuales) de cada fuente -- todas son la fuente
+# por defecto de pygame. Se guardan como tamaños, y no solo como objetos
+# Font, para que src/text.py pueda recrear la misma fuente a la
+# resolución real de la ventana y dibujar el texto nítido en vez de
+# agrandarlo junto con el resto del lienzo virtual.
+FONT_SIZES = {
+    # Texto corrido de la guía de juego (src/states/guide_state.py):
+    # más chico que "small" para que cada regla entre en una o dos
+    # líneas dentro del ancho vertical de la pantalla.
+    "tiny": 22,
+    "small": 28,
+    "medium": 44,
+    "large": 80,
+    "huge": 112,
 }
+
+FONTS = {key: pygame.font.Font(None, size) for key, size in FONT_SIZES.items()}

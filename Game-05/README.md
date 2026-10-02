@@ -45,7 +45,8 @@ Game-05/
     │   ├── elements.py                 # daño/curación/efecto de cada uno de los 8 elementos
     │   └── effects.py                  # proyectiles/impactos por elemento (pixel art)
     └── states/
-        ├── start_state.py              # pantalla de inicio: portada + Enter para jugar
+        ├── start_state.py              # pantalla de inicio: portada + Enter para jugar + botón de guía
+        ├── guide_state.py              # guía de juego: controles, elementos y combos (botón "Guía" o tecla G)
         └── play_state.py               # tablero + combate + puntaje (gale.state)
 ```
 
@@ -108,7 +109,7 @@ en cada caso.
 | Magia | Daño aleatorio, con probabilidad de crítico |
 | Oscuridad | Daño que ignora defensa |
 
-Cada uno tiene su propio efecto visual en pixel art (proyectil,
+Cada uno tiene su propio efecto visual en píxel art (proyectil,
 impacto en el suelo, etc. — `src/combat/effects.py`), generado por
 código en `tools/generate_effect_sprites.py`, sin ningún asset
 externo.

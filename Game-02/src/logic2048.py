@@ -59,6 +59,11 @@ class MoveResult:
     movements: List[TileMovement] = field(default_factory=list)
     new_tile_position: Optional[Tuple[int, int]] = None
     new_tile_value: Optional[int] = None
+    # True cuando el desafío A02 no está implementado: las fichas no se
+    # deslizan (la interfaz las hace "rebotar" contra la dirección
+    # pedida) pero igual se gasta el turno y aparece una ficha nueva,
+    # para que el juego responda a las flechas aunque sea mal.
+    bumped: bool = False
 
 
 class Board:
@@ -69,6 +74,9 @@ class Board:
         self.score: int = 0
         self.won: bool = False
         self.lost: bool = False
+        # Se vuelve True si _compress_and_merge falla (desafío A02 sin
+        # implementar); ver move().
+        self.challenge_missing: bool = False
         # Toda partida arranca con dos fichas.
         self.add_random_tile()
         self.add_random_tile()
@@ -108,26 +116,29 @@ class Board:
     ) -> Tuple[List[int], int, bool, List["_LineShift"]]:
         # TODO: comprimir los huecos, fusionar cada par de fichas iguales
         # una sola vez por turno (ej: [2,2,2,2] -> [4,4], nunca [8,0] ni
-        # [4,2,2]), y volver a rellenar con ceros hasta el tamano
+        # [4,2,2]), y volver a rellenar con ceros hasta el tamaño
         # original. Devolver (linea_resultante, puntos_obtenidos,
         # hubo_cambio, desplazamientos).
-        raise NotImplementedError("Implementar compresion y fusion de una linea de 2048 (A02)")
+        raise NotImplementedError("Implementar compresión y fusión de una línea de 2048 (A02)")
 
-    @classmethod
     def _compress_and_merge_or_default(
-        cls, line: List[int],
+        self, line: List[int],
     ) -> Tuple[List[int], int, bool, List["_LineShift"]]:
-        """Envoltorio de `_compress_and_merge` que cubre el desafio A02
+        """Envoltorio de `_compress_and_merge` que cubre el desafío A02
         sin implementar -- ya sea que lance NotImplementedError (el TODO
-        real) o devuelva None -- tratandolo como si la linea no hubiera
+        real) o devuelva None -- tratándolo como si la línea no hubiera
         cambiado (sin puntos ni fichas movidas) en vez de romper el
         movimiento entero.
         """
         try:
-            outcome = cls._compress_and_merge(line)
+            # Vía la clase (no self.): la sesión guiada reemplaza este
+            # método por la solución del participante sin conservar el
+            # @staticmethod, y así funciona igual con o sin él.
+            outcome = type(self)._compress_and_merge(line)
         except Exception:
             outcome = None
         if outcome is None:
+            self.challenge_missing = True
             return list(line), 0, False, []
         return outcome
 
@@ -228,6 +239,8 @@ class Board:
             changed, movements = self._process_columns(reverse=True)
 
         if not changed:
+            if self.challenge_missing:
+                return self._bump_without_sliding()
             return MoveResult(changed=False)
 
         if any(value >= WIN_VALUE for row in self.cells for value in row):
@@ -245,6 +258,34 @@ class Board:
             movements=movements,
             new_tile_position=new_tile_position,
             new_tile_value=new_tile_value,
+        )
+
+    def _bump_without_sliding(self) -> MoveResult:
+        """
+        Respuesta "mal hecha" a un movimiento mientras el desafío A02 no
+        está implementado: ninguna ficha se mueve ni se fusiona, pero
+        el turno se gasta igual y aparece una ficha nueva. Así las
+        flechas hacen algo visible (y el tablero se va llenando hasta
+        el Game Over) en vez de ignorarse sin ninguna reacción.
+        """
+        movements = [
+            TileMovement((row, col), (row, col), value, False)
+            for row, cells in enumerate(self.cells)
+            for col, value in enumerate(cells)
+            if value
+        ]
+        new_tile = self.add_random_tile()
+
+        if not self.empty_cells():
+            # Sin el desafío ninguna fusión es posible: tablero lleno = derrota.
+            self.lost = True
+
+        return MoveResult(
+            changed=True,
+            movements=movements,
+            new_tile_position=(new_tile[0], new_tile[1]) if new_tile else None,
+            new_tile_value=new_tile[2] if new_tile else None,
+            bumped=True,
         )
 
     def _has_possible_moves(self) -> bool:

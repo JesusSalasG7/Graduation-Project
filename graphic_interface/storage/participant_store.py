@@ -1,9 +1,9 @@
 """Persistencia de participantes en JSON con esquema extensible.
 
-Los participantes se registran de forma anonima: no se guarda nombre,
-apellido ni cedula, solo un numero secuencial ("Participante 1",
+Los participantes se registran de forma anónima: no se guarda nombre,
+apellido ni cédula, solo un número secuencial ("Participante 1",
 "Participante 2", ...) que nunca se reutiliza aunque se borren
-participantes, mas una bolsa "attributes" de clave-valor libre para
+participantes, más una bolsa "attributes" de clave-valor libre para
 poder agregar atributos futuros (edad, grupo experimental, etc.) sin
 romper los registros ya guardados.
 """
@@ -25,7 +25,7 @@ def participant_label(participant: dict) -> str:
 def participant_file_stub(participant: dict) -> str:
     """Identificador "PARTICIPANTE_N" usado para nombrar los archivos de
     datos de este participante (log de emociones, log de frecuencia
-    cardiaca) y la carpeta que debe traer el export del reloj.
+    cardíaca) y la carpeta que debe traer el export del reloj.
     """
     return f"PARTICIPANTE_{participant['number']}"
 

@@ -11,9 +11,8 @@ from typing import Dict, List, Tuple
 
 import pygame
 
-from gale.text import render_text
-
 import settings
+from src.text import render_text
 
 Coord = Tuple[int, int]
 

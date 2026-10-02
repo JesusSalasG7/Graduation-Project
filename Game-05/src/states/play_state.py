@@ -22,21 +22,22 @@ import pygame
 
 from gale.input_handler import InputData
 from gale.state import BaseState
-from gale.text import render_text
 from gale.timer import Timer
 
 import settings
+from src import text as text_layer
+from src.text import render_text
 from src.board.board import Board
 from src.combat import Character, CombatManager
 
 HINT_DELAY = 5.0
 
-# Cuanto dura en pantalla el aviso de bonus de Resonancia Elemental
+# Cuánto dura en pantalla el aviso de bonus de Resonancia Elemental
 # (ver _show_resonance_message) antes de desvanecerse solo.
 RESONANCE_MESSAGE_DURATION = 1.5
 
 # Botones de la pantalla de fin de partida (ver _render_result_overlay
-# / _handle_result_click): opcion 0 reinicia la partida, opcion 1 sale
+# / _handle_result_click): opción 0 reinicia la partida, opción 1 sale
 # del juego.
 RESULT_OPTIONS = ("Volver a jugar", "Salir")
 RESULT_BUTTON_SIZE = (200, 44)
@@ -75,7 +76,7 @@ class PlayState(BaseState):
 
         # Corre en tiempo real -- no se pausa mientras el tablero
         # anima o le toca al enemigo -- para que el jugador sienta la
-        # presion del reloj tambien mientras decide su proxima jugada.
+        # presión del reloj también mientras decide su próxima jugada.
         self.time_remaining = max(0.0, self.time_remaining - dt)
         if self.time_remaining <= 0:
             self._set_result("derrota", time_up=True)
@@ -152,9 +153,14 @@ class PlayState(BaseState):
         )
 
     def _render_result_overlay(self, surface: pygame.Surface) -> None:
+        overlay_color = (10, 8, 16, 190)
         overlay = pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((10, 8, 16, 190))
+        overlay.fill(overlay_color)
         surface.blit(overlay, (0, 0))
+        # El texto se dibuja aparte, a resolución de ventana (ver
+        # src/text.py): hay que taparle también el reloj/avisos ya
+        # dibujados, igual que este velo tapa el tablero.
+        text_layer.overlay(overlay_color)
 
         if self.result == "derrota" and self.time_up:
             render_text(
@@ -353,7 +359,7 @@ class PlayState(BaseState):
 
     def _process_matches(self, runs) -> None:
         # Cada corrida dispara el efecto de combate de su propio
-        # elemento (Modulo C) antes de limpiar el tablero -- así el
+        # elemento (Módulo C) antes de limpiar el tablero -- así el
         # tamaño real del match (3/4/5+) llega intacto a CombatManager.
         for run in runs:
             self.combat.apply_player_match(run.kind, len(run.tiles))
@@ -364,9 +370,9 @@ class PlayState(BaseState):
         self.score += cleared_count * settings.POINTS_PER_TILE
         if catalysis:
             self.score += settings.CATALYSIS_BONUS
-            # Desafio A05 (src/algorithm.py): bonus extra por cada
-            # elemento que se repitio dentro de la linea que arrastro
-            # la Catalisis.
+            # Desafío A05 (src/algorithm.py): bonus extra por cada
+            # elemento que se repitió dentro de la línea que arrastro
+            # la Catálisis.
             resonance_bonus = resonance_kinds * settings.RESONANCE_BONUS_PER_KIND
             self.score += resonance_bonus
             if resonance_bonus:
@@ -385,7 +391,7 @@ class PlayState(BaseState):
         self._reshuffle_if_stuck()
 
         # La jugada del jugador termino de resolverse por completo:
-        # si nadie gano/perdio todavia, le toca el turno automatico
+        # si nadie ganó/perdió todavía, le toca el turno automático
         # al enemigo antes de devolver el control del tablero.
         result = self.combat.check_result()
         if result is not None:
@@ -395,10 +401,10 @@ class PlayState(BaseState):
         self.combat.enemy_turn(on_finish=self._after_enemy_turn)
 
     def _show_resonance_message(self, resonance_kinds: int, resonance_bonus: int) -> None:
-        # Desafio A05 (src/algorithm.py): hace visible en pantalla lo
-        # que find_repeated calculo -- cuantos elementos se repitieron
-        # dentro de la linea que arrastro la Catalisis y cuanto pago
-        # ese bonus de Resonancia Elemental, que de otro modo quedaria
+        # Desafío A05 (src/algorithm.py): hace visible en pantalla lo
+        # que find_repeated calculó -- cuántos elementos se repitieron
+        # dentro de la línea que arrastró la Catálisis y cuánto pagó
+        # ese bonus de Resonancia Elemental, que de otro modo quedaría
         # invisible dentro de self.score.
         self.resonance_message = f"¡Resonancia x{resonance_kinds}! +{resonance_bonus}"
         Timer.after(RESONANCE_MESSAGE_DURATION, lambda: setattr(self, "resonance_message", None))

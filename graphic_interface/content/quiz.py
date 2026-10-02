@@ -1,8 +1,8 @@
-"""Estructura compartida para preguntas de seleccion multiple (opcion unica).
+"""Estructura compartida para preguntas de selección multiple (opción única).
 
-La usan tanto el banco estatico de preguntas sobre el enunciado
-(statement_quiz.py) como las preguntas generadas dinamicamente sobre la
-solucion concreta de cada participante (challenge_solver.py).
+La usan tanto el banco estático de preguntas sobre el enunciado
+(statement_quiz.py) como las preguntas generadas dinámicamente sobre la
+solución concreta de cada participante (challenge_solver.py).
 """
 
 from dataclasses import dataclass

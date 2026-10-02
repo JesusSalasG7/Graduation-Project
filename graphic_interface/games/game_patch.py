@@ -1,18 +1,18 @@
-"""Lanza una copia temporal de un juego para las Etapas 1 y 6 de la sesion
-guiada: "ver el juego sin la solucion" y "ver el juego con la solucion
-hecha" (la funcion/metodo del desafio se reemplaza por el codigo que
-genero la IA aislada a partir del prompt del participante, ver
+"""Lanza una copia temporal de un juego para las Etapas 1 y 6 de la sesión
+guiada: "ver el juego sin la solucion" y "ver el juego con la solución
+hecha" (la función/método del desafío se reemplaza por el código que
+generó la IA aislada a partir del prompt del participante, ver
 challenge_solver.generate_isolated_response).
 
-La Etapa 1 NO parchea la funcion/metodo del desafio: el codigo fuente real
-de cada juego ya deja esa funcion sin resolver (TODO + `raise
-NotImplementedError`, ver CHALLENGES en challenges.py), asi que copiarla
+La Etapa 1 NO parchea la función/método del desafío: el código fuente real
+de cada juego ya deja esa función sin resolver (TODO + `raise
+NotImplementedError`, ver CHALLENGES en challenges.py), así que copiarla
 tal cual ya alcanza para que el participante vea la falla real -- no una
-version sintetica aparte.
+versión sintética aparte.
 
-Nunca se toca el codigo fuente real del proyecto: se copia la carpeta del
-juego a un directorio temporal (sin .venv ni __pycache__), se parchea ahi
-adentro con el modulo `ast` (solo para la Etapa 6), se lanza el proceso
+Nunca se toca el código fuente real del proyecto: se copia la carpeta del
+juego a un directorio temporal (sin .venv ni __pycache__), se parchea ahí
+adentro con el módulo `ast` (solo para la Etapa 6), se lanza el proceso
 apuntando a esa copia, y la copia se borra sola en cuanto el proceso
 termina.
 """
@@ -36,7 +36,7 @@ _LOCATION_RE = re.compile(
 
 
 class PatchError(Exception):
-    """La funcion/metodo del desafio no se pudo ubicar o reemplazar."""
+    """La función/método del desafío no se pudo ubicar o reemplazar."""
 
 
 def _parse_location(location: str) -> tuple[str, Optional[str], str]:
@@ -47,8 +47,8 @@ def _parse_location(location: str) -> tuple[str, Optional[str], str]:
 
 
 def _find_function_slot(tree: ast.Module, class_name: Optional[str], func_name: str):
-    """Devuelve (lista_de_statements, indice) donde vive la funcion/metodo
-    a reemplazar: el body del modulo, o el body de la clase indicada.
+    """Devuelve (lista_de_statements, índice) donde vive la función/método
+    a reemplazar: el body del módulo, o el body de la clase indicada.
     """
     if class_name is None:
         body = tree.body
@@ -68,8 +68,8 @@ def _find_function_slot(tree: ast.Module, class_name: Optional[str], func_name: 
 
 
 def _solution_function(func_name: str, solution_code: str) -> ast.FunctionDef:
-    """Interpreta `solution_code` -- el texto crudo que devolvio la IA
-    aislada, se espera una unica definicion de funcion/metodo -- y
+    """Interpreta `solution_code` -- el texto crudo que devolvió la IA
+    aislada, se espera una única definición de función/método -- y
     devuelve su nodo FunctionDef, renombrado para calzar con `func_name`.
     """
     try:
@@ -112,14 +112,14 @@ def _apply_replacement(game_dir: Path, relative_file: str, class_name: Optional[
 
 
 # Game-01 (Snake) arranca por defecto en el estado "cover" (splash) y de
-# ahi pasa al menu, donde el jugador elige a mano Modo Clasico o Modo
-# Desafio. El desafio A01 (World.count_apples_in_range) SOLO se ejercita
-# en Modo Desafio -- ver `self.mode == "challenge"` en src/world.py --
-# asi que si la sesion guiada dejara el juego en el splash/menu (o el
-# participante terminara en Modo Clasico), nunca se veria el conteo ni
-# el bono periodico roto/incompleto que la Etapa 1 necesita mostrar, ni
-# la solucion aplicada en la Etapa 6. Por eso, solo en esta copia
-# temporal, se salta directo a PlayState en Modo Desafio.
+# ahí pasa al menú, donde el jugador elige a mano Modo Clásico o Modo
+# Desafío. El desafío A01 (World.count_apples_in_range) SOLO se ejercita
+# en Modo Desafío -- ver `self.mode == "challenge"` en src/world.py --
+# así que si la sesión guiada dejara el juego en el splash/menu (o el
+# participante terminara en Modo Clásico), nunca se vería el conteo ni
+# el bono periódico roto/incompleto que la Etapa 1 necesita mostrar, ni
+# la solución aplicada en la Etapa 6. Por eso, solo en esta copia
+# temporal, se salta directo a PlayState en Modo Desafío.
 _SNAKE_COVER_CALL = 'self.state_machine.change("cover")'
 _SNAKE_CHALLENGE_CALL = 'self.state_machine.change("play", mode="challenge")'
 
@@ -132,7 +132,7 @@ def _force_snake_challenge_mode(game_dir: Path) -> None:
     source = source_path.read_text(encoding="utf-8")
     if _SNAKE_COVER_CALL not in source:
         raise PatchError(
-            "No se encontró el arranque en 'cover' de SnakeGame -- no se pudo forzar el Modo Desafio."
+            "No se encontró el arranque en 'cover' de SnakeGame -- no se pudo forzar el Modo Desafío."
         )
     source_path.write_text(
         source.replace(_SNAKE_COVER_CALL, _SNAKE_CHALLENGE_CALL, 1), encoding="utf-8",
@@ -150,14 +150,14 @@ def _launch_and_cleanup(game_dir: Path) -> None:
 
 
 def launch_game_without_solution(game: GameInfo) -> None:
-    """Etapa 1: copia el juego TAL CUAL (la funcion/metodo del desafio ya
-    esta sin resolver en el codigo fuente real, ver challenges.py) y lo
+    """Etapa 1: copia el juego TAL CUAL (la función/método del desafío ya
+    esta sin resolver en el código fuente real, ver challenges.py) y lo
     lanza, para que el participante vea en vivo la falla real -- el
     mismo TODO/raise que hay en el repo -- antes de leer el enunciado.
 
-    Puede lanzar PatchError (Game-01: no se pudo forzar el Modo Desafio)
-    o cualquier excepcion de IO/subprocess si algo falla -- el llamador
-    debe mostrar el error sin tumbar la sesion guiada.
+    Puede lanzar PatchError (Game-01: no se pudo forzar el Modo Desafío)
+    o cualquier excepción de IO/subprocess si algo falla -- el llamador
+    debe mostrar el error sin tumbar la sesión guiada.
     """
     game_dir = _copy_game_to_tempdir(game)
     try:
@@ -170,13 +170,13 @@ def launch_game_without_solution(game: GameInfo) -> None:
 
 
 def launch_game_with_solution(game: GameInfo, challenge: Challenge, solution_code: str) -> None:
-    """Etapa 6: copia el juego, reemplaza la funcion/metodo del desafio por
-    el codigo que genero la IA aislada a partir del prompt del participante
-    (Etapa 3) y lo lanza, para observar esa solucion concreta en accion.
+    """Etapa 6: copia el juego, reemplaza la función/método del desafío por
+    el código que generó la IA aislada a partir del prompt del participante
+    (Etapa 3) y lo lanza, para observar esa solución concreta en acción.
 
-    Puede lanzar PatchError (codigo generado invalido, o no calza con la
-    firma esperada) o cualquier excepcion de IO/subprocess -- el llamador
-    debe mostrar el error sin tumbar la sesion guiada.
+    Puede lanzar PatchError (código generado inválido, o no calza con la
+    firma esperada) o cualquier excepción de IO/subprocess -- el llamador
+    debe mostrar el error sin tumbar la sesión guiada.
     """
     relative_file, class_name, func_name = _parse_location(challenge.location)
     game_dir = _copy_game_to_tempdir(game)

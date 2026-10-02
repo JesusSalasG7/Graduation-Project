@@ -1,22 +1,22 @@
 """Lanzador del Camera Tracker fusionado (tools/camera_tracker.py):
-Emotion Tracker + Eye Tracker sobre UNA sola camara, en un solo proceso
+Emotion Tracker + Eye Tracker sobre UNA sola cámara, en un solo proceso
 -- ver el docstring de ese script para el motivo (la webcam de esta
-configuracion, como la mayoria de las webcams USB, solo admite un
+configuración, como la mayoría de las webcams USB, solo admite un
 handle de captura abierto a la vez; lanzar los dos scripts viejos por
-separado hacia que el segundo en arrancar no pudiera abrir la camara).
+separado hacia que el segundo en arrancar no pudiera abrir la cámara).
 
-Vive en su propio entorno virtual, tools/.venv-tracker (ver la seccion 3
+Vive en su propio entorno virtual, tools/.venv-tracker (ver la sección 3
 de tools/requirements.txt), separado tanto del .venv unificado de la
-raiz como de tools/.venv-eyetracker.
+raíz como de tools/.venv-eyetracker.
 
 Flujo (ver session_wizard._show_configure_camera_tracker):
     1. run_calibration(...) corre `camera_tracker.py --calibrate`: le
-       pide al participante mirar a la izquierda y despues a la derecha,
+       pide al participante mirar a la izquierda y después a la derecha,
        y devuelve (left_x, right_x) -- su gaze_x real en cada lado.
     2. start_camera_tracker(...) lanza el seguimiento continuo (mirada +
-       emocion) pasandole esos dos valores, para que el corte
+       emoción) pasándole esos dos valores, para que el corte
        izquierda/derecha quede calibrado a ESE participante, y con un CSV
-       propio para cada analisis.
+       propio para cada análisis.
 """
 
 import re
@@ -36,14 +36,14 @@ CAMERA_TRACKER_VENV_DIR = TOOLS_DIR / ".venv-tracker"
 _RESULT_RE = re.compile(r"CALIBRATION_RESULT\s+left_x=([\-0-9.]+)\s+right_x=([\-0-9.]+)")
 _FAILED_RE = re.compile(r"CALIBRATION_FAILED\s+reason=(\S+)")
 
-# La calibracion completa (2 fases + su conteo regresivo) dura unos
+# La calibración completa (2 fases + su conteo regresivo) dura unos
 # 10-12s; este timeout es solo una salvaguarda por si el proceso se
-# cuelga (camara que nunca entrega frames, etc.).
+# cuelga (cámara que nunca entrega frames, etc.).
 CALIBRATION_TIMEOUT_SECONDS = 60
 
 
 class CalibrationError(Exception):
-    """La calibracion no se pudo completar (sin rostro, ventana cerrada, timeout)."""
+    """La calibración no se pudo completar (sin rostro, ventana cerrada, timeout)."""
 
 
 def camera_tracker_python() -> Path:
@@ -51,17 +51,17 @@ def camera_tracker_python() -> Path:
     if not candidate.exists():
         raise FileNotFoundError(
             f"No se encontró el entorno virtual del Camera Tracker en {CAMERA_TRACKER_VENV_DIR} "
-            "(ver la seccion 3 de tools/requirements.txt para crearlo)."
+            "(ver la sección 3 de tools/requirements.txt para crearlo)."
         )
     return candidate
 
 
 def delete_camera_data(participant: Optional[dict]) -> None:
-    """Borra los CSV de emocion y de mirada capturados para `participant`
-    en esta sesion -- se usa cuando la sesion guiada se abandona sin
-    terminar los desafios (mismo criterio que neurosky_launcher.
-    delete_neurosky_data): datos de una sesion incompleta no sirven para
-    el analisis."""
+    """Borra los CSV de emoción y de mirada capturados para `participant`
+    en esta sesión -- se usa cuando la sesión guiada se abandona sin
+    terminar los desafíos (mismo criterio que neurosky_launcher.
+    delete_neurosky_data): datos de una sesión incompleta no sirven para
+    el análisis."""
     if not participant:
         return
     for path in (emotion_log_file(participant), eye_log_file(participant)):
@@ -73,13 +73,13 @@ def delete_camera_data(participant: Optional[dict]) -> None:
 
 def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tuple[float, float]:
     """Corre `camera_tracker.py --calibrate` hasta que termina, mandando
-    cada linea de salida a `on_output` (para poder mostrarla en vivo).
+    cada línea de salida a `on_output` (para poder mostrarla en vivo).
     Bloquea al hilo que la llama -- se espera que se dispare desde un
     hilo de fondo, nunca desde el hilo de Tk (ver session_wizard).
 
     Devuelve (left_x, right_x). Lanza CalibrationError si el proceso
-    termina sin imprimir CALIBRATION_RESULT (no se detecto un rostro
-    durante alguna fase, se cerro la ventana, timeout, o la camara no
+    termina sin imprimir CALIBRATION_RESULT (no se detectó un rostro
+    durante alguna fase, se cerró la ventana, timeout, o la cámara no
     se pudo abrir).
     """
     if not CAMERA_TRACKER_SCRIPT.exists():
@@ -120,18 +120,18 @@ def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tu
         return result
     if failure_reason:
         raise CalibrationError(f"No se detectó un rostro mirando hacia: {failure_reason}.")
-    raise CalibrationError("La calibracion se interrumpio antes de terminar.")
+    raise CalibrationError("La calibración se interrumpió antes de terminar.")
 
 
 def start_camera_tracker(
     participant: Optional[dict], session_label: str, left_x: float, right_x: float, mirror: bool = True,
 ) -> subprocess.Popen:
-    """Lanza el seguimiento continuo (mirada + emocion, un solo proceso,
-    una sola camara) con los umbrales calibrados de run_calibration(),
-    con su salida como pipe de texto linea a linea para poder mostrarla
+    """Lanza el seguimiento continuo (mirada + emoción, un solo proceso,
+    una sola cámara) con los umbrales calibrados de run_calibration(),
+    con su salida como pipe de texto línea a línea para poder mostrarla
     en vivo.
 
-    Si hay un participante activo, sus lecturas se registran ademas en
+    Si hay un participante activo, sus lecturas se registran además en
     dos CSV propios -- graphic_interface/data/emotion_logs/<NOMBRE_
     APELLIDO>.csv y graphic_interface/data/eye_logs/<NOMBRE_APELLIDO>.csv
     -- los mismos que usaban las herramientas separadas.

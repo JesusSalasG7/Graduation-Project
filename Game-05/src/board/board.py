@@ -220,15 +220,15 @@ class Board:
                 else:
                     line_tiles = [self.tiles[i][run.line_index] for i in range(settings.BOARD_HEIGHT)]
 
-                # Desafio A05: la fila/columna completa es una matriz
+                # Desafío A05: la fila/columna completa es una matriz
                 # de enteros (una fila, los TileKind.value de cada
                 # ficha) -- find_repeated dice cuantos elementos
-                # aparecieron 2 o mas veces en esta Catalisis (osea,
-                # cuantos "resuenan" dentro de la misma linea).
+                # aparecieron 2 o más veces en esta Catálisis (osea,
+                # cuántos "resuenan" dentro de la misma línea).
                 line_kinds = [[tile.kind.value for tile in line_tiles if tile is not None]]
-                # El desafio A05 sin implementar lanza NotImplementedError
+                # El desafío A05 sin implementar lanza NotImplementedError
                 # (el TODO real) -- la resonancia es simplemente 0 hasta
-                # que este implementado, en vez de romper la Catalisis.
+                # que este implementado, en vez de romper la Catálisis.
                 try:
                     resonance = len(find_repeated(line_kinds) or [])
                 except Exception:

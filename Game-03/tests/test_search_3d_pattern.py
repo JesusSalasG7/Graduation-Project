@@ -13,7 +13,7 @@ Has no dependency on pygame or a window: it can be run directly with:
 import sys
 from pathlib import Path
 
-# Permite correrlo directo (python tests/<archivo>.py): agrega la raiz del juego al path.
+# Permite correrlo directo (python tests/<archivo>.py): agrega la raíz del juego al path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.rubik_cube import RubikCube  # noqa: E402

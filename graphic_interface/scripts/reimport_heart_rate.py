@@ -1,13 +1,13 @@
-"""CLI para (re)procesar la frecuencia cardiaca de un desafio ya cerrado,
-para cualquier participante/desafio -- sin pasar por la sesion guiada.
+"""CLI para (re)procesar la frecuencia cardíaca de un desafío ya cerrado,
+para cualquier participante/desafío -- sin pasar por la sesión guiada.
 
 Casos de uso:
-  - El desafio se cerro con "Siguiente juego" (esa pantalla no pide la
+  - El desafío se cerró con "Siguiente juego" (esa pantalla no pide la
     carpeta del reloj, ver session_wizard._show_heart_rate_import) y el
-    evaluador consigue el export despues.
-  - Ya se habia cargado, pero se proceso con una version anterior de
+    evaluador consigue el export después.
+  - Ya se había cargado, pero se procesó con una versión anterior de
     slice_heart_rate (p.ej. antes de agregarse HEART_RATE_FALLBACK_
-    TOLERANCE, o el soporte de medicion continua via JSON de binning en
+    TOLERANCE, o el soporte de medición continua vía JSON de binning en
     stage_capture.py) y hay que recortarlo de nuevo.
 
 Uso:
@@ -16,11 +16,11 @@ Uso:
 
 `--carpeta` tiene que ser la carpeta COMPLETA que exporta Samsung Health
 ("Descargar mis datos personales"), no el CSV suelto -- el detalle minuto
-a minuto de la medicion continua vive en JSON aparte dentro de ella (ver
+a minuto de la medición continua vive en JSON aparte dentro de ella (ver
 heart_rate_import.HEART_RATE_JSON_SUBDIR); con solo el CSV se pierden esas
-lecturas y quedan unicamente los chequeos puntuales sueltos.
+lecturas y quedan únicamente los chequeos puntuales sueltos.
 
-Requiere que las Etapas 2/3/4/5 de ese desafio ya esten exportadas (con su
+Requiere que las Etapas 2/3/4/5 de ese desafío ya esten exportadas (con su
 sync_timeline.json) -- ver stage_capture.write_sync_timeline.
 """
 
