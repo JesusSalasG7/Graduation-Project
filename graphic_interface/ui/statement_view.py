@@ -12,6 +12,46 @@ import customtkinter as ctk
 FONT_FAMILY = "Segoe UI"
 
 
+def fit_wraplength(parent, labels: list):
+    """Ajusta el `wraplength` de `labels` al ancho real de `parent` cada vez
+    que este cambia de tamaño. Con un ancho fijo en píxeles el texto se
+    cortaba en pantallas más chicas (o con otro escalado de Windows) que la
+    de desarrollo, donde la columna es más angosta que ese ancho. `labels`
+    es una lista de (label, margen horizontal a descontar, widget vecino en
+    la fila o None).
+
+    Se hace en un solo pase diferido para todos los labels: mientras la
+    pantalla se acomoda llegan varios <Configure> seguidos, y re-envolver
+    cada label en cada uno la dejaba varios segundos trabada."""
+    pending = None
+    last_width = 0
+
+    def refit():
+        nonlocal pending, last_width
+        pending = None
+        if not parent.winfo_exists() or parent.winfo_width() == last_width:
+            return
+        last_width = parent.winfo_width()
+        for label, margin, beside in labels:
+            # winfo_* devuelve píxeles reales; CTk reescala wraplength y los
+            # paddings, así que se pasa todo a unidades sin escalar.
+            scaling = ctk.ScalingTracker.get_widget_scaling(label)
+            available = last_width / scaling - margin - 8
+            if beside is not None:
+                available -= beside.winfo_reqwidth() / scaling
+            available = max(round(available), 100)
+            if available != label.cget("wraplength"):
+                label.configure(wraplength=available)
+
+    def schedule(_event):
+        nonlocal pending
+        if pending is not None:
+            parent.after_cancel(pending)
+        pending = parent.after(40, refit)
+
+    parent.bind("<Configure>", schedule, add="+")
+
+
 def _section(parent, title: str, font_scale: float = 1.0):
     ctk.CTkLabel(
         parent, text=title,
@@ -43,27 +83,36 @@ def render_statement(parent, game, challenge, colors: dict, wraplength: int = 42
     wrap_scale = 1 + (font_scale - 1) * 0.6
     wraplength = round(wraplength * wrap_scale)
 
-    ctk.CTkLabel(
+    location_label = ctk.CTkLabel(
         parent, text=f"🎲  {game.display_name}    ·    📄  {challenge.location}",
         font=ctk.CTkFont(family=FONT_FAMILY, size=round(12 * font_scale)), text_color=colors["TEXT_MUTED"],
-    ).pack(anchor="w", pady=(0, 14))
+        justify="left",
+    )
+    location_label.pack(anchor="w", pady=(0, 14))
+    fitted_labels = [(location_label, 0, None)]
 
     _section(parent, "📋  Enunciado", font_scale)
-    ctk.CTkLabel(
+    statement_label = ctk.CTkLabel(
         parent, text=challenge.statement, font=ctk.CTkFont(family=FONT_FAMILY, size=round(14 * font_scale)),
         wraplength=wraplength, justify="left", anchor="w",
-    ).pack(anchor="w", fill="x", pady=(0, 18))
+    )
+    statement_label.pack(anchor="w", fill="x", pady=(0, 18))
+    fitted_labels.append((statement_label, 0, None))
 
     _section(parent, "🧩  Firma exacta a implementar", font_scale)
     _code_block(parent, challenge.signature, colors, font_scale)
 
     _section(parent, "✅  Requisitos", font_scale)
     for req in challenge.requirements:
-        ctk.CTkLabel(
+        req_label = ctk.CTkLabel(
             parent, text=f"•  {req}", font=ctk.CTkFont(family=FONT_FAMILY, size=round(13 * font_scale)),
             wraplength=wraplength - 20, justify="left", anchor="w",
-        ).pack(anchor="w", fill="x", pady=(0, 6))
+        )
+        req_label.pack(anchor="w", fill="x", pady=(0, 6))
+        fitted_labels.append((req_label, 0, None))
     ctk.CTkLabel(parent, text="", height=8).pack()
 
     _section(parent, "🧪  Ejemplos y casos de prueba", font_scale)
     _code_block(parent, challenge.examples, colors, font_scale)
+
+    fit_wraplength(parent, fitted_labels)

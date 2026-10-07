@@ -92,7 +92,7 @@ from storage.stage_capture import (
     write_stage_sensor_files,
     write_sync_timeline,
 )
-from ui.statement_view import render_statement
+from ui.statement_view import fit_wraplength, render_statement
 
 FONT_FAMILY = "Segoe UI"
 PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
@@ -443,15 +443,18 @@ class SessionWizard:
             return
 
         dot_size = scaled(20)
+        fitted_labels = []
         indent = dot_size + scaled(8) + scaled(20)
         for i, question in enumerate(questions):
             card = ctk.CTkFrame(parent, fg_color=self.c["BG_CARD"], corner_radius=10)
             card.pack(fill="x", pady=(0, scaled(14)))
-            ctk.CTkLabel(
+            question_label = ctk.CTkLabel(
                 card, text=f"{i + 1}. {question.text}",
                 font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(16), weight="bold"),
                 wraplength=wraplength, justify="left", anchor="w",
-            ).pack(anchor="w", fill="x", padx=scaled(16), pady=(scaled(14), scaled(10)))
+            )
+            question_label.pack(anchor="w", fill="x", padx=scaled(16), pady=(scaled(14), scaled(10)))
+            fitted_labels.append((question_label, 2 * scaled(16), None))
 
             var = ctk.IntVar(value=-1)
             answers[i] = var
@@ -460,18 +463,21 @@ class SessionWizard:
                 # emparejado con un CTkLabel aparte que sí puede envolver texto largo.
                 option_row = ctk.CTkFrame(card, fg_color="transparent")
                 option_row.pack(anchor="w", fill="x", padx=scaled(26), pady=scaled(6))
-                ctk.CTkRadioButton(
+                radio = ctk.CTkRadioButton(
                     option_row, text="", variable=var, value=j,
                     fg_color=self.c["ACCENT"], width=dot_size,
                     radiobutton_width=dot_size, radiobutton_height=dot_size,
-                ).pack(side="left")
+                )
+                radio.pack(side="left")
                 option_label = ctk.CTkLabel(
                     option_row, text=option, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(14)),
                     wraplength=wraplength - indent, justify="left", anchor="w", cursor="hand2",
                 )
                 option_label.pack(side="left", padx=(scaled(8), 0), fill="x", expand=True)
                 option_label.bind("<Button-1>", lambda _e, v=var, idx=j: v.set(idx))
+                fitted_labels.append((option_label, 2 * scaled(26) + scaled(8), radio))
             ctk.CTkLabel(card, text="", height=scaled(8)).pack()
+        fit_wraplength(parent, fitted_labels)
 
     def _require_all_answered(self, button, answers: dict[int, ctk.IntVar]):
         """Deja `button` deshabilitado hasta que se respondan todas las
@@ -1477,7 +1483,7 @@ class SessionWizard:
         ).pack(anchor="w", padx=16, pady=(0, 14))
 
         self._play_button(
-            body, "🎮  Jugar sin la solución",
+            body, "🎮  Jugar",
             lambda: launch_game_without_solution(game),
         )
 
@@ -1852,7 +1858,7 @@ class SessionWizard:
 
         if result and result.ok and result.response_text:
             self._play_button(
-                scroll, "🎮  Jugar con esta solución",
+                scroll, "🎮  Jugar",
                 lambda: launch_game_with_solution(game, challenge, result.response_text),
             )
         else:
