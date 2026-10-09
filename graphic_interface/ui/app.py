@@ -17,10 +17,13 @@ from ai.isolated_prompt import ai_provider_available
 from content.challenges import get_challenge
 from content.difficulty import get_difficulty
 from games.game_launcher import discover_games, open_in_vscode, play_game, repair_environment
+from consent import consent_mailer
 from paths import ASSETS_DIR, DATA_DIR, PROJECT_ROOT
+from storage import consent_store
 from storage.participant_store import ParticipantStore, participant_file_stub, participant_label
 from storage.personal_records import save_personal_record
 from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_readonly, summarize_stage
+from ui.consent_view import RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, open_consent_viewer
 from ui.session_wizard import SessionWizard
 from ui.statement_view import render_statement
 
@@ -211,12 +214,132 @@ class App(ctk.CTk, *_DND_MIXIN):
             },
         )
 
-    def enter_session_wizard(self):
-        if self.store.get_active() is None:
+        # Consentimiento informado: igual que la sesión guiada, un frame a
+        # ventana completa que tapa sidebar y contenido -- mientras está
+        # arriba no hay nada más para clickear (ver _ensure_consent).
+        self.consent_frame = ctk.CTkFrame(self, fg_color=BG_APP)
+        self.consent_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        self.consent_frame.lower()
+        self.consent_view = ConsentView(
+            self.consent_frame, self,
+            {
+                "ACCENT": ACCENT, "ACCENT_HOVER": ACCENT_HOVER,
+                "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT,
+                "BORDER": BORDER, "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING,
+                "SUCCESS": SUCCESS, "SUCCESS_HOVER": SUCCESS_HOVER, "DANGER": DANGER,
+            },
+        )
+
+        # Envíos de consentimiento que quedaron pendientes (sin internet,
+        # .env sin completar...) se reintentan solos al abrir la app.
+        self.after(1500, self._retry_pending_consent_mails)
+
+    # ---------------- Consentimiento informado ----------------
+    def _ensure_consent(self, participant: dict, then) -> bool:
+        """True si `participant` ya firmó. Si no, muestra la pantalla de
+        consentimiento (o avisa que rechazó participar) y devuelve False;
+        `then` se llama solo si termina firmando."""
+        number = participant["number"]
+        if consent_store.has_signed(number):
+            return True
+        if consent_store.has_declined(number):
+            messagebox.showinfo(
+                "Participante sin consentimiento",
+                f"El {participant_label(participant)} indicó que no desea participar en el "
+                "estudio, así que no puede iniciar la sesión ni los juegos.",
+            )
+            return False
+
+        def on_close(result: str):
+            self.consent_frame.lower()
+            if result == RESULT_DECLINED:
+                self.store.set_active(None)
+            self._refresh_participants()
+            self._refresh_session_tab()
+            if result == RESULT_ACCEPTED:
+                then()
+
+        self._maximize()
+        self.consent_frame.tkraise()
+        self.consent_view.show(participant, on_close)
+        return False
+
+    def _consent_target(self) -> Optional[dict]:
+        """Participante activo con consentimiento firmado, o None (avisando por qué)."""
+        active = self.store.get_active()
+        if active is None:
             messagebox.showinfo(
                 "Sin participante activo",
                 "Selecciona un participante activo en la pestaña Participantes primero.",
             )
+            return None
+        if not consent_store.has_signed(active["number"]):
+            messagebox.showinfo(
+                "Sin consentimiento firmado",
+                f"El {participant_label(active)} todavía no firmó el consentimiento. "
+                "Se le pedirá al iniciar la sesión guiada o un juego.",
+            )
+            return None
+        return active
+
+    def _view_consent(self):
+        active = self._consent_target()
+        if active is not None:
+            open_consent_viewer(
+                self, consent_store.signed_pdf_path(active["number"]),
+                f"Consentimiento · {participant_label(active)}",
+            )
+
+    def _resend_consent(self):
+        active = self._consent_target()
+        if active is None:
+            return
+        number = active["number"]
+        consent_store.request_participant_copy(number)
+
+        def on_done(result):
+            def show():
+                self._refresh_consent_status()
+                if result.ok:
+                    messagebox.showinfo("Copia enviada", result.message)
+                else:
+                    messagebox.showwarning("No se pudo enviar", result.message)
+            self.after(0, show)
+
+        self.consent_status_label.configure(text="✉️  Enviando copia...")
+        consent_mailer.send_consent_async(number, on_done)
+
+    def _retry_pending_consent_mails(self):
+        def on_done(sent: int, failed: int):
+            self.after(0, self._refresh_consent_status)
+
+        consent_mailer.retry_pending_async(on_done)
+
+    def _consent_status_text(self) -> str:
+        active = self.store.get_active()
+        if active is None:
+            return "📝  Consentimiento: sin participante activo"
+        number = active["number"]
+        if not consent_store.has_signed(number):
+            return f"📝  Consentimiento: {consent_store.consent_status_text(number).lower()}"
+        record = consent_store.get_record(number)
+        mail = "copia por correo pendiente" if consent_store.has_pending_mail(record) else "copia enviada"
+        return f"📝  Consentimiento: firmado ({record['firmado_en'][:10]}) · {mail}"
+
+    def _refresh_consent_status(self):
+        self.consent_status_label.configure(text=self._consent_status_text())
+
+    def enter_session_wizard(self):
+        active = self.store.get_active()
+        if active is None:
+            messagebox.showinfo(
+                "Sin participante activo",
+                "Selecciona un participante activo en la pestaña Participantes primero.",
+            )
+            return
+        # Sin consentimiento firmado no se llega a ninguna pantalla del
+        # estudio; al firmar se vuelve a entrar acá.
+        if not self._ensure_consent(active, self.enter_session_wizard):
             return
         if not ai_provider_available():
             continue_anyway = messagebox.askyesno(
@@ -723,6 +846,8 @@ class App(ctk.CTk, *_DND_MIXIN):
             )
             if not proceed:
                 return
+        elif not self._ensure_consent(active, lambda: self._play(game)):
+            return
         try:
             play_game(game)
         except FileNotFoundError as exc:
@@ -792,6 +917,24 @@ class App(ctk.CTk, *_DND_MIXIN):
             command=self._delete_selected,
         ).pack(fill="x", padx=18, pady=(0, 18))
 
+        self.consent_status_label = ctk.CTkLabel(
+            form, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)),
+            text_color=TEXT_MUTED, justify="left", wraplength=wrap(280),
+        )
+        self.consent_status_label.pack(anchor="w", padx=18, pady=(0, 8))
+        ctk.CTkButton(
+            form, text="📄  Ver mi consentimiento", height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self._view_consent,
+        ).pack(fill="x", padx=18, pady=(0, 8))
+        ctk.CTkButton(
+            form, text="✉️  Reenviar copia", height=scaled(36), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self._resend_consent,
+        ).pack(fill="x", padx=18, pady=(0, 18))
+
         table_frame = ctk.CTkFrame(container, fg_color=BG_CARD, corner_radius=12)
         table_frame.grid(row=0, column=1, sticky="nsew")
         table_frame.grid_rowconfigure(1, weight=1)
@@ -805,11 +948,12 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         self._style_treeview()
 
-        columns = ("participante", "nivel", "fecha")
+        columns = ("participante", "nivel", "consentimiento", "fecha")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for col, label, width in (
             ("participante", "Participante", scaled(160)),
             ("nivel", "Nivel de experiencia", scaled(220)),
+            ("consentimiento", "Consentimiento", scaled(160)),
             ("fecha", "Registrado", scaled(180)),
         ):
             self.tree.heading(col, text=label, anchor="center")
@@ -852,13 +996,16 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tree.delete(*self.tree.get_children())
         for p in self.store.list_participants():
             nivel = p.get("attributes", {}).get("nivel_experiencia", "—")
-            self.tree.insert("", "end", iid=p["id"], values=(participant_label(p), nivel, p["created_at"]))
+            self.tree.insert("", "end", iid=p["id"], values=(
+                participant_label(p), nivel, consent_store.consent_status_text(p["number"]), p["created_at"],
+            ))
         active = self.store.get_active()
         if active is not None:
             self.tree.selection_set(active["id"])
         self.active_label.configure(text=self._active_label_text())
         self.participants_active_label.configure(text=self._active_label_text())
         self.participant_count_label.configure(text=self._participant_count_text())
+        self._refresh_consent_status()
         count = len(self.store.list_participants())
         self._nav_buttons["participants"].configure(text=f"🧑‍🤝‍🧑  Participantes ({count})")
 
@@ -1015,7 +1162,13 @@ class App(ctk.CTk, *_DND_MIXIN):
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             command=self.enter_session_wizard,
         )
-        self.guided_session_button.pack(anchor="w", padx=18, pady=(4, 18))
+        self.guided_session_button.pack(anchor="w", padx=18, pady=(4, 8))
+        ctk.CTkButton(
+            guided_card, text="📄  Ver mi consentimiento", height=scaled(32), width=scaled(280),
+            corner_radius=8, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self._view_consent,
+        ).pack(anchor="w", padx=18, pady=(0, 18))
 
         # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
         # Matriz de lo que ya se exportó para el participante activo, leyendo

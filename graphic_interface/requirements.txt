@@ -28,3 +28,11 @@ pyserial==3.5
 # oficial de Google para no sumar una dependencia más de las que ya trae
 # este archivo.
 requests==2.32.3
+
+# Consentimiento informado (ver consent/ y ui/consent_view.py): PyMuPDF
+# muestra y rellena la carta en PDF, Pillow guarda la imagen de la firma y
+# python-dotenv lee las credenciales SMTP del archivo .env de la raíz del
+# proyecto. El envío de correo usa smtplib/email, de la librería estándar.
+pymupdf==1.28.2
+pillow>=10.0
+python-dotenv==1.2.4
