@@ -244,3 +244,10 @@ tools/.venv-*/
 # Dataset consolidado de la sesion guiada (datos biometricos de
 # participantes, no debe ir al repo -- se regenera con data/build_dataset.py)
 /data/*.csv
+
+# Consentimientos firmados (nombre, C.I., correo y firma). La app los
+# guarda fuera del repo, en ~/Escritorio/Participantes/consentimientos/;
+# estas reglas son un respaldo por si se copian dentro del proyecto.
+data/consentimientos/
+graphic_interface/data/consentimientos/
+consentimiento_P*_v*.pdf

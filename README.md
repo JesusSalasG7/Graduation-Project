@@ -17,10 +17,12 @@ respuestas a cuestionarios de comprensión/razonamiento.
    - [1. Entorno base (panel + juegos)](#1-entorno-base-panel--juegos)
    - [2. Backend de IA (`claude` o Gemini)](#2-backend-de-ia-claude-o-gemini)
    - [3. Sensores opcionales](#3-sensores-opcionales)
+   - [4. Correo del consentimiento informado (`.env`)](#4-correo-del-consentimiento-informado-env)
 5. [Cómo usar la aplicación](#cómo-usar-la-aplicación)
    - [Arrancar el panel](#arrancar-el-panel)
    - [Pestaña Juegos](#pestaña-juegos)
    - [Pestaña Participantes](#pestaña-participantes)
+   - [Consentimiento informado](#consentimiento-informado)
    - [Sesión guiada](#sesión-guiada)
    - [Pestaña Sesión: datos guardados y dataset](#pestaña-sesión-datos-guardados-y-dataset)
 6. [Dónde quedan los datos](#dónde-quedan-los-datos)
@@ -63,14 +65,15 @@ Graduation-Project/
 ├── graphic_interface/     # Panel principal (GUI, orquesta toda la sesión guiada)
 │   ├── main.py            # Punto de entrada (python graphic_interface/main.py)
 │   ├── paths.py           # Rutas compartidas (raíz del proyecto, tools/, data/, assets/)
-│   ├── ui/                # Interfaz: app.py (ventana principal), session_wizard.py (Etapas 1-6), statement_view.py
+│   ├── ui/                # Interfaz: app.py (ventana principal), session_wizard.py (Etapas 1-6), consent_view.py, statement_view.py
 │   ├── ai/                # IA: ai_backend.py (Claude/Gemini), isolated_prompt.py (Etapa 3), challenge_solver.py (cuestionarios 4-5)
 │   ├── content/           # Contenido estático: challenges.py, statement_quiz.py, quiz.py, difficulty.py
+│   ├── consent/           # Consentimiento informado: consent_pdf.py (llenado del PDF), consent_mailer.py (envío por correo)
 │   ├── sensors/           # Integración con cada sensor: NeuroSky, cámara, eye tracker, reloj (heart_rate_import.py)
 │   ├── games/             # Lanzar juegos y parchearlos con la solución de la IA
-│   ├── storage/           # Persistencia: participantes, récords, respuestas de cuestionarios, stage_capture.py
-│   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py
-│   ├── assets/
+│   ├── storage/           # Persistencia: participantes, consentimientos (consent_store.py), respuestas de cuestionarios, stage_capture.py
+│   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py, test_email_config.py
+│   ├── assets/            # Icono de la app y consentimiento/consentimiento_v1.0.pdf (carta original)
 │   ├── requirements.txt
 │   └── data/              # participants.json, quiz_results/, emotion_logs/ (NO va al repo)
 ├── Game-01/ … Game-07/    # Un juego por carpeta, cada uno con su propio .venv y requirements.txt
@@ -81,6 +84,7 @@ Graduation-Project/
 │   └── requirements.txt   # Instrucciones DETALLADAS de instalación de estos sensores
 ├── data/
 │   └── build_dataset.py   # Genera el CSV consolidado de todas las sesiones exportadas
+├── .env.example           # Plantilla de la configuración de correo (copiar a .env, que NO va al repo)
 └── .venv/                 # Entorno virtual único compartido por el panel y los 7 juegos
 ```
 
@@ -323,6 +327,43 @@ terminar la sesión), hay un CLI dedicado:
     --participante 1 --desafio 1 --carpeta "/ruta/al/export/samsunghealth_usuario_<fecha>"
 ```
 
+### 4. Correo del consentimiento informado (`.env`)
+
+Al firmar el [consentimiento informado](#consentimiento-informado), la
+app envía el PDF firmado por correo al investigador y, si lo pide, al
+participante. Las credenciales se leen de un archivo `.env` en la raíz
+del repositorio (ignorado por git), nunca del código:
+
+```bash
+cp .env.example .env
+```
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu_cuenta@gmail.com
+SMTP_PASSWORD=contraseña de aplicación
+RESEARCHER_EMAIL=correo_del_investigador@gmail.com
+```
+
+- Con Gmail, `SMTP_PASSWORD` tiene que ser una [contraseña de
+  aplicación](https://myaccount.google.com/apppasswords) (requiere
+  verificación en dos pasos), no la contraseña normal de la cuenta.
+- Puerto `587` usa STARTTLS; `465` usa SSL.
+- **No completes `.env.example` con datos reales**: ese archivo sí se
+  sube al repositorio. Los datos reales van solo en `.env`.
+
+Para probar la configuración sin abrir la app (manda un correo de
+prueba a `RESEARCHER_EMAIL`, o a la dirección que le pases):
+
+```bash
+.venv/bin/python graphic_interface/scripts/test_email_config.py
+```
+
+Este paso es opcional para usar la app: sin `.env` (o sin internet) el
+consentimiento se firma y se guarda igual, y el envío queda pendiente
+hasta que se pueda hacer.
+
 ## Cómo usar la aplicación
 
 ### Arrancar el panel
@@ -366,6 +407,51 @@ Cada participante es **anónimo dentro de la app** ("Participante 1",
 Hacé clic en una fila de la tabla para marcarlo como el participante
 **activo** — la sesión guiada y la pestaña Sesión siempre operan
 sobre ese participante activo.
+
+La columna **Consentimiento** de la tabla muestra si cada participante
+ya firmó (`Firmado`), todavía no (`Pendiente`) o indicó que no quiere
+participar (`No participa`). Para el participante activo, **"📄 Ver mi
+consentimiento"** abre su carta firmada y **"✉️ Reenviar copia"**
+vuelve a mandarla por correo.
+
+### Consentimiento informado
+
+La primera vez que un participante va a entrar al estudio — al tocar
+**"🚀 Iniciar sesión guiada"** o **▶ Jugar** con él como participante
+activo — aparece la carta de consentimiento a ventana completa, y no
+se llega a ninguna pantalla del estudio sin firmarla:
+
+- A la izquierda se ve la carta original
+  (`graphic_interface/assets/consentimiento/consentimiento_v1.0.pdf`)
+  con los datos ya colocados sobre sus líneas; la vista previa se
+  actualiza mientras se escribe.
+- A la derecha se completan **nombre completo** (precargado con el que
+  se registró al agregar al participante), **C.I.** (solo números,
+  prefijo `V-`/`E-` opcional) y **correo**; la fecha se pone sola. Se
+  firma con el mouse sobre el recuadro blanco (**Limpiar**
+  la borra).
+- **"✍️ Firmar y continuar"** se habilita recién con los datos
+  válidos, la firma hecha y la casilla de aceptación marcada.
+- **"No deseo participar"** cierra el flujo con un agradecimiento, sin
+  guardar ningún dato personal: el participante queda marcado como
+  `No participa`, deja de ser el activo y no puede iniciar la sesión
+  ni los juegos.
+- **"← Volver al panel (sin firmar)"** (o cerrar la app) no registra
+  nada: el consentimiento se vuelve a pedir la próxima vez.
+
+Al firmar se guarda una **copia nueva** del PDF con los datos y la
+firma (la carta original nunca se modifica) y se envía por correo al
+investigador, y también al participante si dejó marcada la casilla
+"Enviarme una copia por correo" (ver [configuración del
+correo](#4-correo-del-consentimiento-informado-env)). El envío corre
+en segundo plano y no frena el estudio: si falla, queda pendiente y se
+reintenta solo cada vez que se abre la app, o a mano con **"Reenviar
+copia"**.
+
+Quien ya firmó entra directo las veces siguientes. Si la carta cambia,
+se reemplaza el PDF de `assets/consentimiento/` y se actualiza
+`CONSENT_VERSION` en `graphic_interface/paths.py`; la versión queda
+anotada en el nombre de cada copia firmada y en el registro.
 
 ### Sesión guiada
 
@@ -430,13 +516,18 @@ Con un participante activo, esta pestaña muestra:
 |---|---|
 | Datos de cada sesión (sensores, cuestionarios, prompts) | `~/Escritorio/Sesiones_participantes/Participante_N/Desafio_N/Etapa_N/...` |
 | Nombre/apellido de los participantes (dato personal) | `~/Escritorio/Participantes/participantes.csv` |
+| Consentimientos firmados (PDF con nombre, C.I. y firma) | `~/Escritorio/Participantes/consentimientos/consentimiento_P001_v1.0.pdf` |
+| Registro de consentimientos (nombre, C.I., correo, fecha/hora de firma, versión del documento, estado del envío por correo) | `~/Escritorio/Participantes/consentimientos/registro.json` |
+| Credenciales de correo (SMTP) | `.env` en la raíz del repositorio (ignorado por git) |
 | Registro anónimo de participantes de la app | `graphic_interface/data/participants.json` (ignorado por git) |
 | Respuestas de cuestionarios | `graphic_interface/data/quiz_results/PARTICIPANTE_N.json` (ignorado por git) |
 | Dataset consolidado | `data/dataset_sesiones.csv` (se regenera con el botón de la app o `python data/build_dataset.py`; ignorado por git) |
 
 Nada de lo anterior se sube al repositorio (ver `.gitignore`): son
 datos de participantes reales, algunos con información sensible
-(biométrica o personal).
+(biométrica o personal). Nombre, C.I., correo y firma viven solo en
+`~/Escritorio/Participantes/`; los datos del estudio y los textos que
+se envían a la IA solo llevan el número de participante.
 
 ## Solución de problemas comunes
 
@@ -456,6 +547,19 @@ datos de participantes reales, algunos con información sensible
 - **Las Etapas 3/5 muestran "no se pudo generar" o timeout**: el CLI
   `claude` no respondió a tiempo o no está en el `PATH`. Confirmá
   `claude --version` desde la misma terminal donde corre el panel.
+- **La copia del consentimiento queda "pendiente" / no llega el
+  correo**: corré
+  `.venv/bin/python graphic_interface/scripts/test_email_config.py`,
+  que dice si falta completar el `.env`, si el servidor rechazó el
+  usuario/contraseña (con Gmail hace falta una contraseña de
+  aplicación) o si no hay conexión. Una vez resuelto, el envío
+  pendiente sale solo al reabrir la app o con "Reenviar copia".
+- **"No se encontró la etiqueta ... en la carta de consentimiento"**:
+  el PDF de `graphic_interface/assets/consentimiento/` no tiene alguno
+  de los campos que la app rellena ("Estimado/a", "C.I.:", "Nombre
+  completo:", "Firma:", "Fecha:", cada uno seguido de su línea de
+  guiones bajos). Pasa si se reemplaza la carta por una con otro
+  formato.
 - **El reloj no tiene lecturas dentro de la ventana exacta de una
   etapa**: es esperable si no tenías "Medición continua" activada —
   el reloj solo mide cada varios minutos. El sistema usa la lectura
