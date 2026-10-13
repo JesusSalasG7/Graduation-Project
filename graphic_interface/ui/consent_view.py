@@ -14,6 +14,7 @@ datos del estudio, a la IA ni a la consola.
 
 import re
 import tkinter as tk
+import tkinter.font as tkfont
 import tkinter.messagebox as messagebox
 from datetime import datetime
 from pathlib import Path
@@ -27,7 +28,7 @@ from consent import consent_mailer, consent_pdf
 from paths import CONSENT_PDF, CONSENT_VERSION
 from storage import consent_store
 from storage.participant_store import participant_label
-from storage.personal_records import load_personal_record
+from storage.personal_records import load_personal_contact, load_personal_record
 
 FONT_FAMILY = "Segoe UI"
 FONT_SCALE = 1.5  # igual que el panel principal (ver app.py)
@@ -68,6 +69,71 @@ def normalize_ci(text: str) -> Optional[str]:
         return None
     prefix, digits = match.groups()
     return f"{prefix.upper()}-{digits}" if prefix else digits
+
+
+# Emoji inicial de un botón (con su selector de variante / ZWJ), que
+# outline_button_text deja tal cual lo dibuja el propio botón.
+LEADING_EMOJI_RE = re.compile("^[\u2600-\u27bf\ufe0f\u200d\U0001f000-\U0001faff]+")
+
+
+def outline_button_text(button: ctk.CTkButton, width: int = 1) -> Callable[..., None]:
+    """Le pone un contorno negro al texto de `button`. Tk no dibuja texto
+    con contorno: se tapa el texto de la etiqueta del botón con un canvas
+    que lo repite en negro, corrido en todas las direcciones, y encima el
+    texto real. El canvas copia fuente y colores de la etiqueta (también
+    al pasar el mouse) y le reenvía los clics al botón.
+
+    Si el texto empieza con un emoji, el canvas no lo tapa: con el
+    contorno encima se ve emborronado, así que queda el de la etiqueta.
+
+    Devuelve la función que redibuja el contorno: hay que llamarla después
+    de cambiarle al botón el estado, el texto o los colores."""
+    label = button._text_label
+    canvas = tk.Canvas(button, highlightthickness=0, bd=0, cursor=label.cget("cursor"))
+
+    def redraw(*_):
+        if not canvas.winfo_exists():
+            return
+        font = tkfont.Font(root=canvas, font=label.cget("font"))
+        text = label.cget("text")
+        emoji = LEADING_EMOJI_RE.match(text)
+        outlined = text[emoji.end():] if emoji else text
+        # Dónde empieza el tramo con contorno dentro de la etiqueta (que
+        # centra su texto), y cuánto se deja de margen a cada lado: a la
+        # izquierda solo el contorno si hay un emoji que no hay que pisar.
+        text_width, outlined_width = font.measure(text), font.measure(outlined)
+        start = (label.winfo_width() - text_width) / 2 + text_width - outlined_width
+        left, right = (width if emoji else 5), 5
+        canvas.place(
+            in_=label, x=round(start) - left, y=0,
+            width=outlined_width + left + right, relheight=1,
+        )
+        canvas.configure(bg=label.cget("bg"), cursor=label.cget("cursor"))
+        canvas.delete("all")
+        y = label.winfo_height() / 2
+        for dx in range(-width, width + 1):
+            for dy in range(-width, width + 1):
+                if dx or dy:
+                    canvas.create_text(left + dx, y + dy, text=outlined, font=font, fill="#000000", anchor="w")
+        canvas.create_text(left, y, text=outlined, font=font, fill=label.cget("fg"), anchor="w")
+
+    def on_enter(event):
+        button._on_enter(event)
+        redraw()
+
+    def on_leave(event):
+        button._on_leave(event)
+        redraw()
+
+    label.bind("<Configure>", redraw, add="+")
+    canvas.bind("<Enter>", on_enter)
+    canvas.bind("<Leave>", on_leave)
+    canvas.bind("<Button-1>", button._clicked)
+    # El fondo del botón cambia al pasar el mouse por cualquier parte de él.
+    button.bind("<Enter>", redraw, add="+")
+    button.bind("<Leave>", redraw, add="+")
+    redraw()
+    return redraw
 
 
 def open_consent_viewer(parent, pdf_path: Path, title: str = "Consentimiento firmado") -> None:
@@ -167,7 +233,7 @@ class ConsentView:
         ctk.CTkLabel(
             header,
             text=f"{participant_label(participant)} · documento v{CONSENT_VERSION}\n"
-                 "Lee la carta completa, revisa tus datos y firma para continuar.",
+                 "Lee la carta completa y firma para continuar.",
             font=self._font(11), text_color=self.c["TEXT_MUTED"], justify="left",
             wraplength=scaled(290),
         ).pack(anchor="w", pady=(2, 0))
@@ -177,8 +243,13 @@ class ConsentView:
 
         record = load_personal_record(participant["number"])
         self._nombre_var = tk.StringVar(value=" ".join(record).strip() if record else "")
-        self._ci_var = tk.StringVar()
-        self._correo_var = tk.StringVar()
+        # Nombre, cédula y correo ya cargados al registrar al participante
+        # se muestran como texto fijo: acá solo le queda firmar. Un dato
+        # que falte (participantes registrados antes de que se pidieran
+        # cédula y correo) sí se pide con un campo, para no dejarlo trabado.
+        ci, correo = load_personal_contact(participant["number"])
+        self._ci_var = tk.StringVar(value=ci if CI_TYPING_RE.match(ci) else "")
+        self._correo_var = tk.StringVar(value=correo)
         self._accept_var = tk.BooleanVar(value=False)
         self._copy_var = tk.BooleanVar(value=True)
 
@@ -193,13 +264,31 @@ class ConsentView:
             entry.pack(fill="x", padx=12)
             return entry
 
-        field("Nombre completo", self._nombre_var, "Nombre y apellido")
-        ci_check = (body.register(lambda value: bool(CI_TYPING_RE.match(value))), "%P")
-        self._ci_entry = field(
-            "C.I. (solo números; prefijo V- o E- opcional)", self._ci_var, "12345678",
-            validate="key", validatecommand=ci_check,
-        )
-        self._correo_entry = field("Correo electrónico", self._correo_var, "nombre@correo.com")
+        def fixed(label: str, value: str) -> None:
+            ctk.CTkLabel(body, text=label, font=self._font(11), text_color=self.c["TEXT_MUTED"]).pack(
+                anchor="w", padx=12, pady=(8, 0))
+            ctk.CTkLabel(
+                body, text=value, font=self._font(12, bold=True), justify="left",
+                wraplength=scaled(280),
+            ).pack(anchor="w", padx=12)
+
+        self._correo_entry = None
+        if len(self._nombre_var.get().split()) >= 2:
+            fixed("Nombre completo", self._nombre_var.get())
+        else:
+            field("Nombre completo", self._nombre_var, "Nombre y apellido")
+        if normalize_ci(self._ci_var.get()) is not None:
+            fixed("C.I.", self._ci_var.get())
+        else:
+            ci_check = (body.register(lambda value: bool(CI_TYPING_RE.match(value))), "%P")
+            field(
+                "C.I. (solo números; prefijo V- o E- opcional)", self._ci_var, "12345678",
+                validate="key", validatecommand=ci_check,
+            )
+        if EMAIL_RE.match(self._correo_var.get()):
+            fixed("Correo electrónico", self._correo_var.get())
+        else:
+            self._correo_entry = field("Correo electrónico", self._correo_var, "nombre@correo.com")
 
         ctk.CTkLabel(body, text="Fecha", font=self._font(11), text_color=self.c["TEXT_MUTED"]).pack(
             anchor="w", padx=12, pady=(8, 0))
@@ -251,12 +340,15 @@ class ConsentView:
             state="disabled", command=self._sign,
         )
         self._sign_button.pack(fill="x")
-        ctk.CTkButton(
+        self._redraw_sign_outline = outline_button_text(self._sign_button)
+        decline_button = ctk.CTkButton(
             footer, text="No deseo participar", height=scaled(32), corner_radius=8,
             font=self._font(11), fg_color="transparent", hover_color=self.c["DANGER"],
             border_width=1, border_color=self.c["DANGER"], text_color=self.c["DANGER"],
             command=self._decline,
-        ).pack(fill="x", pady=(8, 0))
+        )
+        decline_button.pack(fill="x", pady=(8, 0))
+        outline_button_text(decline_button)
         ctk.CTkButton(
             footer, text="←  Volver al panel (sin firmar)", height=scaled(26), corner_radius=8,
             font=self._font(10), fg_color="transparent", hover_color=self.c["BORDER"],
@@ -410,10 +502,12 @@ class ConsentView:
     def _refresh_state(self):
         missing = self._missing()
         self._sign_button.configure(state="disabled" if missing else "normal")
+        self._redraw_sign_outline()
         self._hint_label.configure(text=f"Falta: {', '.join(missing)}." if missing else "")
-        correo = self._correo_var.get().strip()
-        self._correo_entry.configure(
-            border_color=self.c["DANGER"] if correo and not EMAIL_RE.match(correo) else self.c["BORDER"])
+        if self._correo_entry is not None:
+            correo = self._correo_var.get().strip()
+            self._correo_entry.configure(
+                border_color=self.c["DANGER"] if correo and not EMAIL_RE.match(correo) else self.c["BORDER"])
 
     # ---------------- acciones ----------------
     def _sign(self):

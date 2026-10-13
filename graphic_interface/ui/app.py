@@ -23,7 +23,9 @@ from storage import consent_store
 from storage.participant_store import ParticipantStore, participant_file_stub, participant_label
 from storage.personal_records import save_personal_record
 from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_readonly, summarize_stage
-from ui.consent_view import RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, open_consent_viewer
+from ui.consent_view import (
+    EMAIL_RE, RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, normalize_ci, open_consent_viewer,
+)
 from ui.session_wizard import SessionWizard
 from ui.statement_view import render_statement
 
@@ -53,11 +55,24 @@ except ImportError:
 DATA_FILE = DATA_DIR / "participants.json"
 APP_ICON_FILE = ASSETS_DIR / "app_icon.png"
 
-EXPERIENCE_LEVELS = [
-    "Avanzado",
-    "Intermedio",
-    "Principiante",
+# El nivel de experiencia de un participante se define por las materias
+# que ya aprobó: (perfil, materias aprobadas). En participants.json (y en
+# el dataset) solo se guarda el nombre del perfil, ej. "Perfil 2".
+EXPERIENCE_PROFILES = [
+    ("Perfil 1", "Programación 2 o 3"),
+    ("Perfil 2", "Análisis y diseño de algoritmos"),
+    ("Perfil 3", "Base de datos o Ingeniería del software"),
 ]
+
+
+def experience_text(level: str) -> str:
+    """Texto del perfil para la tabla de participantes, con sus materias.
+    Los participantes registrados antes de que existieran los perfiles
+    conservan su nivel anterior tal cual (ej. "Avanzado")."""
+    for profile, subjects in EXPERIENCE_PROFILES:
+        if profile == level:
+            return f"{profile} · {subjects}"
+    return level
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -952,7 +967,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for col, label, width in (
             ("participante", "Participante", scaled(160)),
-            ("nivel", "Nivel de experiencia", scaled(220)),
+            ("nivel", "Perfil (materias aprobadas)", scaled(330)),
             ("consentimiento", "Consentimiento", scaled(160)),
             ("fecha", "Registrado", scaled(180)),
         ):
@@ -995,7 +1010,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _refresh_participants(self):
         self.tree.delete(*self.tree.get_children())
         for p in self.store.list_participants():
-            nivel = p.get("attributes", {}).get("nivel_experiencia", "—")
+            nivel = experience_text(p.get("attributes", {}).get("nivel_experiencia", "—"))
             self.tree.insert("", "end", iid=p["id"], values=(
                 participant_label(p), nivel, consent_store.consent_status_text(p["number"]), p["created_at"],
             ))
@@ -1012,7 +1027,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _open_add_participant_modal(self):
         modal = ctk.CTkToplevel(self)
         modal.title("Nuevo participante")
-        modal.geometry(f"{wrap(400)}x{wrap(420)}")
+        modal.geometry(f"{wrap(400)}x{wrap(570)}")
         modal.configure(fg_color=BG_APP)
         modal.transient(self)
         modal.resizable(False, False)
@@ -1024,67 +1039,124 @@ class App(ctk.CTk, *_DND_MIXIN):
         ctk.CTkLabel(
             modal, text="➕  Nuevo participante",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(18), weight="bold"),
-        ).pack(pady=(26, 8))
-        ctk.CTkLabel(
-            modal,
-            text=(
-                "El nombre y apellido son datos personales: se guardan\n"
-                "solo en tu Escritorio (carpeta \"Participantes\"), nunca\n"
-                "en los datos anónimos de la sesión (emociones, BPM, etc.),\n"
-                "que dentro de la app siguen identificando a esta persona\n"
-                "únicamente como su número de participante."
-            ),
-            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED, justify="center",
-        ).pack(padx=24, pady=(0, 16))
+        ).pack(pady=(26, 18))
 
-        entry_nombre = ctk.CTkEntry(
-            modal, width=scaled(260), height=scaled(34), corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
-            placeholder_text="Nombre",
-        )
-        entry_nombre.pack(pady=(0, 10))
-        entry_apellido = ctk.CTkEntry(
-            modal, width=scaled(260), height=scaled(34), corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
-            placeholder_text="Apellido",
-        )
-        entry_apellido.pack(pady=(0, 14))
+        def field(label: str, placeholder: str = "", bottom: int = 8) -> ctk.CTkEntry:
+            # Etiqueta fija arriba: el texto de ayuda de adentro desaparece
+            # al escribir (y en el primer campo, que arranca con el cursor).
+            ctk.CTkLabel(
+                modal, text=label, width=scaled(260), height=scaled(16), anchor="w",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            ).pack(pady=(0, 2))
+            entry = ctk.CTkEntry(
+                modal, width=scaled(260), height=scaled(34), corner_radius=8, fg_color=BG_CARD_ALT, border_width=0,
+                placeholder_text=placeholder,
+            )
+            entry.pack(pady=(0, bottom))
+            return entry
+
+        entry_nombre = field("Nombre")
+        entry_apellido = field("Apellido")
+        entry_cedula = field("Cédula", "ej. 12345678 o V-12345678")
+        entry_correo = field("Correo electrónico", "ej. nombre@correo.com", bottom=16)
         entry_nombre.focus_set()
 
         ctk.CTkLabel(
-            modal, text="Nivel de experiencia", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
-            text_color=TEXT_MUTED,
+            modal, text="Nivel de experiencia",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
         ).pack(anchor="center")
-        experience_menu = ctk.CTkOptionMenu(
-            modal, width=scaled(260), height=scaled(34), corner_radius=8,
-            values=EXPERIENCE_LEVELS,
-            fg_color=BG_CARD_ALT, button_color=BORDER, button_hover_color=ACCENT,
-        )
-        experience_menu.pack(pady=(4, 18))
+        ctk.CTkLabel(
+            modal, text="Elige el perfil según las materias que ya aprobó el participante",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+        ).pack(anchor="center", pady=(0, 6))
+
+        # Una tarjeta por perfil; se elige haciendo clic en cualquier parte
+        # de la tarjeta y la elegida queda resaltada con el color de acento.
+        experience_var = ctk.StringVar(value="")
+        profile_cards = {}
+
+        def highlight_profile(*_):
+            for profile, card in profile_cards.items():
+                card.configure(border_color=ACCENT if experience_var.get() == profile else BORDER)
+
+        for profile, subjects in EXPERIENCE_PROFILES:
+            card = ctk.CTkFrame(
+                modal, width=scaled(260), height=scaled(42), fg_color=BG_CARD_ALT, corner_radius=8,
+                border_width=2, border_color=BORDER, cursor="hand2",
+            )
+            card.grid_propagate(False)  # todas del mismo tamaño, igual que los campos de arriba
+            card.grid_rowconfigure((0, 1), weight=1)
+            card.pack(pady=(0, 6))
+            profile_cards[profile] = card
+            radio = ctk.CTkRadioButton(
+                card, text="", variable=experience_var, value=profile, width=scaled(14),
+                radiobutton_width=scaled(14), radiobutton_height=scaled(14),
+                fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            )
+            radio.grid(row=0, column=0, rowspan=2, padx=(scaled(10), scaled(4)))
+            title_label = ctk.CTkLabel(
+                card, text=profile, height=scaled(16), anchor="w",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            )
+            title_label.grid(row=0, column=1, sticky="sw", pady=(3, 0))
+            subjects_label = ctk.CTkLabel(
+                card, text=f"Aprobó: {subjects}", height=scaled(14), anchor="w",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(10)), text_color=TEXT_MUTED,
+            )
+            subjects_label.grid(row=1, column=1, sticky="nw", pady=(0, 3))
+            for widget in (card, title_label, subjects_label):
+                widget.bind("<Button-1>", lambda _e, value=profile: experience_var.set(value))
+        experience_var.trace_add("write", highlight_profile)
+        ctk.CTkLabel(modal, text="", height=scaled(6)).pack()
 
         def on_accept():
             nombre = entry_nombre.get().strip()
             apellido = entry_apellido.get().strip()
-            experience_level = experience_menu.get()
-            if not nombre or not apellido:
+            experience_level = experience_var.get()
+            correo = entry_correo.get().strip()
+            if not nombre or not apellido or not entry_cedula.get().strip() or not correo:
                 messagebox.showwarning(
-                    "Datos incompletos", "Nombre y apellido son obligatorios.", parent=modal,
+                    "Datos incompletos", "Nombre, apellido, cédula y correo son obligatorios.", parent=modal,
+                )
+                return
+            cedula = normalize_ci(entry_cedula.get())
+            if cedula is None:
+                messagebox.showwarning(
+                    "Cédula inválida",
+                    "La cédula debe tener de 6 a 9 dígitos, con prefijo V- o E- opcional.",
+                    parent=modal,
+                )
+                return
+            if not EMAIL_RE.match(correo):
+                messagebox.showwarning(
+                    "Correo inválido",
+                    "El correo no tiene un formato válido (ej. nombre@correo.com).",
+                    parent=modal,
+                )
+                return
+            if not experience_level:
+                messagebox.showwarning(
+                    "Falta el nivel de experiencia",
+                    "Elige el perfil del participante según las materias que ya aprobó.",
+                    parent=modal,
                 )
                 return
 
             participant = self.store.add_participant(nivel_experiencia=experience_level)
             try:
-                record_path = save_personal_record(participant["number"], nombre, apellido)
+                record_path = save_personal_record(participant["number"], nombre, apellido, cedula, correo)
             except OSError as exc:
                 messagebox.showerror(
                     "No se pudo guardar el registro personal",
                     f"Se creó {participant_label(participant)} en la app, pero no se pudo "
-                    f"guardar el nombre en el Escritorio:\n{exc}",
+                    f"guardar sus datos personales en el Escritorio:\n{exc}",
                     parent=modal,
                 )
             else:
                 messagebox.showinfo(
                     "Participante agregado",
                     f"Se creó {participant_label(participant)}.\n\n"
-                    f"El nombre se guardó en:\n{record_path}",
+                    f"Sus datos personales se guardaron en:\n{record_path}",
                     parent=modal,
                 )
 
@@ -1105,6 +1177,10 @@ class App(ctk.CTk, *_DND_MIXIN):
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             command=on_accept,
         ).pack(side="left")
+
+        # El alto se ajusta al contenido, que ya no entra en uno fijo.
+        modal.update_idletasks()
+        modal.geometry(f"{wrap(400)}x{modal.winfo_reqheight() + scaled(16)}")
 
     def _selected_id(self):
         selection = self.tree.selection()
