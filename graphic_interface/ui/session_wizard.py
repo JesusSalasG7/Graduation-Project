@@ -47,6 +47,7 @@ import signal
 import subprocess
 import threading
 import time
+import tkinter
 from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox
@@ -128,6 +129,15 @@ WRAP_SCALE = 1 + (FONT_SCALE - 1) * 0.6
 
 def wrap(px: int) -> int:
     return round(px * WRAP_SCALE)
+
+
+def blend(color: str, background: str, opacity: float) -> str:
+    """Tk no tiene transparencia por widget: se simula mezclando `color`
+    sobre `background` con la opacidad dada (0-1) y devolviendo el hex
+    resultante."""
+    fg = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+    bg = [int(background[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{round(b + (f - b) * opacity):02x}" for f, b in zip(fg, bg))
 
 
 class SessionWizard:
@@ -486,15 +496,51 @@ class SessionWizard:
         if not answers:
             return
         enabled_text = button.cget("text")
+        enabled_fg = button.cget("fg_color")
+        # Bloqueado: estilo "cristal esmerilado" -- gris claro (#E5E7EB) al
+        # 25% sobre el fondo, con el texto en ese mismo gris al 75%. Se ve
+        # bien en modo oscuro y no se confunde con el azul del botón activo.
+        disabled_fg = blend("#e5e7eb", self.container.cget("fg_color"), 0.25)
+        disabled_text_color = blend("#e5e7eb", disabled_fg, 0.75)
+        button.configure(text_color_disabled=disabled_text_color)
+
+        # Tk no dibuja texto con contorno: mientras el botón está bloqueado
+        # se tapa su etiqueta con un canvas del mismo tamaño que repite el
+        # texto en negro, corrido en todas las direcciones, y encima el
+        # texto real. Usa la fuente de la propia etiqueta, así que no se
+        # mueve ni cambia de tamaño respecto al texto original.
+        outline = tkinter.Canvas(button, bg=disabled_fg, highlightthickness=0, bd=0)
+        outline_px = 2
+
+        def draw_outline(*_):
+            label = button._text_label
+            if label is None or not outline.winfo_exists():
+                return
+            outline.delete("all")
+            x, y = outline.winfo_width() / 2, outline.winfo_height() / 2
+            text, font = label.cget("text"), label.cget("font")
+            for dx in range(-outline_px, outline_px + 1):
+                for dy in range(-outline_px, outline_px + 1):
+                    if dx or dy:
+                        outline.create_text(x + dx, y + dy, text=text, font=font, fill="#000000")
+            outline.create_text(x, y, text=text, font=font, fill=disabled_text_color)
+
+        outline.bind("<Configure>", draw_outline)
 
         def refresh(*_):
             if not button.winfo_exists():
                 return
             pending = sum(1 for var in answers.values() if var.get() < 0)
             if pending:
-                button.configure(state="disabled", text=f"Responde todas las preguntas ({pending} pendientes)")
+                button.configure(
+                    state="disabled", fg_color=disabled_fg,
+                    text=f"Responde todas las preguntas ({pending} pendientes)",
+                )
+                outline.place(in_=button._text_label, relwidth=1, relheight=1)
+                draw_outline()
             else:
-                button.configure(state="normal", text=enabled_text)
+                outline.place_forget()
+                button.configure(state="normal", fg_color=enabled_fg, text=enabled_text)
 
         for var in answers.values():
             var.trace_add("write", refresh)
@@ -1399,7 +1445,7 @@ class SessionWizard:
                 "Vas a resolver una serie de desafíos de programación escribiendo\n"
                 "tu propio prompt para pedirle a una IA que lo resuelva. Cada\n"
                 "desafío tiene 6 etapas:\n\n"
-                "Etapa 1: Jugar el juego sin la solución del desafío.\n"
+                "Etapa 1: Probar el juego sin la solución del desafío.\n"
                 "Etapa 2: Leer el enunciado y responder 7 preguntas sobre él.\n"
                 "Etapa 3: Escribir tu prompt para resolverlo.\n"
                 "Etapa 4: Ver el resultado y responder 7 preguntas sobre la solución.\n"
@@ -1411,7 +1457,7 @@ class SessionWizard:
                 "Vas a resolver una serie de desafíos de programación, del más\n"
                 "fácil al más difícil, escribiendo tu propio prompt para pedirle\n"
                 "a una IA que lo resuelva. Cada desafío tiene 6 etapas:\n\n"
-                "Etapa 1: Jugar el juego sin la solución del desafío.\n"
+                "Etapa 1: Probar el juego sin la solución del desafío.\n"
                 "Etapa 2: Leer el enunciado y responder 7 preguntas sobre él.\n"
                 "Etapa 3: Escribir tu prompt para resolverlo.\n"
                 "Etapa 4: Ver el resultado y responder 7 preguntas sobre la solución.\n"
@@ -1461,7 +1507,7 @@ class SessionWizard:
         ctk.CTkLabel(
             body,
             text=(
-                "Juega este juego tal como está, sin el algoritmo del desafío: "
+                "Prueba este juego tal como está, sin el algoritmo del desafío: "
                 "notarás que algo falla. No necesitas entender por qué todavía. "
                 "El juego se abre en pantalla completa; presiona ESC para salir."
             ),

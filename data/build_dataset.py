@@ -15,8 +15,9 @@ vive deliberadamente FUERA del proyecto (ver
 graphic_interface/storage/personal_records.py) para no mezclar datos personales con
 los datos anónimos de la sesión -- este dataset respeta esa misma
 separación y solo identifica a cada participante por su número. El nivel de
-experiencia del jugador (Avanzado/Intermedio/Principiante, elegido al
-registrarlo) si se incluye: se lee de graphic_interface/data/participants.json
+experiencia del jugador (Perfil 1/2/3 según las materias que aprobó, elegido
+al registrarlo; Avanzado/Intermedio/Principiante en registros viejos) si se
+incluye: se lee de graphic_interface/data/participants.json
 y queda vacío si ese participante ya no está registrado ahí.
 
 Una sesión vieja (grabada antes de agregar el desglose de emociones por

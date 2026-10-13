@@ -397,12 +397,16 @@ registrarlos en ningún lado, alcanza con que la carpeta tenga un
 Cada participante es **anónimo dentro de la app** ("Participante 1",
 "Participante 2", ...). Al agregar uno nuevo se pide:
 
-- **Nombre y apellido**: se guardan aparte, en
+- **Nombre, apellido, cédula y correo**: se guardan aparte, en
   `~/Escritorio/Participantes/participantes.csv` — nunca junto a los
   datos de la sesión (emociones, frecuencia cardíaca, etc.), a
   propósito, para no mezclar datos personales con datos anónimos de
-  investigación.
-- **Nivel de experiencia**: Avanzado / Intermedio / Principiante.
+  investigación. Con ellos la carta de consentimiento ya aparece
+  completa y el participante solo tiene que firmar.
+- **Nivel de experiencia**: un perfil según las materias que ya aprobó:
+  - **Perfil 1**: Programación 2 o 3.
+  - **Perfil 2**: Análisis y diseño de algoritmos.
+  - **Perfil 3**: Base de datos o Ingeniería del software.
 
 Hacé clic en una fila de la tabla para marcarlo como el participante
 **activo** — la sesión guiada y la pestaña Sesión siempre operan
