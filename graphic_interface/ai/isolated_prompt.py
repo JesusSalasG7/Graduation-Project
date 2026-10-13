@@ -77,8 +77,11 @@ ISOLATED_SYSTEM_PROMPT = (
 @dataclass
 class IsolatedPromptResult:
     ok: bool
-    text: str = ""
+    text: str = ""  # el código extraído: lo que ve el participante y se aplica al juego
     error: str = ""
+    # Solo para el registro de la sesión (ver stage_capture.write_stage3_ai_files):
+    raw_text: str = ""  # la respuesta completa tal cual llegó, antes de extraer el código
+    model: str = ""  # modelo exacto que informó el proveedor, si lo informó
 
 
 def _strip_code_fences(text: str) -> str:
@@ -111,10 +114,12 @@ def ask_isolated_prompt(participant_prompt: str) -> IsolatedPromptResult:
         )
 
     if not result.ok:
-        return IsolatedPromptResult(ok=False, error=result.error)
+        return IsolatedPromptResult(ok=False, error=result.error, raw_text=result.raw_text, model=result.model)
 
     text = _strip_code_fences(result.text).strip()
     if not text:
-        return IsolatedPromptResult(ok=False, error="La IA no devolvió ninguna respuesta.")
+        return IsolatedPromptResult(
+            ok=False, error="La IA no devolvió ninguna respuesta.", raw_text=result.raw_text, model=result.model,
+        )
 
-    return IsolatedPromptResult(ok=True, text=text)
+    return IsolatedPromptResult(ok=True, text=text, raw_text=result.raw_text, model=result.model)

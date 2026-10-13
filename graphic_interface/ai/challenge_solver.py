@@ -14,10 +14,12 @@ investigador, no la respuesta que ve la IA del participante.
 
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Callable, Optional
 
 from ai import ai_backend
 from content.challenges import Challenge
-from ai.isolated_prompt import ask_isolated_prompt
+from ai.isolated_prompt import ISOLATED_MODEL, ask_isolated_prompt
 from content.quiz import QuizQuestion
 
 # 14 preguntas de opción multiple + una explicación de razonamiento de 2-4
@@ -70,6 +72,11 @@ class ChallengeSolveResult:
     reasoning_questions: list[QuizQuestion] = field(default_factory=list)  # Etapa 4
     reasoning_explanation: str = ""  # Etapa 4 -- por qué la IA aislada llegó a esa respuesta
     quiz_generation_error: str = ""  # por qué comprehension/reasoning quedaron vacíos (si aplica)
+    # Registro de la llamada aislada (ver stage_capture.write_stage3_ai_files):
+    raw_response_text: str = ""  # respuesta completa tal cual llegó (response_text es el código extraído)
+    provider: str = ""  # "claude" o "gemini"
+    model: str = ""
+    called_at: Optional[datetime] = None  # momento en que se envió el prompt
 
 
 def _question_from_payload(payload: dict) -> QuizQuestion:
@@ -153,24 +160,42 @@ def generate_response_quiz(
         return [], [], "", f"Respuesta inesperada del backend de IA al generar las preguntas: {exc}"
 
 
-def generate_isolated_response(challenge: Challenge, participant_prompt: str) -> ChallengeSolveResult:
+def generate_isolated_response(
+    challenge: Challenge, participant_prompt: str,
+    on_isolated_response: Optional[Callable[[ChallengeSolveResult], None]] = None,
+) -> ChallengeSolveResult:
     """Envía el prompt del participante a la llamada 100% aislada (ver
     isolated_prompt.ask_isolated_prompt) y, si responde, arma los bancos de
     preguntas y la explicación de razonamiento de las Etapas 3 y 4 a partir
     de esa respuesta.
+
+    `on_isolated_response` se llama apenas vuelve la llamada aislada (haya
+    respondido o fallado), ANTES de generar los cuestionarios -- que pueden
+    tardar minutos --, para poder dejar registrada la respuesta aunque la
+    sesión se cierre en el medio. Lo que lance se ignora: es solo registro.
     """
+    provider = ai_backend.active_provider()
+    called_at = datetime.now()
     started = time.monotonic()
     result = ask_isolated_prompt(participant_prompt)
     elapsed = time.monotonic() - started
 
-    if not result.ok:
-        return ChallengeSolveResult(ok=False, error=result.error, elapsed_seconds=elapsed)
+    solve_result = ChallengeSolveResult(
+        ok=result.ok, response_text=result.text, error=result.error, elapsed_seconds=elapsed,
+        raw_response_text=result.raw_text, provider=provider,
+        model=result.model or ai_backend.requested_model(ISOLATED_MODEL), called_at=called_at,
+    )
+    if on_isolated_response is not None:
+        try:
+            on_isolated_response(solve_result)
+        except Exception:  # noqa: BLE001 -- el registro nunca corta la sesión
+            pass
 
-    comprehension_questions, reasoning_questions, reasoning_explanation, quiz_error = generate_response_quiz(
-        challenge, result.text,
-    )
-    return ChallengeSolveResult(
-        ok=True, response_text=result.text, elapsed_seconds=elapsed,
-        comprehension_questions=comprehension_questions, reasoning_questions=reasoning_questions,
-        reasoning_explanation=reasoning_explanation, quiz_generation_error=quiz_error,
-    )
+    if not result.ok:
+        return solve_result
+
+    (
+        solve_result.comprehension_questions, solve_result.reasoning_questions,
+        solve_result.reasoning_explanation, solve_result.quiz_generation_error,
+    ) = generate_response_quiz(challenge, result.text)
+    return solve_result

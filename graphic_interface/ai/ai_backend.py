@@ -43,6 +43,9 @@ class AIResult:
     text: str = ""
     payload: Optional[dict] = None  # solo si se pidió json_schema -- ya parseado
     error: str = ""
+    # Solo para el registro de la sesión (ver stage_capture.write_stage3_ai_files):
+    raw_text: str = ""  # la respuesta tal cual llegó, sin el .strip() de `text`
+    model: str = ""  # modelo exacto que informó el proveedor, si lo informó
 
 
 def active_provider() -> str:
@@ -76,6 +79,23 @@ def provider_unavailable_reason() -> str:
 
 def _gemini_model() -> str:
     return os.environ.get(GEMINI_MODEL_ENV, "").strip() or DEFAULT_GEMINI_MODEL
+
+
+def requested_model(claude_model: str) -> str:
+    """Modelo que se le pide al backend activo: el alias que recibe el CLI
+    `claude` (ej. "sonnet") o el modelo de Gemini configurado. Se usa para
+    el registro de la sesión cuando la respuesta no informa el modelo
+    exacto (o cuando la llamada falló)."""
+    return _gemini_model() if active_provider() == PROVIDER_GEMINI else claude_model
+
+
+def _claude_reported_model(payload: dict) -> str:
+    """Modelo(s) exacto(s) que usó el CLI según su salida JSON ("modelUsage":
+    {<id de modelo>: {...}}), o "" si esta versión del CLI no lo informa."""
+    usage = payload.get("modelUsage")
+    if not isinstance(usage, dict):
+        return ""
+    return ", ".join(str(name) for name in usage)
 
 
 def _gemini_request(
@@ -114,12 +134,14 @@ def _gemini_request(
         payload = response.json()
         candidates = payload.get("candidates") or []
         parts = candidates[0]["content"]["parts"]
-        text = "".join(part.get("text", "") for part in parts).strip()
+        raw_text = "".join(part.get("text", "") for part in parts)
+        text = raw_text.strip()
+        model = str(payload.get("modelVersion") or "")
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         return AIResult(ok=False, error=f"Respuesta inesperada de Gemini: {exc}")
 
     if not text:
-        return AIResult(ok=False, error="Gemini no devolvió ninguna respuesta.")
+        return AIResult(ok=False, error="Gemini no devolvió ninguna respuesta.", raw_text=raw_text, model=model)
 
     if json_schema is not None:
         try:
@@ -127,7 +149,7 @@ def _gemini_request(
         except json.JSONDecodeError as exc:
             return AIResult(ok=False, error=f"Gemini no devolvió JSON válido: {exc}")
 
-    return AIResult(ok=True, text=text)
+    return AIResult(ok=True, text=text, raw_text=raw_text, model=model)
 
 
 def _claude_cli_request(
@@ -157,7 +179,9 @@ def _claude_cli_request(
     except (json.JSONDecodeError, TypeError) as exc:
         return AIResult(ok=False, error=f"Respuesta inesperada de 'claude' (no es JSON): {exc}")
 
-    result_text = str(payload.get("result", "")).strip()
+    raw_text = str(payload.get("result", ""))
+    result_text = raw_text.strip()
+    model = _claude_reported_model(payload)
     if json_schema is not None:
         structured = payload.get("structured_output")
         if structured is None:
@@ -168,8 +192,8 @@ def _claude_cli_request(
         return AIResult(ok=True, text=result_text, payload=structured)
 
     if not result_text:
-        return AIResult(ok=False, error="La IA no devolvió ninguna respuesta.")
-    return AIResult(ok=True, text=result_text)
+        return AIResult(ok=False, error="La IA no devolvió ninguna respuesta.", raw_text=raw_text, model=model)
+    return AIResult(ok=True, text=result_text, raw_text=raw_text, model=model)
 
 
 def run_isolated_prompt(

@@ -1,0 +1,2024 @@
+[
+  {
+    "id": "CHA-001",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la función para contar las manzanas del juego y que salga bien el número en pantalla.",
+    "palabras": 17
+  },
+  {
+    "id": "CHA-002",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito que programes el contador de manzanas según el rango que elija el jugador, no se muy bien como va la logica.",
+    "palabras": 22
+  },
+  {
+    "id": "CHA-003",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "Implementa el conteo de las frutas para sumar puntos cuando corresponda. Que funcione con el tablero.",
+    "palabras": 16
+  },
+  {
+    "id": "CHA-004",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "Haz count_apples_in_range(self) para contar las manzanas cuyo valor esté entre el minimo y maximo. Devuelve el total, aunque no se si los extremos se cuentan.",
+    "palabras": 25
+  },
+  {
+    "id": "CHA-005",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa el método de World que cuenta las manzanas que pasan el filtro. Puedes revisar los valores y compararlos con filter_min y filter_max directamente, y devolver cuantas hay.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-006",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "Quiero una función que recorra las manzanas y devuelva las que entran en el rango como una lista, para poder mostrarlas en el indicador del juego.",
+    "palabras": 26
+  },
+  {
+    "id": "CHA-007",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa World.count_apples_in_range(self) -> int. Recorre self.apples y cuenta las que cumplen el rango activo. Usa el atributo value de cada manzana y no cambies el tablero.",
+    "palabras": 26
+  },
+  {
+    "id": "CHA-008",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito count_apples_in_range(self) en World, que devuelva cuantas manzanas pasan el filtro actual usando self._apple_passes_filter(apple.value). Debe ser un entero y no modificar el estado. Ten en cuenta que puede no haber manzanas.",
+    "palabras": 31
+  },
+  {
+    "id": "CHA-009",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Haz el método count_apples_in_range de la clase World, recorriendo self.apples y contando las manzanas que pasan el filtro. El resultado es un int y debe servir para actualizar el contador de la interfaz. No hace falta crear otra lista.",
+    "palabras": 39
+  },
+  {
+    "id": "CHA-010",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def count_apples_in_range(self) -> int en World. Recorre todas las manzanas de self.apples y cuenta cada una usando self._apple_passes_filter(apple.value), sin volver a programar la comparación del rango. Devuelve un entero, en O(n), sin modificar self ni su lista de manzanas. Si la lista está vacía devuelve 0 y los valores justo en filter_min o filter_max cuentan si el filtro los acepta. Por ejemplo, con dos manzanas de valor -5, dos de 5 y dos de 15, el rango [-5, 5] debe dar 4.",
+    "palabras": 83
+  },
+  {
+    "id": "CHA-011",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "En la clase World crea count_apples_in_range(self) -> int. Las manzanas están en self.apples y cada una tiene apple.value. Para decidir si cuenta, llama siempre a self._apple_passes_filter(apple.value); no hagas las comparaciones a mano ni cambies los atributos del mundo. Tiene que ser una pasada lineal, devolver solo el número y dar 0 si no hay frutas. Los límites del filtro son inclusivos: con valores -5, 5 y 15 repetidos dos veces cada uno, [0, 10] da 2 y [-5, 15] da 6.",
+    "palabras": 81
+  },
+  {
+    "id": "CHA-012",
+    "generador": "ChatGPT",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Programa el método de instancia def count_apples_in_range(self) -> int para el contador En rango. Itera sobre self.apples, usa apple.value y delega la comprobación en self._apple_passes_filter(apple.value). No devuelvas las frutas, no ordenes ni alteres la colección. Complejidad O(n). Comprueba al menos lista vacía y valores situados exactamente en los límites; por ejemplo, seis manzanas con dos valores -5, dos 5 y dos 15 dan 4 para el filtro [-5, 5].",
+    "palabras": 69
+  },
+  {
+    "id": "CHA-013",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la función del 2048 que mueve los números y junta los iguales.",
+    "palabras": 13
+  },
+  {
+    "id": "CHA-014",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito arreglar el movimiento de las fichas, que se compriman y sumen puntos cuando choquen.",
+    "palabras": 15
+  },
+  {
+    "id": "CHA-015",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Programa el algoritmo de mover una linea del tablero, con los resultados que necesita el juego.",
+    "palabras": 16
+  },
+  {
+    "id": "CHA-016",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "Haz _compress_and_merge(line) para juntar números iguales y moverlos al principio. Si hay cuatro doses seguidos puedes juntarlos todos en un ocho, y devuelve la línea y los puntos.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-017",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa la función que recibe una línea y la comprime. Devuelve la línea nueva, los puntos y si cambió. Puedes modificar la lista original para ahorrar memoria y completar con ceros si hace falta.",
+    "palabras": 34
+  },
+  {
+    "id": "CHA-018",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "Haz un método que fusione las fichas iguales, incluso si después de una fusión aparece otro número igual al siguiente. Que retorne también un registro de los movimientos, aunque con devolver un booleano de cambio basta.",
+    "palabras": 36
+  },
+  {
+    "id": "CHA-019",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa _compress_and_merge(line) para una línea ya orientada hacia donde se mueven las fichas. Comprime sin alterar el orden, fusiona iguales, rellena con ceros y devuelve la línea, los puntos y si hubo cambios, además de los desplazamientos.",
+    "palabras": 37
+  },
+  {
+    "id": "CHA-020",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito la función _compress_and_merge(line) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]. No modifiques line. Las fichas se juntan de dos en dos y los puntos son los valores nuevos creados. Falta definir bien cómo registrar cada desplazamiento, pero quiero mantener esa info.",
+    "palabras": 40
+  },
+  {
+    "id": "CHA-021",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Haz el algoritmo de compresión del 2048. El primer elemento es el lado hacia donde se mueve la línea, los ceros se quitan antes de fusionar y luego se añaden al final. Devuelve cuatro datos incluyendo los movimientos originales. Una línea idéntica debe indicar que no hubo cambios.",
+    "palabras": 48
+  },
+  {
+    "id": "CHA-022",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa _compress_and_merge(line) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]. La línea ya está orientada: el índice 0 es el extremo del movimiento. Devuelve una lista nueva del mismo tamaño, puntos por la suma de los valores creados, un booleano que solo sea True si cambió la línea y un registro por cada ficha original con origen, destino, valor y si se fusionó. No mutar la entrada. Cada ficha puede fusionarse una sola vez por movimiento: [2,2,2,2] produce [4,4,0,0] y 8 puntos, nunca un 8 único. [2,2,2,4] produce [4,2,4,0] y 4 puntos. Desplazar sin fusionar también es cambio; una línea ya compacta que no cambia debe dar False.",
+    "palabras": 105
+  },
+  {
+    "id": "CHA-023",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Programa el helper _compress_and_merge(line) con retorno Tuple[List[int], int, bool, List[\"_LineShift\"]]. La entrada representa una fila o columna que ya se orientó para mover hacia el principio. No la modifiques. Conserva el orden relativo, elimina ceros para procesar, fusiona solo parejas iguales y no vuelvas a fusionar una ficha que acaba de salir de una fusión; al final completa con ceros hasta la longitud inicial. Los puntos son la suma de las fichas resultantes de las fusiones. Para cada ficha de entrada registra índice de origen, destino, valor y si se fusionó. Ejemplos: [4,0,0,2] -> [4,2,0,0], 0 puntos y cambio True; [8,4,2,0] queda igual, 0 puntos y cambio False.",
+    "palabras": 108
+  },
+  {
+    "id": "CHA-024",
+    "generador": "ChatGPT",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Necesito la implementación pura de _compress_and_merge(line), que retorna la nueva línea, score ganado, hubo_cambio y una lista de registros _LineShift. La orientación viene dada por el orden de line, no hay que mover desde el final. Cada ficha original necesita su propio registro (índice inicial, índice final, valor y flag de fusión). La salida conserva la longitud, no altera line y solo marca cambio si la salida difiere de la entrada. Comprueba [2,2,2,2] -> [4,4,0,0] con 8 puntos, [2,2,2,4] -> [4,2,4,0] con 4, y una línea sin cambios con False.",
+    "palabras": 90
+  },
+  {
+    "id": "CHA-025",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Haz una función para encontrar un patrón dentro de una matriz de números.",
+    "palabras": 13
+  },
+  {
+    "id": "CHA-026",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito buscar un bloque del cubo de Rubik dentro del tablero grande y decir donde está.",
+    "palabras": 16
+  },
+  {
+    "id": "CHA-027",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Implementa la búsqueda de la matriz pequeña, que devuelva si aparece en la otra y su posición.",
+    "palabras": 17
+  },
+  {
+    "id": "CHA-028",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Haz find_3d_pattern(big_matrix, pattern_matrix) para buscar el patrón y devolver found y position. Puedes revisar solo las primeras dimensiones como si fueran matrices 2D, ya que es más sencillo.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-029",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa find_3d_pattern(big_matrix, pattern_matrix). Devuelve True si está y False si no, y lanza un error si el patrón es más grande que la matriz para avisar del problema.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-030",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Crea una función que busque la matriz pequeña en la grande y retorne un diccionario con la posición. Prueba todas las posiciones donde empiece el patrón, aunque si encuentras una puedes seguir para encontrar la última coincidencia.",
+    "palabras": 37
+  },
+  {
+    "id": "CHA-031",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa find_3d_pattern(big_matrix, pattern_matrix) -> Dict[str, object]. Busca el bloque 3D en la matriz grande probando las posiciones posibles y compara las celdas. Devuelve un diccionario con found y position; si no está, position es None.",
+    "palabras": 35
+  },
+  {
+    "id": "CHA-032",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Haz una búsqueda por fuerza bruta para find_3d_pattern. No asumas que las matrices son cubos perfectos, y si un valor no coincide pasa a otra posición. Devuelve un diccionario, no un booleano. Cuando haya coincidencia devuelve sus coordenadas.",
+    "palabras": 38
+  },
+  {
+    "id": "CHA-033",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito buscar pattern_matrix dentro de big_matrix en tres dimensiones. Prueba las posiciones válidas, compara los valores y para al encontrar la primera coincidencia. Si el patrón no cabe o no aparece, devuelve found False y position None. No uses excepciones para esos casos.",
+    "palabras": 43
+  },
+  {
+    "id": "CHA-034",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Recorre por fuerza bruta todas las posiciones iniciales válidas en los tres ejes y compara elemento por elemento usando matrix[i][j][k]. En cuanto una celda no coincida, abandona esa posición; si el bloque coincide completo, devuelve inmediatamente {\"found\": True, \"position\": coordenadas_de_inicio}. Si no hay coincidencia devuelve {\"found\": False, \"position\": None}. No asumas tamaños cúbicos ni fijos y no lances errores si el patrón es más grande en alguna dimensión. Prueba también patrones rectangulares como 3x3x2 y un patrón con un 99 que no aparece en la matriz.",
+    "palabras": 95
+  },
+  {
+    "id": "CHA-035",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Crea find_3d_pattern(big_matrix, pattern_matrix) -> Dict[str, object] para localizar una submatriz tridimensional. Recorre candidatos que permitan que quepa el patrón en los tres ejes, en un orden fijo y consistente, y compara cada celda. Devuelve exactamente las claves found y position; position son las coordenadas de inicio de la primera coincidencia, o None si falla. No continúes buscando después de encontrarla, no devuelvas una lista ni un bool suelto y no asumas que cada dimensión mide lo mismo. Si pattern_matrix es más grande por cualquiera de sus ejes, devuelve found=False sin excepción.",
+    "palabras": 91
+  },
+  {
+    "id": "CHA-036",
+    "generador": "ChatGPT",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa una búsqueda 3D por fuerza bruta con firma find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Para cada origen posible, verifica las celdas correspondientes de las dos matrices; corta esa comprobación al primer valor distinto y retorna en cuanto una posición encaje entera. La respuesta siempre es un diccionario con found y position. Usa coordenadas de fila/plano/columna según el formato de la matriz, no hagas una búsqueda 2D y maneja dimensiones distintas. Casos para validar: un bloque 2x2x2 sacado de un cubo 3x3x3 debe localizarse, un patrón 3x3x2 debe poder encontrarse y un patrón con un valor inexistente debe dar False y None.",
+    "palabras": 103
+  },
+  {
+    "id": "CHA-037",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la función que decide si la señal es estable o no.",
+    "palabras": 12
+  },
+  {
+    "id": "CHA-038",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito que el juego pueda comprobar las palabras y decir si se alteran.",
+    "palabras": 13
+  },
+  {
+    "id": "CHA-039",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "Programa la lógica de las señales, si la palabra es correcta devuelve verdadero y si no falso.",
+    "palabras": 17
+  },
+  {
+    "id": "CHA-040",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "Haz is_stable_signal(text: str) -> bool para comprobar si una palabra empieza y termina con la misma letra. Si coincide devuelve True.",
+    "palabras": 21
+  },
+  {
+    "id": "CHA-041",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa is_stable_signal(text) para ver si el texto es un palíndromo. Convierte primero todo a minúsculas y quita espacios y símbolos para que no falle por detalles.",
+    "palabras": 26
+  },
+  {
+    "id": "CHA-042",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "Crea una función que compare el texto con su reverso y diga si es igual, devolviendo 'True' o 'False' como texto. Se usará para la señal del juego.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-043",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa is_stable_signal(text: str) -> bool. Debe devolver True cuando el texto se lee igual de izquierda a derecha y al revés, y False en otro caso. No necesita pygame ni tocar el juego.",
+    "palabras": 33
+  },
+  {
+    "id": "CHA-044",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Haz is_stable_signal(text: str) -> bool para detectar palíndromos. Compara los caracteres originales, sin cambiar mayúsculas ni minúsculas. Debe ser una función simple que devuelva un booleano.",
+    "palabras": 26
+  },
+  {
+    "id": "CHA-045",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito comprobar si una señal es palíndroma. La firma es is_stable_signal(text: str) -> bool y no debe tener efectos secundarios ni usar el estado del juego. Ten en cuenta cadenas de una sola letra.",
+    "palabras": 34
+  },
+  {
+    "id": "CHA-046",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def is_stable_signal(text: str) -> bool como lógica pura de palíndromos: devuelve True si la cadena original se lee exactamente igual en ambos sentidos y False si no. Compara carácter por carácter, distinguiendo mayúsculas y minúsculas y conservando espacios y símbolos; no normalices el texto ni uses pygame o librerías. La cadena vacía y una cadena de un solo carácter también deben dar True. Por ejemplo, ROTOR da True y VENTANA da False.",
+    "palabras": 73
+  },
+  {
+    "id": "CHA-047",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Programa is_stable_signal(text: str) -> bool. La regla de estabilidad es que el string sea igual a su reverso exacto. No basta con que la primera y última letra coincidan. No conviertas a minúsculas, no elimines espacios ni signos y devuelve un bool real, sin modificar nada externo. Prueba con \"SALAS\" (True), \"MENSAJE\" (False), \"\" (True) y una cadena de un carácter (True).",
+    "palabras": 62
+  },
+  {
+    "id": "CHA-048",
+    "generador": "ChatGPT",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Haz una función independiente del juego llamada is_stable_signal(text: str) -> bool que valide si el texto es un palíndromo. Tiene que usar los caracteres tal como vienen, con espacios, símbolos y capitalización incluidos, y devolver solamente True o False. No dependas de pygame, no alteres la entrada ni devuelvas cadenas. Criterios: ROTOR y SOMOS son True, CIRCUITO es False, y el string vacío se considera válido.",
+    "palabras": 66
+  },
+  {
+    "id": "CHA-049",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Haz una función para encontrar los números repetidos de la matriz.",
+    "palabras": 11
+  },
+  {
+    "id": "CHA-050",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito saber qué fichas aparecen más de una vez y devolverlas.",
+    "palabras": 11
+  },
+  {
+    "id": "CHA-051",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Programa el detector de duplicados del tablero para que ayude a la mecánica de transmutación.",
+    "palabras": 15
+  },
+  {
+    "id": "CHA-052",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa find_repeated(matrix: List[List[int]]) -> List[int]. Recorre la matriz y devuelve los valores repetidos, aunque puedes devolver el mismo número varias veces si aparece tres o más veces.",
+    "palabras": 27
+  },
+  {
+    "id": "CHA-053",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "Haz find_repeated(matrix) para obtener los números duplicados. Ordena el resultado de menor a mayor para que sea más fácil de mostrar, y usa un Counter para contar las apariciones.",
+    "palabras": 29
+  },
+  {
+    "id": "CHA-054",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "Crea la función que recorre el tablero y devuelve los repetidos usando dos bucles para comparar cada número con los demás. No hace falta controlar el orden de salida.",
+    "palabras": 29
+  },
+  {
+    "id": "CHA-055",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa find_repeated(matrix: List[List[int]]) -> List[int]. Recorre las filas y devuelve cada entero que aparezca al menos dos veces, una sola vez en la salida. Usa un set para detectar los vistos y no hagas comparaciones cuadráticas.",
+    "palabras": 36
+  },
+  {
+    "id": "CHA-056",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito find_repeated(matrix) para una matriz de enteros. Tiene que devolver los valores repetidos sin duplicarlos en el resultado y recorrer fila por fila. Puede llegar una sola fila o una matriz sin valores repetidos.",
+    "palabras": 34
+  },
+  {
+    "id": "CHA-057",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Haz la función find_repeated(matrix: List[List[int]]) -> List[int] usando conjuntos. No supongas que el tablero siempre es cuadrado, y devuelve una lista vacía si todos los valores son distintos. Me falta especificar el orden exacto de la lista.",
+    "palabras": 37
+  },
+  {
+    "id": "CHA-058",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa find_repeated(matrix: List[List[int]]) -> List[int]. Recorre las celdas fila por fila y usa un set de vistos para detectar la primera aparición y otro set para no añadir un repetido más de una vez. Añade el número a la salida justo cuando aparece por segunda vez, así el orden refleja las segundas apariciones, no el valor ni la primera aparición. Debe ser una sola pasada, sin Counter ni doble bucle, y soportar filas de distintos tamaños, una matriz de una fila y una matriz vacía. Si no hay duplicados devuelve [].",
+    "palabras": 91
+  },
+  {
+    "id": "CHA-059",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Crea find_repeated(matrix: List[List[int]]) -> List[int] para el tablero de fichas. Recorre cada fila de izquierda a derecha y las filas de arriba abajo. Mantén un set con los valores vistos y otro con los ya añadidos; cuando un valor visto vuelve a salir, añádelo al resultado solo si aún no estaba en el segundo set. Así un valor que sale tres veces aparece una sola vez y el orden es el de la segunda aparición. No ordenes ni uses Counter, y consigue O(n) con conjuntos. Debe funcionar aunque las filas no midan lo mismo.",
+    "palabras": 94
+  },
+  {
+    "id": "CHA-060",
+    "generador": "ChatGPT",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Programa find_repeated(matrix: List[List[int]]) -> List[int] usando sets en tiempo lineal. La salida incluye los enteros que se encuentran por segunda vez durante el recorrido de la matriz, sin repetir un entero en la respuesta si aparece más veces. No los ordenes numéricamente ni por su primera aparición. Por ejemplo, si el 2 tiene su segunda aparición antes que el 3 y después se repite el 1, el resultado debe ser [2, 3, 1]. Maneja matriz vacía, filas de longitudes diferentes y el tablero de una sola fila; si no hay repetidos devuelve una lista vacía.",
+    "palabras": 95
+  },
+  {
+    "id": "CHA-061",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "Haz una función que ordene las palabras para que queden mejor organizadas.",
+    "palabras": 12
+  },
+  {
+    "id": "CHA-062",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito ordenar la lista de palabras del juego, implementa lo que haga falta.",
+    "palabras": 13
+  },
+  {
+    "id": "CHA-063",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "Ordena las palabras de forma eficiente y que la lista quede correcta.",
+    "palabras": 12
+  },
+  {
+    "id": "CHA-064",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Haz sort_words_by_length(words: List[str]) -> List[str] para ordenar las palabras por longitud. Puedes usar sorted(words, key=len), y no hace falta conservar palabras repetidas porque son iguales.",
+    "palabras": 25
+  },
+  {
+    "id": "CHA-065",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa sort_words_by_length(words) para ordenar de menor a mayor según la cantidad de letras, pero ordena la lista original directamente para no crear memoria extra.",
+    "palabras": 24
+  },
+  {
+    "id": "CHA-066",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Necesito ordenar words por su tamaño, de mayor a menor, con un algoritmo propio como quicksort. Devuelve la lista con las palabras ordenadas.",
+    "palabras": 23
+  },
+  {
+    "id": "CHA-067",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa sort_words_by_length(words: List[str]) -> List[str]. Ordena de menor a mayor según len(palabra), usando un algoritmo propio, sin sorted ni list.sort. Devuelve una lista nueva y conserva todas las palabras, incluidos los duplicados.",
+    "palabras": 32
+  },
+  {
+    "id": "CHA-068",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Haz sort_words_by_length(words) con mergesort o quicksort. No modifiques la lista de entrada y ordena por longitud ascendente. Si dos palabras miden lo mismo pueden quedar en cualquier orden.",
+    "palabras": 28
+  },
+  {
+    "id": "CHA-069",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Programa la función de ordenar palabras por longitud, no alfabéticamente. Tiene que funcionar con listas vacías, de un elemento y con palabras repetidas. No uses sort(), y retorna una lista nueva.",
+    "palabras": 31
+  },
+  {
+    "id": "CHA-070",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def sort_words_by_length(words: List[str]) -> List[str]. Ordena las palabras por longitud ascendente usando un algoritmo propio, por ejemplo mergesort, heapsort o quicksort; no uses sorted() ni list.sort(). No modifiques words: trabaja sobre una copia o construye otra lista. Conserva todos los elementos y duplicados, sin añadir ni perder palabras, y no lances errores para entradas válidas. Prueba lista vacía, una palabra, lista ordenada, lista inversa y muchas palabras con la misma longitud. Para comprobarlo, las longitudes deben coincidir con las de sorted(words, key=len), aunque las palabras de igual longitud no tienen que mantener un orden particular.",
+    "palabras": 96
+  },
+  {
+    "id": "CHA-071",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Haz sort_words_by_length(words: List[str]) -> List[str] con un algoritmo de ordenamiento implementado por ti, sin llamar a sorted() ni a list.sort(). El criterio es len de cada palabra, de menor a mayor. La función devuelve otra lista y deja la original intacta; no elimines duplicados ni cambies la cantidad de elementos. Si varias palabras tienen la misma longitud no impongas orden alfabético, solo que queden agrupadas por longitud. Verifica que funcione con [] y con una lista de una sola palabra, además de listas en orden inverso.",
+    "palabras": 86
+  },
+  {
+    "id": "CHA-072",
+    "generador": "ChatGPT",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Necesito una implementación propia de sort_words_by_length(words: List[str]) -> List[str]. Puedes hacer mergesort para ordenar por len(palabra) ascendente. No se permite sorted ni list.sort y no debes alterar la lista que te pasan. La salida tiene exactamente las mismas palabras, con sus repeticiones, pero ordenadas por tamaño. Para probarla, compara las longitudes resultantes con sorted(words, key=len); si hay palabras de igual longitud, su orden relativo no importa. Incluye los casos de lista vacía, un elemento, lista ya ordenada, inversa y muchas longitudes repetidas.",
+    "palabras": 82
+  },
+  {
+    "id": "CHA-073",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la función de Conway que calcula cómo queda el tablero en el siguiente turno.",
+    "palabras": 15
+  },
+  {
+    "id": "CHA-074",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito implementar la siguiente generación de las células, incluyendo las paredes del tablero.",
+    "palabras": 13
+  },
+  {
+    "id": "CHA-075",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Programa el juego de la vida para que actualice las casillas vivas y muertas.",
+    "palabras": 14
+  },
+  {
+    "id": "CHA-076",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Haz next_generation(matrix, blocked=frozenset()) para aplicar Conway. Una célula vive si tiene dos o tres vecinas y nace con tres, pero puedes actualizar matrix en el mismo bucle para ahorrar espacio.",
+    "palabras": 30
+  },
+  {
+    "id": "CHA-077",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Cuenta las vecinas vivas, pero solo las cuatro de arriba, abajo, izquierda y derecha. Las celdas bloqueadas no deberían cambiar.",
+    "palabras": 29
+  },
+  {
+    "id": "CHA-078",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Haz la siguiente generación de Conway y devuelve una matriz nueva. Si una celda está en el borde, considera que sus vecinos continúan al otro lado del tablero, como un mapa circular.",
+    "palabras": 32
+  },
+  {
+    "id": "CHA-079",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Aplica las reglas clásicas de Conway contando las ocho vecinas. Devuelve otra matriz del mismo tamaño y no modifiques la entrada.",
+    "palabras": 30
+  },
+  {
+    "id": "CHA-080",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Haz next_generation(matrix, blocked=frozenset()) para calcular una generación a partir del tablero anterior, con B3/S23. Las coordenadas bloqueadas deben quedar muertas y el resultado debe tener el mismo tamaño, incluso en matrices rectangulares.",
+    "palabras": 32
+  },
+  {
+    "id": "CHA-081",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito la función de la vida de Conway. Cuenta también las diagonales, no envuelvas el tablero por los bordes y crea una matriz nueva. Una celda viva rodeada por ocho vivas tiene que morir. Ten cuidado con las paredes.",
+    "palabras": 39
+  },
+  {
+    "id": "CHA-082",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Calcula una nueva matriz del mismo número de filas y columnas sin mutar matrix, usando exclusivamente el estado de la generación anterior. Cuenta las ocho posiciones vecinas, incluidas diagonales; las coordenadas fuera del tablero no cuentan y no se conecta un borde con el opuesto. Aplica B3/S23: las vivas sobreviven con 2 o 3 vecinas vivas y las muertas nacen con exactamente 3; las demás quedan muertas. Toda coordenada de blocked es una pared y debe quedar muerta aunque tenga tres vecinas. Soporta tableros rectangulares y esquinas. Un blinker horizontal de tres celdas debe volverse vertical y luego horizontal.",
+    "palabras": 109
+  },
+  {
+    "id": "CHA-083",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Crea next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Para cada celda, cuenta sus ocho vecinas sin contar la propia y sin salirte de los límites. Decide su estado nuevo a partir de la matriz original, no de las celdas que ya calculaste. Usa las reglas de Conway: viva con 2 o 3 sigue viva, muerta con 3 nace y en cualquier otro caso queda muerta. Las coordenadas (fila, columna) que estén en blocked siempre quedan False. Devuelve una matriz independiente, del mismo tamaño y válida para matrices no cuadradas. Comprueba que una celda bloqueada con tres vecinas no nazca, que una celda viva rodeada por ocho vivas muera y que una célula muerta pueda nacer aunque sus vecinas mueran en esta misma generación.",
+    "palabras": 124
+  },
+  {
+    "id": "CHA-084",
+    "generador": "ChatGPT",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa la siguiente generación de Conway con firma next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. No cambies la matriz recibida: crea otra y calcula todas las decisiones con los valores de la generación previa. Cuenta las 8 celdas adyacentes, diagonales incluidas; las posiciones fuera de la matriz se ignoran y no hay efecto de borde toroidal. Una viva permanece solo con 2 o 3 vecinas vivas, una muerta nace solo con 3 y todas las demás quedan muertas. Las coordenadas fila-columna del conjunto blocked son paredes que nunca pueden estar vivas. No supongas tablero cuadrado. Para verificar, un blinker debe alternar orientación, una celda bloqueada con tres vecinas sigue muerta y una celda rodeada de ocho vivas muere.",
+    "palabras": 119
+  },
+  {
+    "id": "PER-001",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la parte de las manzanas para que el juego muestre cuántas sirven.",
+    "palabras": 13
+  },
+  {
+    "id": "PER-002",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "En este juego hay manzanas con números y una especie de filtro que puedo mover. Quiero que programes eso, porque el contador de arriba tiene que cambiar cuando cambio el filtro y después se ganan puntos. Fijate que quede bien con lo que se ve en pantalla.",
+    "palabras": 47
+  },
+  {
+    "id": "PER-003",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito una funcion para revisar las frutas del tablero. Que calcule el resultado correcto, sin romper el juego.",
+    "palabras": 18
+  },
+  {
+    "id": "PER-004",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa count_apples_in_range para contar las manzanas cuyo número está entre el mínimo y el máximo del filtro. Recorre las manzanas y compara sus valores con esos dos límites.",
+    "palabras": 28
+  },
+  {
+    "id": "PER-005",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "En World hay una función count_apples_in_range. Usa self.apples y apple.value para devolver las manzanas que entran en el filtro actual, así después puedo mostrar cuántas hay.",
+    "palabras": 26
+  },
+  {
+    "id": "PER-006",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "Completa count_apples_in_range(self). Tiene que devolver un número contando las manzanas con valor mayor que filter_min y menor que filter_max. Los valores de las manzanas son -5, 5 y 15. No cambies las manzanas, solo contalas.",
+    "palabras": 35
+  },
+  {
+    "id": "PER-007",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Escribe en Python el método de World def count_apples_in_range(self) -> int. Las manzanas están en self.apples y cada una tiene apple.value. Para decidir si suma al contador usa self._apple_passes_filter(apple.value), no armes otra comparación. Recorre la colección una vez y devuelve la cantidad, sin tocar ningún atributo del objeto.",
+    "palabras": 48
+  },
+  {
+    "id": "PER-008",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito def count_apples_in_range(self) -> int dentro de World. Debe contar, no devolver una lista. Itera self.apples y consulta self._apple_passes_filter con el value de cada manzana; el filtro acepta también sus extremos. No modifiques el mundo ni uses un segundo recorrido. Si no hay manzanas da 0.",
+    "palabras": 46
+  },
+  {
+    "id": "PER-009",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "Completa World.count_apples_in_range(self) -> int usando las manzanas de self.apples. Cada objeto guarda su número en value y existe el helper self._apple_passes_filter(valor), que debes llamar para saber si cuenta. Hazlo en O(n), sin alterar estado. Por ejemplo, con dos manzanas de cada valor -5, 5 y 15, el filtro [0,10] debería dar 2.",
+    "palabras": 52
+  },
+  {
+    "id": "PER-010",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def count_apples_in_range(self) -> int como método de World. self.apples contiene objetos con value entero (-5, 5 o 15). Cuenta los que acepta el filtro actual [filter_min, filter_max], incluyendo ambos extremos, pero decide eso únicamente mediante self._apple_passes_filter(apple.value). Una pasada O(n), sin cambiar self.apples ni ningún otro atributo. Si está vacío devuelve 0. Para comprobar: dos manzanas de cada valor y filtro [-5,5] deben dar 4. Solo devuelve el conteo; el indicador y los puntos los maneja el juego.",
+    "palabras": 78
+  },
+  {
+    "id": "PER-011",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Quiero el método count_apples_in_range de World, con firma def count_apples_in_range(self) -> int. Mira todos los objetos de self.apples y suma uno cuando self._apple_passes_filter(apple.value) sea verdadero. No compares tú los límites: ese helper ya resuelve el rango inclusivo filter_min..filter_max. Los valores posibles son -5, 5 y 15. No escribas en el estado del mundo y tarda O(n). Cero manzanas → 0; una justo en cualquiera de los extremos sí cuenta. Con dos de cada valor, [10,20] da 2 y [-5,15] da 6. El método no debe dar puntos ni actualizar la interfaz.",
+    "palabras": 91
+  },
+  {
+    "id": "PER-012",
+    "generador": "Perplexity",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "En World falta def count_apples_in_range(self) -> int. Hacela como consulta, sin efectos secundarios: recorre self.apples una sola vez, toma apple.value y usa self._apple_passes_filter(apple.value) para decidir si incrementar un contador entero. No reemplaces el helper por condiciones propias. El filtro va de filter_min a filter_max con extremos incluidos; las manzanas valen -5, 5 o 15. Devuelve 0 si no hay ninguna y no cambies atributos de self. Debe ser O(n). Prueba que dos de cada valor produzcan 2 para [0,10] y 4 para [-5,5]. Este resultado lo consume el juego para su contador y puntuación, eso no se implementa acá.",
+    "palabras": 99
+  },
+  {
+    "id": "PER-013",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Haz el movimiento del 2048, que se junten los números como en el juego.",
+    "palabras": 14
+  },
+  {
+    "id": "PER-014",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito que cuando aprieto una flecha las fichas se acomoden y sumen. Si hay números parecidos deberían juntarse y dejar espacio para otros. También estaría bueno que devuelva lo que pasó para poder mostrar el movimiento, pero no sé bien cómo hacerlo.",
+    "palabras": 42
+  },
+  {
+    "id": "PER-015",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "Programa la función que arregla una fila del tablero. Que funcione igual a cuando juego normalmente.",
+    "palabras": 16
+  },
+  {
+    "id": "PER-016",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa _compress_and_merge(line) para mover los números al comienzo y juntar los que sean iguales. Devuelve la fila resultante y los puntos ganados.",
+    "palabras": 22
+  },
+  {
+    "id": "PER-017",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "Haz _compress_and_merge para una lista de números del 2048. Quita los ceros, suma vecinos iguales y sigue juntando mientras se pueda. Por ejemplo cuatro doses deberían terminar en un ocho. Al final agrega ceros para recuperar el tamaño.",
+    "palabras": 38
+  },
+  {
+    "id": "PER-018",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "La función _compress_and_merge recibe una fila. Debe dejar todos los números a la izquierda y fusionar los iguales de dos en dos, sin fusionar dos veces una ficha. Devuelve la nueva fila, el puntaje y True cuando hubo alguna fusión. No cambies la lista que recibes.",
+    "palabras": 46
+  },
+  {
+    "id": "PER-019",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']]. La línea ya está orientada hacia el índice 0. Quita los huecos manteniendo el orden, fusiona iguales de a pares desde el inicio y no vuelvas a fusionar el valor recién creado. Completa con ceros. Los puntos son la suma de los valores generados y el booleano compara resultado con entrada. No alteres line. Incluye registros _LineShift para las fichas que participaron del movimiento.",
+    "palabras": 73
+  },
+  {
+    "id": "PER-020",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Para Board escribe _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']]. Devuelve línea nueva, puntos, cambio y registros de fichas. El inicio de line es el lado del movimiento: comprime sin reordenar y luego junta parejas iguales, usando cada ficha una sola vez. Añade ceros hasta el largo inicial y no modifiques la entrada. Cambio debe ser nueva_linea != line. Por cada ficha registra origen, destino, valor y si se fusionó. [2,2,2,2] tiene que dar [4,4,0,0] con 8 puntos.",
+    "palabras": 78
+  },
+  {
+    "id": "PER-021",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']]. No modifiques line. Se mueve hacia el primer elemento, conservando el orden de los no ceros. Fusiona dos iguales consecutivos, salta ambas fichas y sigue, luego rellena ceros. Devuelve también los puntos de las fusiones y si cambió la línea, incluso si solo se desplazaron fichas. En la lista de _LineShift guarda para cada ficha no cero su índice original, índice final, valor y marca de fusión. No se suman puntos por fichas que solo se movieron.",
+    "palabras": 86
+  },
+  {
+    "id": "PER-022",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Escribe la rutina de Board con firma def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']]. line ya viene orientada: se desliza hacia 0, no tienes que interpretar flechas. Conserva el orden al sacar ceros, combina pares iguales empezando por el principio y no reutilices una ficha ni un resultado de fusión en otra fusión del mismo turno. Devuelve una lista nueva del mismo largo, completada con ceros, puntos que suman los valores creados, changed calculado comparando con line y una lista de registros _LineShift. Cada ficha original no cero necesita registro con origen, destino, valor y si participó en fusión; las dos de una pareja comparten destino. No mutar line. [2,2,2,4] da [4,2,4,0], 4 puntos y True; [2,2,2,2] da [4,4,0,0] y 8. Si solo hay desplazamiento también cambia; una línea intacta da False. Vacía o toda cero no cambia.",
+    "palabras": 139
+  },
+  {
+    "id": "PER-023",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']] para Board. Usa el índice 0 como extremo de llegada porque la fila o columna ya está acomodada para esa dirección. Trabaja sin modificar la entrada. Compacta los valores distintos de cero respetando su orden y fusiona parejas contiguas iguales de izquierda a derecha, una fusión por ficha como máximo. Rellena con ceros para conservar el tamaño. La tupla es (resultado, puntos, hubo_cambio, desplazamientos), con puntos solo por valores nacidos de fusiones y hubo_cambio igual a resultado != line. Los desplazamientos son registros _LineShift de todas las fichas originales no cero, incluso las quietas: origen, destino, valor y bandera de fusión. En una pareja ambos registros van al mismo destino. Comprobaciones: [4,0,0,2] → [4,2,0,0], 0, True; [8,4,2,0] queda igual, 0, False. Tres iguales juntan los dos primeros; cuatro doses producen dos cuatros, no un ocho. También soporta línea vacía y solo ceros.",
+    "palabras": 150
+  },
+  {
+    "id": "PER-024",
+    "generador": "Perplexity",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Haceme def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List['_LineShift']] de Board. No es mover todo el tablero, solo una línea cuyo comienzo ya indica hacia dónde deslizar. Sacá huecos sin cambiar el orden, juntá pares iguales desde ese comienzo y prohibí fusionar de nuevo una ficha recién formada. Generá una línea nueva, del largo original, con ceros al final. Retorná en este orden: línea, suma de los valores creados por fusión, si difiere de la entrada, registros _LineShift. Cada ficha original distinta de cero, se mueva o no, debe quedar registrada con su origen, destino, valor y si se fusionó; las dos que se juntan llegan a la misma casilla. No tocar line. Chequea [2,2,2,2] → [4,4,0,0] con 8 puntos, y [2,2,2,4] → [4,2,4,0] con 4. Un movimiento sin fusión cuenta como cambio, una línea igual no. Vacía o llena de ceros devuelve puntaje 0 y cambio False.",
+    "palabras": 148
+  },
+  {
+    "id": "PER-025",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Busca el pedacito del cubo dentro del cubo grande y dime si está.",
+    "palabras": 13
+  },
+  {
+    "id": "PER-026",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Hay un juego con un Rubik y tengo que encontrar una forma chiquita que aparece por ahí. Quiero una función que revise el cubo y responda correctamente, sin que se trabe si no la encuentra. Usa el método que te parezca.",
+    "palabras": 41
+  },
+  {
+    "id": "PER-027",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "Haz la búsqueda de matrices del desafío. Que detecte la coincidencia.",
+    "palabras": 11
+  },
+  {
+    "id": "PER-028",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa find_3d_pattern(big_matrix, pattern_matrix). Busca el patrón en la matriz grande y devuelve True si aparece y False si no.",
+    "palabras": 19
+  },
+  {
+    "id": "PER-029",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Necesito find_3d_pattern para encontrar un bloque 2x2x2 dentro de un cubo 3x3x3. Revisa los lugares donde entra y devuelve un diccionario con found y position.",
+    "palabras": 25
+  },
+  {
+    "id": "PER-030",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "Escribe find_3d_pattern(big_matrix, pattern_matrix). Compara las matrices en las distintas posiciones y guarda la posición cada vez que coincidan. Al terminar devuelve {'found': True, 'position': posicion} si viste alguna; si no, found False y position None.",
+    "palabras": 35
+  },
+  {
+    "id": "PER-031",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Usa fuerza bruta sobre listas tridimensionales, comparando celdas con acceso matrix[i][j][k]. Devuelve {'found': True, 'position': coordenadas} apenas encuentres el patrón completo; si no aparece, {'found': False, 'position': None}. Calcula los tamaños de cada eje, sin fijar 3x3x3. Si no cabe devuelve el resultado negativo. En cada candidato corta la comparación al primer valor distinto y no accedas fuera de rango.",
+    "palabras": 69
+  },
+  {
+    "id": "PER-032",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Quiero find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Son matrices 3D indexadas como [i][j][k], no necesariamente cubos. Prueba por fuerza bruta cada origen donde quepa el patrón; compara todas sus celdas y abandona ese origen si una falla. Devuelve de inmediato found True y position con el origen de la primera coincidencia; al agotar opciones found False y position None. Recorre i, después j y después k en orden creciente. No uses búsquedas optimizadas ni provoques errores de índices.",
+    "palabras": 79
+  },
+  {
+    "id": "PER-033",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "Escribe def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Hay que buscar un bloque 3D completo, no solo una cara del Rubik. Considera tamaños independientes para los tres ejes y prueba orígenes válidos comparando elemento a elemento. Ante una diferencia sigue con otro origen; ante una coincidencia completa retorna {'found': True, 'position': (i,j,k)} sin seguir buscando. Si el patrón es demasiado grande o no aparece retorna {'found': False, 'position': None}. Nada de algoritmos optimizados y nada de excepciones.",
+    "palabras": 78
+  },
+  {
+    "id": "PER-034",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Ambas se consultan como matrix[i][j][k]; busca el bloque sin girarlo mediante fuerza bruta, no con índices auxiliares ni otro algoritmo. Obtén por separado los tamaños de los tres ejes y prueba solo orígenes donde entre completo, incluyendo el último posible. Recorre orígenes en orden creciente con i afuera, j en medio y k adentro; position será la tupla (i,j,k) del origen. Compara celda por celda, descarta el candidato al primer desacuerdo y retorna la primera coincidencia inmediatamente con {'found': True, 'position': (i,j,k)}. Si no cabe en algún eje o no hay coincidencia, {'found': False, 'position': None}, sin lanzar excepciones. No asumas tamaños fijos ni cubos: debe funcionar con bloques como 3x3x2. Para revisar, busca un bloque extraído de una matriz, y otro lleno de 99 en una matriz sin 99; ese segundo debe dar False. Si hay varias coincidencias importa la primera del recorrido.",
+    "palabras": 153
+  },
+  {
+    "id": "PER-035",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Necesito find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. El juego usa RubikCube.matrix, pero la función debe servir para matrices 3D rectangulares de otros tamaños también. Acceso [i][j][k]. Haz búsqueda exhaustiva: i, j, k crecientes, con k variando más rápido. Para cada origen válido compara el bloque completo contra el patrón; deja de comparar ese origen apenas difiera una celda. En cuanto todo coincida devuelve {'found': True, 'position': (i,j,k)}, donde las coordenadas son el comienzo del bloque, no su centro. Si terminás sin coincidencia devuelve {'found': False, 'position': None}. Lo mismo si el patrón excede cualquier dimensión, sin excepciones. No uses optimizaciones y limita cada origen al tamaño grande menos el tamaño del patrón, inclusive. Prueba un bloque 2x2x2 dentro de 3x3x3, uno no cúbico 3x3x2 y un patrón con un valor ausente. Si aparece más de una vez, no reemplaces la primera posición por otra.",
+    "palabras": 145
+  },
+  {
+    "id": "PER-036",
+    "generador": "Perplexity",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "En Python, def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]. Buscá el patrón 3D tal cual está, revisando todas las ubicaciones en que quepa. Son estructuras con acceso matrix[i][j][k], y las dimensiones pueden ser diferentes entre ejes. Usá solo fuerza bruta y comparación de celdas: primer desacuerdo → siguiente candidato; bloque completo igual → retorno inmediato. Orden de candidatos: i creciente como bucle externo, luego j creciente y finalmente k creciente. Devuelve dos claves exactas, found y position: True y una tupla (i,j,k) con el origen de la primera coincidencia, o False y None. Si el patrón no entra, no tires excepción, devolvé el caso negativo. Evitá salirte de índices y revisá también el último origen permitido. Un patrón 3x3x2 tiene que funcionar igual que uno 2x2x2; un bloque de 99 no puede encontrarse donde no hay ningún 99. Para una prueba con posición conocida, usa una matriz donde el bloque extraído no se repita en otro sitio.",
+    "palabras": 158
+  },
+  {
+    "id": "PER-037",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "Haz una función que diga si la señal es estable o se altera.",
+    "palabras": 13
+  },
+  {
+    "id": "PER-038",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "En el juego aparecen palabras y hay que contestar rápido si mantienen su forma. Quiero automatizar esa decisión para no tener que estar mirando cada señal. Que la función responda bien en todos los casos.",
+    "palabras": 35
+  },
+  {
+    "id": "PER-039",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "Resuelve lo de las señales con letras, la parte de comprobarlas.",
+    "palabras": 11
+  },
+  {
+    "id": "PER-040",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa is_stable_signal(text). Una señal es estable si empieza y termina con la misma letra. Devuelve True o False.",
+    "palabras": 18
+  },
+  {
+    "id": "PER-041",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "Escribe is_stable_signal para saber si una palabra es palíndroma. Antes pon todo en minúsculas y elimina espacios, así la comparación no falla por cómo la escribieron.",
+    "palabras": 26
+  },
+  {
+    "id": "PER-042",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "La función is_stable_signal(text) compara el texto con su versión al revés. Si es igual devuelve 'estable' y si no 'inestable'. La cadena vacía debería ser inestable porque no tiene señal.",
+    "palabras": 30
+  },
+  {
+    "id": "PER-043",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def is_stable_signal(text: str) -> bool. Tiene que detectar si text es exactamente igual leído desde el final, o sea un palíndromo. Respeta mayúsculas, espacios y símbolos, no limpies el texto. Solo lógica de strings, sin librerías ni pygame y sin efectos secundarios.",
+    "palabras": 43
+  },
+  {
+    "id": "PER-044",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Quiero def is_stable_signal(text: str) -> bool, una función pura que compare los caracteres de ambos extremos hacia el centro. Si alguna pareja difiere, False; si ninguna difiere, True. No pases a minúsculas ni quites nada y no importes librerías. Vacío y un solo carácter dan True.",
+    "palabras": 46
+  },
+  {
+    "id": "PER-045",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "Haz is_stable_signal(text: str) -> bool en Python. Estable quiere decir palíndromo exacto: RADAR da True, MENSAJE da False. Hay que respetar cada carácter, incluyendo espacios, signos y diferencias de mayúsculas. No depende del juego ni de pygame y no debe modificar nada o imprimir. Un texto vacío cuenta como estable.",
+    "palabras": 50
+  },
+  {
+    "id": "PER-046",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def is_stable_signal(text: str) -> bool. La regla que deduje del juego es que la señal debe ser un palíndromo exacto: comparar caracteres enfrentados desde los extremos. Devuelve True si todos coinciden y False si alguna pareja no. No normalices mayúsculas, espacios, tildes ni símbolos; todos son parte del texto. Función pura, sin imports, pygame, estado del juego, prints ni otros efectos. '' y cualquier string de un carácter dan True. Pruebas: ROTOR → True, VENTANA → False, Aa → False y a a → True.",
+    "palabras": 86
+  },
+  {
+    "id": "PER-047",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Necesito is_stable_signal(text: str) -> bool. No es revisar solo la primera y última letra: todo el string tiene que verse idéntico al recorrerlo al revés. Hazlo con comparaciones de caracteres y devuelve un bool real. No borres espacios ni signos y no conviertas a minúsculas, porque la comparación distingue cada carácter. No uses bibliotecas ni datos del juego; no debe tener efectos secundarios. Vacío o longitud 1 son estables. Para chequear: SOMOS y SERES dan True; CIRCUITO da False; Radar da False por las mayúsculas. El límite de tiempo del jugador no se programa en esta función.",
+    "palabras": 97
+  },
+  {
+    "id": "PER-048",
+    "generador": "Perplexity",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Escribe def is_stable_signal(text: str) -> bool usando solo el string recibido. Es estable cuando cada carácter coincide con el que está a la misma distancia del otro extremo, incluyendo espacios y símbolos. Sin quitar cosas, sin cambiar mayúsculas y sin librerías ni pygame. Retorna únicamente True o False, no mensajes, y no alteres estado ni produzcas efectos secundarios. Cadena vacía y un carácter → True. Comprueba SALAS → True, MENSAJE → False, A a → False y !a! → True. Si coincide solo el inicio con el final pero falla una pareja interior, también es False.",
+    "palabras": 96
+  },
+  {
+    "id": "PER-049",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Encuentra las fichas repetidas del tablero y ponlas en el resultado.",
+    "palabras": 11
+  },
+  {
+    "id": "PER-050",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Estoy haciendo la parte de Transmutación donde algunas fichas aparecen varias veces. Necesito que la IA revise lo que hay y saque los números que importan para la jugada, tanto en el tablero como cuando limpio una línea. Haz la funcion de eso.",
+    "palabras": 43
+  },
+  {
+    "id": "PER-051",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "Programa lo de detectar repeticiones, que no se escape ninguna.",
+    "palabras": 10
+  },
+  {
+    "id": "PER-052",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa find_repeated(matrix). Recorre los números de la matriz y devuelve los que están repetidos, ordenados de menor a mayor.",
+    "palabras": 19
+  },
+  {
+    "id": "PER-053",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "Haz find_repeated para una matriz de enteros. Usa Counter para contar cuántas veces aparece cada número y devuelve los que tienen cuenta mayor a uno, sin duplicarlos.",
+    "palabras": 27
+  },
+  {
+    "id": "PER-054",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "find_repeated(matrix) debe devolver los repetidos del tablero 6x6. Compara cada casilla con todas las demás y agrega su valor cuando encuentres otro igual. No metas dos veces el mismo valor en la respuesta.",
+    "palabras": 33
+  },
+  {
+    "id": "PER-055",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def find_repeated(matrix: List[List[int]]) -> List[int]. Recorre fila por fila y usa conjuntos para hacerlo en una pasada: uno de vistos y otro de valores ya agregados. Añade un número justo cuando lo encuentras por segunda vez; las siguientes veces no lo añadas. Así el resultado sigue el orden de las segundas apariciones, no el numérico. Nada de Counter ni comparar todas las parejas.",
+    "palabras": 64
+  },
+  {
+    "id": "PER-056",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito find_repeated(matrix: List[List[int]]) -> List[int]. Devuelve cada entero que aparezca al menos dos veces, una sola vez, ordenándolo según cuándo se repite por primera vez al leer filas de izquierda a derecha. Usa set para vistos y para ya reportados, una pasada sin Counter ni búsquedas cuadráticas. Acepta filas de largos diferentes y también una sola fila; si no hay repetidos devuelve [].",
+    "palabras": 63
+  },
+  {
+    "id": "PER-057",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "Escribe def find_repeated(matrix: List[List[int]]) -> List[int] con un recorrido por filas y sets para recordar vistos y repetidos ya emitidos. Añade al resultado en la segunda aparición, sin volver a añadir en la tercera ni después. No ordenes por valor o primera aparición y no uses Counter o comparaciones O(n²). Ejemplo: [[1,2,3],[2,3,1]] devuelve [2,3,1]. Si no se repite nada, lista vacía.",
+    "palabras": 61
+  },
+  {
+    "id": "PER-058",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def find_repeated(matrix: List[List[int]]) -> List[int]. La entrada tiene enteros de fichas; aunque el tablero del juego sea 6x6, no fijes ese tamaño. Recorre cada fila de izquierda a derecha y luego la siguiente, aceptando filas desiguales, vacías o una matriz de una fila. Usa sets en una sola pasada: registra vistos y cuáles ya agregaste al resultado. Cada valor con dos o más apariciones sale exactamente una vez, en el momento de su segunda aparición. No ordenes después, no uses Counter ni compares elementos por parejas en O(n²). Matriz vacía o sin repetidos → []. Ejemplo propio: [[1,2,3,2],[3,1,1,4]] → [2,3,1]. Que el 1 aparezca tres veces no debe duplicarlo. La Catálisis puede enviar solo una fila; esta función detecta valores, no limpia el tablero.",
+    "palabras": 125
+  },
+  {
+    "id": "PER-059",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Haceme find_repeated(matrix: List[List[int]]) -> List[int]. Tiene que devolver los números que aparecen más de una vez, sin duplicados en la salida, y en orden de segunda aparición durante el recorrido por filas. Usa un set de vistos y otro de reportados para resolverlo en una pasada; no Counter, no ordenar y no un bucle que compare cada número con todos los otros. Las fichas se representan con enteros. No asumas matriz cuadrada ni filas igual de largas: también llega una única fila por la jugada de Catálisis. Vacía, filas vacías o ausencia de repeticiones dan []. Si un número aparece cuatro veces se devuelve una vez. Prueba [[9,4],[4],[],[9,4]]: tiene que salir [4,9], porque el 4 alcanza su segunda aparición antes que el 9.",
+    "palabras": 123
+  },
+  {
+    "id": "PER-060",
+    "generador": "Perplexity",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Quiero def find_repeated(matrix: List[List[int]]) -> List[int]. Lee los enteros fila a fila, respetando el orden dentro de cada fila, y devuelve únicamente valores que hayas encontrado al menos dos veces. Incorpora cada uno al verlo por segunda vez y nunca más; ese momento determina el orden de salida. Resolver con conjuntos y una pasada, no con Counter ni comparación entre todas las casillas. No limitarlo al tablero 6x6: admite listas de filas con distintos largos, una sola fila, filas vacías y []. Sin repetidos retorna []. Ejemplo [[5,7,5,7,5]] → [5,7]; [[1,2,3],[2,3,1]] → [2,3,1]. La función solo identifica números repetidos, no aplica la limpieza de fichas del juego.",
+    "palabras": 107
+  },
+  {
+    "id": "PER-061",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "Ordena las palabras para que queden bien para la partida.",
+    "palabras": 10
+  },
+  {
+    "id": "PER-062",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "El juego me da varias palabras y hay que acomodarlas antes de seguir. Necesito que hagas una función que reciba eso y lo deje listo. Usa algún algoritmo que funcione bien aunque lleguen muchas palabras o algunas sean parecidas.",
+    "palabras": 39
+  },
+  {
+    "id": "PER-063",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "Haz el algoritmo de las palabras, que las organice y devuelva el resultado.",
+    "palabras": 13
+  },
+  {
+    "id": "PER-064",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa sort_words_by_length(words). Devuelve sorted(words, key=len), para poner las palabras de la más corta a la más larga.",
+    "palabras": 17
+  },
+  {
+    "id": "PER-065",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Haz sort_words_by_length para ordenar por cantidad de letras. Programa un algoritmo tuyo, sin sorted ni sort. Puedes intercambiar elementos directamente en words hasta que queden de menor a mayor.",
+    "palabras": 29
+  },
+  {
+    "id": "PER-066",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "Escribe sort_words_by_length(words). Primero elimina palabras repetidas para no hacer trabajo de más y después ordénalas por longitud usando mergesort. Devuelve una lista nueva y no uses sorted.",
+    "palabras": 27
+  },
+  {
+    "id": "PER-067",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def sort_words_by_length(words: List[str]) -> List[str]. Devuelve una lista nueva ordenada por len de menor a mayor, manteniendo todas las palabras y sus duplicados. Usa mergesort propio; nada de sorted() o list.sort(). No cambies words. Los empates pueden conservar su orden usando la palabra izquierda primero. Debe funcionar sin excepciones para entradas válidas.",
+    "palabras": 53
+  },
+  {
+    "id": "PER-068",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito sort_words_by_length(words: List[str]) -> List[str]. Ordena por longitud ascendente, no alfabéticamente, con un algoritmo hecho por ti como mergesort. No sorted ni .sort y no tocar la lista original. Conserva multiplicidades y cantidad de elementos. Vacía da [] y una palabra da una nueva lista con esa palabra. Maneja también entrada ya ordenada o al revés.",
+    "palabras": 56
+  },
+  {
+    "id": "PER-069",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "Escribe def sort_words_by_length(words: List[str]) -> List[str]. Implementa mergesort comparando len y construyendo listas nuevas, sin sorted ni list.sort. No perder duplicados ni mutar words. Para iguales puedes elegir primero el de la izquierda. Comprueba que ['sol','a','luna','sol'] dé longitudes [1,3,3,4] y siga teniendo ambos 'sol'. No debe fallar con listas vacías o de un elemento.",
+    "palabras": 54
+  },
+  {
+    "id": "PER-070",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def sort_words_by_length(words: List[str]) -> List[str]. Son las palabras que entrega PlayState, pero no necesitas acceder al juego. Devuelve otra lista con exactamente las mismas palabras y repeticiones, ordenada por len creciente. Programa mergesort tú mismo, sin sorted() ni list.sort(), y no modifiques words. Al empatar elige primero la palabra de la mitad izquierda para mantener además su orden original. Casos a cubrir: [], una palabra, lista ya ordenada, orden inverso y muchas palabras con igual largo; no lanzar excepciones con entradas válidas. Ejemplo ['sol','a','luna','sol'] → ['a','sol','sol','luna']. Para verificar, las longitudes deben coincidir con las de sorted(words, key=len), y además las frecuencias de cada palabra y la entrada original deben mantenerse; sorted solo sería para la prueba, no para implementar.",
+    "palabras": 120
+  },
+  {
+    "id": "PER-071",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Haceme sort_words_by_length(words: List[str]) -> List[str] con orden de menor a mayor número de caracteres. No orden alfabético ni eliminar repetidas. Usá mergesort propio, sin llamar sorted o .sort en ninguna parte del algoritmo, y trabajá con listas nuevas para dejar words intacta. Cuando haya empate tomá primero el elemento izquierdo, así también conserva el orden previo. Debe devolver una lista nueva aun con cero o una palabra, no fallar con entradas válidas y conservar cantidad y multiplicidad de elementos. Revisa listas ordenadas, invertidas y con muchísimos empates. Por ejemplo ['bb','a','cc','a'] devuelve ['a','a','bb','cc']. El juego genera las palabras en PlayState, pero la función solo usa el parámetro. Como control, longitudes ascendentes, mismos elementos con las mismas repeticiones y lista original sin cambios.",
+    "palabras": 121
+  },
+  {
+    "id": "PER-072",
+    "generador": "Perplexity",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Quiero def sort_words_by_length(words: List[str]) -> List[str]. La lista viene de PlayState; no la cambies ni dependas de ese objeto. Implementa tu propio ordenamiento, por ejemplo mergesort, comparando exclusivamente len de las palabras. Prohibido resolverlo con sorted() o list.sort(). Produce una lista nueva de longitud igual a la entrada y conserva cada ocurrencia, aunque varias palabras sean idénticas. Para empates conserva el orden original eligiendo la izquierda primero al fusionar. Contempla lista vacía, una palabra, entrada ya ordenada, invertida y muchas longitudes iguales, sin excepciones para datos válidos. Prueba ['ccc','b','aa','b'] → ['b','b','aa','ccc']. Verifica longitudes iguales a las que daría sorted(words, key=len), multiplicidades intactas y ausencia de cambios en words. No uses ese sorted dentro de la solución.",
+    "palabras": 116
+  },
+  {
+    "id": "PER-073",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Haz que avance el tablero una ronda y cambien las células.",
+    "palabras": 11
+  },
+  {
+    "id": "PER-074",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Necesito la función del juego de la vida. Hay casillas prendidas, apagadas y unas paredes que no se pueden usar. Cuando pasan los turnos algunas aparecen y otras desaparecen según lo que tienen cerca. Programa eso para que se vea como en el juego.",
+    "palabras": 44
+  },
+  {
+    "id": "PER-075",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "Calcula el próximo estado de la simulación, respetando las paredes.",
+    "palabras": 10
+  },
+  {
+    "id": "PER-076",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Implementa next_generation(matrix, blocked). Las vivas siguen si tienen dos o tres vecinos y las muertas nacen con tres. Cuenta solamente arriba, abajo, izquierda y derecha. Las casillas blocked deben quedar apagadas.",
+    "palabras": 31
+  },
+  {
+    "id": "PER-077",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Haz next_generation con las reglas de Conway. Recorre matrix y cambia cada casilla directamente según sus ocho vecinos: nace con tres, sobrevive con dos o tres. Las paredes nunca se prenden. Al terminar devuelve matrix.",
+    "palabras": 35
+  },
+  {
+    "id": "PER-078",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "Escribe next_generation(matrix, blocked) devolviendo una matriz nueva. Usa las ocho casillas alrededor para Conway y deja las bloqueadas muertas. Cuando un vecino queda fuera del tablero, búscalo en el lado contrario para que los bordes estén conectados.",
+    "palabras": 37
+  },
+  {
+    "id": "PER-079",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Implementa def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Devuelve una matriz nueva sin mutar matrix. Cada celda mira las ocho vecinas, excluyendo ella misma, y cuenta solo posiciones dentro del tablero. Viva sobrevive con 2 o 3; muerta nace con 3; las demás mueren. Las coordenadas (fila,columna) de blocked siempre dan False. Todos los cálculos usan la generación anterior, no resultados recién escritos.",
+    "palabras": 65
+  },
+  {
+    "id": "PER-080",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Necesito next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Haz Conway B3/S23 en un tablero rectangular: ocho vecinos con diagonales, sin contar la propia celda y sin conectar bordes. Las paredes de blocked, pares (fila,columna), quedan False incluso si tienen tres vecinas. Crea una matriz nueva del mismo tamaño y consulta solo matrix para calcularla, sin alterar la entrada. Una viva rodeada de ocho vivas muere.",
+    "palabras": 66
+  },
+  {
+    "id": "PER-081",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "Escribe def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Entrada booleana y salida nueva, con iguales dimensiones aunque no sea cuadrada. Cuenta ocho vecinas dentro de límites, nunca la celda misma. Aplica nacimiento con 3 y supervivencia con 2 o 3; cualquier otro caso False. Las posiciones (fila,columna) en blocked fuerzan False. No actualices la entrada ni uses estados ya calculados. Sin paredes, una línea horizontal de tres vivas debe pasar a vertical.",
+    "palabras": 74
+  },
+  {
+    "id": "PER-082",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. matrix es el estado anterior; True significa viva. blocked contiene pares (fila,columna) de paredes, y por defecto no hay paredes. Devuelve otra matriz con las mismas dimensiones y no cambies la entrada. Para cada celda cuenta las ocho vecinas, diagonales incluidas, sin contar ella misma ni posiciones fuera de límites: el tablero no se conecta por los bordes. Usa siempre el estado anterior. Viva conserva True con 2 o 3 vecinas; muerta pasa a True con exactamente 3; todo lo demás False. Las paredes fuerzan False aunque las reglas permitan nacimiento o supervivencia. Admite tableros rectangulares y trata correctamente esquinas y bordes. Comprueba un blinker horizontal de tres celdas dentro de un 5x5: se vuelve vertical y al otro paso horizontal. Una viva con ocho vecinas muere; una pared con tres vecinas no nace; una muerta con tres vecinas sí nace aunque esas vecinas mueran en el mismo paso.",
+    "palabras": 159
+  },
+  {
+    "id": "PER-083",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Haceme next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Es Conway con paredes: nacen las muertas con 3 vecinos y sobreviven las vivas con 2 o 3, cualquier otra queda muerta. Vecinos son las 8 posiciones alrededor, incluyendo diagonales pero no la propia, y solo si están dentro de la matriz. Nada de envolver bordes. blocked es una colección inmutable de coordenadas (fila,columna); esas posiciones deben salir False siempre. Crea una matriz nueva de las mismas filas y columnas, también si es rectangular, y no toques matrix ni blocked. Toda decisión usa la generación anterior para que el orden del recorrido no afecte. Verifica esquinas, una viva rodeada de 8 vivas y una bloqueada con 3 vecinas. Sin bloqueos, el blinker de 3 vivas alterna horizontal/vertical. También prueba nacimiento por tres vecinas que van a morir: sus muertes futuras no cambian el conteo actual.",
+    "palabras": 144
+  },
+  {
+    "id": "PER-084",
+    "generador": "Perplexity",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Quiero def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]. Devuelve el siguiente tablero booleano en una matriz nueva del mismo tamaño, sin modificar datos recibidos. No presupongas tablero cuadrado. Cuenta únicamente las ocho celdas vecinas válidas de la generación de entrada, con diagonales y sin incluir la propia celda; fuera del borde no hay vecino y tampoco se salta al extremo opuesto. Regla: si estaba viva, sigue viva con 2 o 3; si estaba muerta, nace con 3; en cualquier otro caso False. blocked guarda coordenadas (fila,columna) y tiene prioridad: una pared queda False aunque tenga exactamente 3 vecinas. El valor por defecto permite usar la función sin paredes. Revisa bordes y esquinas, sobrepoblación de una viva con 8 vecinas y cálculo simultáneo, no actualización en el lugar. Ejemplo: en 5x5, vivas en (2,1),(2,2),(2,3) pasan a (1,2),(2,2),(3,2) sin bloqueos y luego regresan. Si bloqueas (1,2), esa celda no puede nacer.",
+    "palabras": 151
+  },
+  {
+    "id": "GEM-001",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "necesito que hagas la funcion count_apples_in_range en python para el juego porque no se como se hace, porfa ayudame",
+    "palabras": 19
+  },
+  {
+    "id": "GEM-002",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "haz una funcion que cuente las manzanas del tablero y ya",
+    "palabras": 11
+  },
+  {
+    "id": "GEM-003",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 1,
+    "prompt": "programa la funcion count_apples_in_range en el archivo world.py para contar cosas que estan en el mundo",
+    "palabras": 16
+  },
+  {
+    "id": "GEM-004",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "crea el metodo count_apples_in_range que recorra self.apples y cuente las manzanas que estan dentro del filtro min y max comparando los valores a mano con un if",
+    "palabras": 27
+  },
+  {
+    "id": "GEM-005",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "haz la funcion count_apples_in_range en world.py que devuelva la lista con las manzanas que pasan el filtro activo del juego",
+    "palabras": 20
+  },
+  {
+    "id": "GEM-006",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 2,
+    "prompt": "escribe def count_apples_in_range(self) -> int: que agarre self.apples y modifique el estado quitando las que no sirven y devolviendo el total entero",
+    "palabras": 22
+  },
+  {
+    "id": "GEM-007",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "escribe el metodo def count_apples_in_range(self) -> int en world.py que recorra self.apples y cuente cuantas cumplen llamando a self._apple_passes_filter(apple.value), sin mutar nada y devolviendo un int",
+    "palabras": 26
+  },
+  {
+    "id": "GEM-008",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "necesito def count_apples_in_range(self) -> int para la clase World. tiene que usar self._apple_passes_filter(apple.value) sobre cada manzana en self.apples y retornar el total en O(n) sin cambiar el array original",
+    "palabras": 29
+  },
+  {
+    "id": "GEM-009",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 3,
+    "prompt": "haz def count_apples_in_range(self) -> int en world.py. Debe verificar las manzanas llamando a self._apple_passes_filter(apple.value) y devolver un entero con la cantidad total sin tocar self.apples",
+    "palabras": 25
+  },
+  {
+    "id": "GEM-010",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en world.py el metodo def count_apples_in_range(self) -> int de la clase World. Debe recorrer self.apples en tiempo O(n) sin mutarla y contar cuántas pasan llamando a self._apple_passes_filter(apple.value) (sin comparar el rango a mano). Si está vacía debe retornar 0, y los límites del filtro son inclusivos. Ejemplo: con dos manzanas de cada valor (-5, 5 y 15) y el filtro [-5, 5], da 4.",
+    "palabras": 65,
+    "nota_revision": "Corregido: el ejemplo no coincidía con la especificación"
+  },
+  {
+    "id": "GEM-011",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Haz el metodo count_apples_in_range(self) -> int dentro de World en world.py. Recorre self.apples sin modificarla y usa self._apple_passes_filter(apple.value) para saber si cuenta. Retorna un int con el total en O(n). Maneja bien el caso de que no haya manzanas dando 0 y respeta que los extremos cuentan por ser inclusivos.",
+    "palabras": 50
+  },
+  {
+    "id": "GEM-012",
+    "generador": "Gemini",
+    "desafio": "Game-01",
+    "nivel_pretendido": 4,
+    "prompt": "Para la clase World en world.py, crea def count_apples_in_range(self) -> int. Cuenta las manzanas en self.apples evaluando cada una con self._apple_passes_filter(apple.value). Debe ser O(n), retornar int, no alterar self.apples y manejar listas vacías devolviendo 0.",
+    "palabras": 35
+  },
+  {
+    "id": "GEM-013",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "haz la funcion del 2048 para deslizar las fichas",
+    "palabras": 9
+  },
+  {
+    "id": "GEM-014",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "necesito que programes _compress_and_merge porque el juego de numeros no me compila",
+    "palabras": 12
+  },
+  {
+    "id": "GEM-015",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 1,
+    "prompt": "crea la funcion que une las fichas iguales en una lista para el 2048",
+    "palabras": 14
+  },
+  {
+    "id": "GEM-016",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "haz def _compress_and_merge(line): que junte los numeros iguales desde el final de la lista hacia adelante, sume los puntos en cascada y devuelva la linea nueva",
+    "palabras": 26
+  },
+  {
+    "id": "GEM-017",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "escribe _compress_and_merge(line) en logic2048.py que mueva todo a la izquierda, fusione las fichas sumando puntos y devuelva la linea sin importar los ceros ni los cambios",
+    "palabras": 26
+  },
+  {
+    "id": "GEM-018",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion _compress_and_merge que modifique la lista de entrada directamente juntando los pares y contando todos los puntos de las fichas del tablero",
+    "palabras": 24
+  },
+  {
+    "id": "GEM-019",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]: en logic2048.py. comprime hacia el inicio sin mutar la entrada, fusiona contiguas una sola vez, rellena con ceros y devuelve la tupla con linea, puntos y si hubo cambio",
+    "palabras": 38
+  },
+  {
+    "id": "GEM-020",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "haz la funcion _compress_and_merge que recibe una linea orientada, comprime sin mutarla, fusiona fichas iguales contiguas una sola vez por movimiento, completa con ceros y retorna la tupla con los resultados y el registro de movimientos",
+    "palabras": 36
+  },
+  {
+    "id": "GEM-021",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 3,
+    "prompt": "crea def _compress_and_merge(line) que devuelva una tupla con la linea comprimida, puntos obtenidos, bool de si hubo_cambio y la lista de desplazamientos. no modifiques la lista original y haz las fusiones sin cascada",
+    "palabras": 33
+  },
+  {
+    "id": "GEM-022",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en src/logic2048.py la funcion def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]: Recibe una fila o columna ya orientada al inicio, comprime sin mutar la entrada y fusiona fichas iguales contiguas como máximo una vez por movimiento (sin fusionar en cascada tipo [2,2,2,2]->[8]). Rellena con ceros al final. Retorna tupla con la nueva línea, puntos creados por fusión, bool hubo_cambio (False si queda idéntica) y el registro de desplazamiento.",
+    "palabras": 70
+  },
+  {
+    "id": "GEM-023",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Haz la funcion _compress_and_merge in logic2048.py con la firma def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]. La linea viene orientada al extremo inicial. Comprime sin cambiar orden, fusiona pares contiguos una vez maximo, rellena con ceros. Devuelve la tupla exacta: nueva linea, puntos, hubo_cambio y registro de desplazamientos. No mutar la lista de entrada y manejar bien casos como [2,2,2,2] que da [4,4,0,0].",
+    "palabras": 64
+  },
+  {
+    "id": "GEM-024",
+    "generador": "Gemini",
+    "desafio": "Game-02",
+    "nivel_pretendido": 4,
+    "prompt": "Crea def _compress_and_merge(line: List[int]) -> Tuple[List[int], int, bool, List[\"_LineShift\"]]: en logic2048.py. Debe procesar la linea orientada al inicio sin mutarla. Comprime las fichas y fusiona las contiguas iguales una sola vez por ficha. Rellena con ceros hasta el tamaño original. Retorna la tupla con la linea resultante, los puntos de la fusion, si hubo cambio (False si sigue igual) y el registro completo de desplazamientos de cada ficha.",
+    "palabras": 68
+  },
+  {
+    "id": "GEM-025",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "haz una funcion para buscar matrices en 3D porque el cubo de rubik necesita encontrar bloques",
+    "palabras": 16
+  },
+  {
+    "id": "GEM-026",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "necesito que programes find_3d_pattern para buscar cosas",
+    "palabras": 7
+  },
+  {
+    "id": "GEM-027",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 1,
+    "prompt": "programa la busqueda tridimensional de la matriz grande para el juego",
+    "palabras": 11
+  },
+  {
+    "id": "GEM-028",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "haz def find_3d_pattern(big_matrix, pattern_matrix): que busque el patron en 2D dentro de la matriz grande y devuelva un booleano si lo encuentra",
+    "palabras": 22
+  },
+  {
+    "id": "GEM-029",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "escribe find_3d_pattern en src/algorithms/find_3d_pattern.py que recorra todo el cubo y si no cabe lance una excepcion de tamaño",
+    "palabras": 18
+  },
+  {
+    "id": "GEM-030",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion find_3d_pattern que busque el patron y siga buscando hasta el final aunque ya lo haya encontrado para devolver una lista de posiciones",
+    "palabras": 25
+  },
+  {
+    "id": "GEM-031",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]: que busque por fuerza bruta el patron pequeño en el big_matrix 3D y devuelva un dict con \"found\" y \"position\" sin lanzar excepciones",
+    "palabras": 32
+  },
+  {
+    "id": "GEM-032",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "haz def find_3d_pattern(big_matrix, pattern_matrix) que pruebe todas las posiciones con fuerza bruta elemento por elemento, se detenga en la primera coincidencia y retorne el diccionario con las claves found y position",
+    "palabras": 31
+  },
+  {
+    "id": "GEM-033",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 3,
+    "prompt": "crea la funcion find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object] para buscar bloques 3D como los del cubo de rubik. Usa fuerza bruta, corta cuando halla coincidencia y devuelve diccionario",
+    "palabras": 30
+  },
+  {
+    "id": "GEM-034",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en src/algorithms/find_3d_pattern.py la funcion def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]: Busca el bloque pequeño dentro de la matriz 3D grande probando por fuerza bruta todas las posiciones válidas elemento por elemento, sin optimizaciones raras ni lanzar excepciones si el patrón es más grande. En cuanto una celda falla pasa a la siguiente, y al hallar la primera coincidencia la devuelve de inmediato en un dict con llaves \"found\" (True/False) y \"position\" (tupla o lista con los índices, o None).",
+    "palabras": 82
+  },
+  {
+    "id": "GEM-035",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Haz def find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]: en src/algorithms/find_3d_pattern.py. Realiza una busqueda por fuerza bruta de pattern_matrix en big_matrix. No asumas tamaños fijos ni cubicos. Si el patron es mas grande o tiene valores inexistentes como 99 devuelve found False y position None sin lanzar errores. Si encuentra algo, retorna de inmediato el dict con \"found\": True y la \"position\" de la primera coincidencia.",
+    "palabras": 66,
+    "nota_revision": "Restaurado del archivo original (la nueva versión llegó alterada)"
+  },
+  {
+    "id": "GEM-036",
+    "generador": "Gemini",
+    "desafio": "Game-03",
+    "nivel_pretendido": 4,
+    "prompt": "Crea la funcion find_3d_pattern(big_matrix: Matrix3D, pattern_matrix: Matrix3D) -> Dict[str, object]: ubicada en src/algorithms/find_3d_pattern.py. Compara por fuerza bruta celdas de matrices 3D de cualquier dimension. No lanza excepciones si el patron no cabe (retorna found False, position None). Corta la busqueda apenas encuentra la primera coincidencia y devuelve el diccionario exacto con \"found\" y \"position\".",
+    "palabras": 54
+  },
+  {
+    "id": "GEM-037",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "haz la funcion de la señal que dura 4 segundos",
+    "palabras": 10
+  },
+  {
+    "id": "GEM-038",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "programa is_stable_signal para ver si el texto sirve",
+    "palabras": 8
+  },
+  {
+    "id": "GEM-039",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 1,
+    "prompt": "necesito el codigo para verificar la señal del juego",
+    "palabras": 9
+  },
+  {
+    "id": "GEM-040",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "haz def is_stable_signal(text): que quite los espacios, ponga todo en minusculas y devuelva un string diciendo si es estable o no",
+    "palabras": 21
+  },
+  {
+    "id": "GEM-041",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "escribe is_stable_signal(text) en src/signal.py que revise si el texto es igual al reves, pero que devuelva falso si la cadena esta vacia porque eso no cuenta como señal",
+    "palabras": 28,
+    "nota_revision": "Corregido: no mencionaba la regla del palíndromo (era nivel 1); ahora la menciona con un error en la cadena vacía"
+  },
+  {
+    "id": "GEM-042",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion is_stable_signal que revise si la palabra empieza y termina con la misma letra para saber si es un palindromo",
+    "palabras": 22
+  },
+  {
+    "id": "GEM-043",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def is_stable_signal(text: str) -> bool: en src/signal.py que verifique si el texto es un palindromo exacto, comparando caracter por caracter sin normalizar mayusculas ni espacios, y devuelva true si esta vacio",
+    "palabras": 32
+  },
+  {
+    "id": "GEM-044",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "haz def is_stable_signal(text: str) -> bool que compruebe si la señal se lee igual al reves. Debe retornar un booleano sin efectos secundarios, respetando mayusculas, espacios y simbolos tal cual llegan",
+    "palabras": 31
+  },
+  {
+    "id": "GEM-045",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 3,
+    "prompt": "crea def is_stable_signal(text: str) -> bool en src/signal.py. Retorna True si el string es igual al derecho y al reves, sin usar pygame y sin quitar espacios ni cambiar minusculas, manejando bien la cadena vacia como True",
+    "palabras": 37
+  },
+  {
+    "id": "GEM-046",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en src/signal.py la funcion def is_stable_signal(text: str) -> bool: Devuelve True si la señal es un palíndromo perfecto (se lee igual al revés) y False si no. Es lógica pura sin pygame ni librerías externas. La comparación es estricta carácter por carácter: distingue mayúsculas de minúsculas e incluye espacios y símbolos sin normalizar nada. Casos borde: cadena vacía \"\" y un solo carácter retornan True. Ejemplos como RADAR, ROTOR, SALAS dan True, y VENTANA da False.",
+    "palabras": 77
+  },
+  {
+    "id": "GEM-047",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Haz la funcion is_stable_signal(text: str) -> bool en src/signal.py. Retorna un booleano indicando si el texto es simetrico (palindromo). No usa pygame, no tiene efectos secundarios y hace comparacion exacta sin quitar espacios ni normalizar mayusculas o minusculas. La cadena vacia y de un solo caracter dan True. Señales como ANILINA o SOMOS dan True.",
+    "palabras": 55
+  },
+  {
+    "id": "GEM-048",
+    "generador": "Gemini",
+    "desafio": "Game-04",
+    "nivel_pretendido": 4,
+    "prompt": "Crea def is_stable_signal(text: str) -> bool: en src/signal.py para comprobar si una señal de texto es un palindromo. Debe retornar True o False estrictamente, evaluando sin normalizar espacios ni mayusculas. La cadena vacia da True. Funciona con logica pura en python sin tocar el estado del juego.",
+    "palabras": 47
+  },
+  {
+    "id": "GEM-049",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "haz una funcion para encontrar repetidos en la matriz de fichas",
+    "palabras": 11
+  },
+  {
+    "id": "GEM-050",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "programa find_repeated para el juego de transmutacion",
+    "palabras": 7
+  },
+  {
+    "id": "GEM-051",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 1,
+    "prompt": "necesito que hagas que el juego detecte cuando hay fichas repetidas",
+    "palabras": 11
+  },
+  {
+    "id": "GEM-052",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "haz def find_repeated(matrix): que use Counter de collections para buscar los elementos repetidos de la matriz y devuelva una lista con todos los duplicados",
+    "palabras": 24
+  },
+  {
+    "id": "GEM-053",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "escribe find_repeated(matrix) en src/algorithms/find_repeated.py que compare cada elemento contra todos los demas con un doble bucle en O(n^2) ordenando por primera aparicion",
+    "palabras": 22
+  },
+  {
+    "id": "GEM-054",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion find_repeated que recorra la matriz y devuelva los numeros ordenados de menor a mayor si se repiten",
+    "palabras": 20
+  },
+  {
+    "id": "GEM-055",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def find_repeated(matrix: List[List[int]]) -> List[int]: que recorra la matriz fila por fila usando un conjunto para detectar los que aparecen dos o mas veces en una sola pasada, sin duplicados y ordenados por su segunda aparicion",
+    "palabras": 37
+  },
+  {
+    "id": "GEM-056",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "haz def find_repeated(matrix: List[List[int]]) -> List[int] en src/algorithms/find_repeated.py. Encuentra los valores que se repiten en la matriz 6x6 usando un set para evitar O(n^2), devolviendo cada valor una sola vez segun la segunda aparicion",
+    "palabras": 34
+  },
+  {
+    "id": "GEM-057",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 3,
+    "prompt": "crea def find_repeated(matrix: List[List[int]]) -> List[int]: que procese la matriz fila por fila. Usa conjuntos para eficiencia, acepta filas de distinto tamaño, y retorna una lista con los repetidos en el orden de su segunda aparicion",
+    "palabras": 36,
+    "nota_revision": "Corregido: 'ignora filas de distinto tamaño' contradecía un requisito"
+  },
+  {
+    "id": "GEM-058",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en src/algorithms/find_repeated.py la funcion def find_repeated(matrix: List[List[int]]) -> List[int]: Recorre la matriz de fichas TileKind fila por fila para devolver los valores que aparecen 2 o más veces. Cada valor aparece una sola vez en la lista resultante. El orden debe ser estrictamente el de la segunda aparición de cada valor durante el recorrido. Debes usar un conjunto (set) para hacerlo en una sola pasada eficiente sin comparar elemento contra elemento en O(n^2). Maneja matrices no cuadradas, de una sola fila (como en la catálisis) y retorna lista vacía si no hay repetidos.",
+    "palabras": 94
+  },
+  {
+    "id": "GEM-059",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Haz def find_repeated(matrix: List[List[int]]) -> List[int] en src/algorithms/find_repeated.py. Recorre la matriz fila por fila buscando enteros repetidos. Utiliza un set para detectar repeticiones en una pasada (nada de Counter ni doble bucle). Retorna los valores unicos que se repiten ordenados segun la segunda vez que aparecen. Soporta matrices de una sola fila y filas de largo variable.",
+    "palabras": 57
+  },
+  {
+    "id": "GEM-060",
+    "generador": "Gemini",
+    "desafio": "Game-05",
+    "nivel_pretendido": 4,
+    "prompt": "Crea la funcion find_repeated(matrix: List[List[int]]) -> List[int]: en src/algorithms/find_repeated.py. Encuentra elementos repetidos barriendo la matriz fila por fila. Emplea un set para deteccion rapida. El resultado contiene cada valor repetido una sola vez, ordenado por el momento de su segunda aparicion. Maneja matrices de 6x6, filas irregulares y filas unicas.",
+    "palabras": 50
+  },
+  {
+    "id": "GEM-061",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "haz una funcion para ordenar palabras por tamaño",
+    "palabras": 8
+  },
+  {
+    "id": "GEM-062",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "programa sort_words_by_length para acomodar las palabras del juego",
+    "palabras": 8
+  },
+  {
+    "id": "GEM-063",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 1,
+    "prompt": "necesito que ordenes una lista de strings por su longitud en python",
+    "palabras": 12
+  },
+  {
+    "id": "GEM-064",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "haz def sort_words_by_length(words): usando sorted(words, key=len) para ordenar directamente la lista original in-place y quitar las palabras duplicadas",
+    "palabras": 18
+  },
+  {
+    "id": "GEM-065",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "escribe sort_words_by_length(words) que ordene las palabras alfabeticamente de mayor a menor longitud usando list.sort()",
+    "palabras": 14
+  },
+  {
+    "id": "GEM-066",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion sort_words_by_length que modifique la lista original de palabras eliminando las que tengan la misma longitud",
+    "palabras": 18
+  },
+  {
+    "id": "GEM-067",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def sort_words_by_length(words: List[str]) -> List[str]: que reciba las palabras de playstate, implemente un algoritmo propio como mergesort sin usar sorted() ni list.sort(), devuelva una lista nueva ordenada por longitud sin mutar la original",
+    "palabras": 34
+  },
+  {
+    "id": "GEM-068",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "haz def sort_words_by_length(words: List[str]) -> List[str] ordenando de menor a mayor longitud con un algoritmo propio (ej quicksort o mergesort). No uses sorted ni modifiques la lista de entrada, conservando todos los duplicados",
+    "palabras": 33
+  },
+  {
+    "id": "GEM-069",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 3,
+    "prompt": "crea def sort_words_by_length(words) que devuelva una lista nueva con todas las palabras de la entrada ordenadas por su tamaño de menor a mayor. Prohibido usar sorted() o .sort(), debes programar tu propio ordenamiento y no mutar el original",
+    "palabras": 38
+  },
+  {
+    "id": "GEM-070",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa la funcion def sort_words_by_length(words: List[str]) -> List[str]: Recibe la lista de palabras generada por PlayState. Devuelve una lista nueva con todas las palabras (incluyendo duplicados y sin perder elementos) ordenadas de menor a mayor longitud. Es obligatorio implementar un algoritmo de ordenamiento propio (como mergesort, heapsort o quicksort); está totalmente prohibido usar sorted() o list.sort(). Tampoco debes mutar la lista original (trabaja sobre copia). No lanza excepciones con entradas validas.",
+    "palabras": 71
+  },
+  {
+    "id": "GEM-071",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Haz def sort_words_by_length(words: List[str]) -> List[str]: Recorre las palabras de la partida y retornalas ordenadas por longitud ascendente en una lista nueva. No puedes usar sorted() ni .sort(). Debes codificar tu propio algoritmo de ordenamiento (mergesort o similar). Respeta los duplicados, no modifiques la lista original y asegura que la cantidad de elementos sea exactamente la misma.",
+    "palabras": 57
+  },
+  {
+    "id": "GEM-072",
+    "generador": "Gemini",
+    "desafio": "Game-06",
+    "nivel_pretendido": 4,
+    "prompt": "Crea def sort_words_by_length(words: List[str]) -> List[str]: Obtiene las palabras de PlayState y las ordena de menor a mayor longitud devolviendo una nueva lista. Implementa tu propio algoritmo de sorting (prohibido sorted y list.sort). La lista original no se toca, se conservan los duplicados y las longitudes del resultado deben coincidir con las esperadas.",
+    "palabras": 53
+  },
+  {
+    "id": "GEM-073",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "haz el juego de la vida de conway con paredes",
+    "palabras": 10
+  },
+  {
+    "id": "GEM-074",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "programa next_generation para calcular las celulas",
+    "palabras": 6
+  },
+  {
+    "id": "GEM-075",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 1,
+    "prompt": "necesito la funcion de conway en board.py",
+    "palabras": 7
+  },
+  {
+    "id": "GEM-076",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "haz def next_generation(matrix, blocked): que actualice la matriz de conway in-place celda por celda usando los valores ya actualizados y contando a la propia celda como vecina",
+    "palabras": 27,
+    "nota_revision": "Restaurado del archivo original (la nueva versión llegó alterada)"
+  },
+  {
+    "id": "GEM-077",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "escribe next_generation(matrix, blocked) en board.py aplicando las reglas de conway pero haciendo que los bordes del tablero se conecten de forma toroidal",
+    "palabras": 22
+  },
+  {
+    "id": "GEM-078",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 2,
+    "prompt": "crea la funcion next_generation que aplique b3/s23 a todas las celdas incluyendo las que estan en blocked sin importar las paredes",
+    "palabras": 21
+  },
+  {
+    "id": "GEM-079",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "escribe def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]: en src/board.py que calcule la siguiente generacion de conway b3/s23 sin mutar la original, usando las 8 celdas vecinas y respetando que las bloqueadas siempre mueren",
+    "palabras": 36,
+    "nota_revision": "Restaurado del archivo original (la nueva versión llegó alterada)"
+  },
+  {
+    "id": "GEM-080",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "haz def next_generation(matrix, blocked=frozenset()) que devuelva una matriz nueva con el automata celular de conway. Usa las 8 direcciones, no envuelvas los bordes, calcula a partir de la generacion anterior y pon en falso las coordenadas bloqueadas",
+    "palabras": 37
+  },
+  {
+    "id": "GEM-081",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 3,
+    "prompt": "crea def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]: Calcula el siguiente turno de conway sin modificar la matriz de entrada. Las celdas en blocked quedan muertas siempre y los bordes no se envuelven",
+    "palabras": 35
+  },
+  {
+    "id": "GEM-082",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Implementa en src/board.py la funcion def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]: Calcula la siguiente generación del autómata celular con reglas B3/S23 clásicas (viva con 2-3 vecinos sobrevive, muerta con 3 nace, resto muere). Las coordenadas en blocked son paredes y siempre quedan muertas sin importar las reglas. Devuelve una matriz nueva rectangular sin mutar la original. Calcula toda la generación a partir de la anterior (sin actualizar sobre la marcha). Considera los 8 vecinos alrededor sin envolver los bordes (sin toroides).",
+    "palabras": 84
+  },
+  {
+    "id": "GEM-083",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Haz def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]: en src/board.py. Aplica Conway B3/S23 a matrices rectangulares. Retorna una matriz nueva sin tocar la vieja. Los vecinos son las 8 celdas circundantes, sin envolver bordes. Las celdas bloqueadas en blocked permanecen muertas obligatoriamente y no se actualizan con los valores nuevos durante el calculo.",
+    "palabras": 55
+  },
+  {
+    "id": "GEM-084",
+    "generador": "Gemini",
+    "desafio": "Game-07",
+    "nivel_pretendido": 4,
+    "prompt": "Crea def next_generation(matrix: List[List[bool]], blocked: frozenset = frozenset()) -> List[List[bool]]: en src/board.py. Obtiene el siguiente estado del automata de Conway. Las reglas son B3/S23 evaluadas sobre las 8 vecinas sin conexion toroidal en los bordes. Devuelve matriz nueva intacta y fija las celdas de blocked siempre en muerto sin excepcion.",
+    "palabras": 50
+  }
+]
