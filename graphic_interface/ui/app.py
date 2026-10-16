@@ -63,9 +63,9 @@ APP_ICON_FILE = ASSETS_DIR / "app_icon.png"
 # que ya aprobó: (perfil, materias aprobadas). En participants.json (y en
 # el dataset) solo se guarda el nombre del perfil, ej. "Perfil 2".
 EXPERIENCE_PROFILES = [
-    ("Perfil 1", "Programación 2 o 3"),
+    ("Perfil 1", "Programación 2"),
     ("Perfil 2", "Análisis y diseño de algoritmos"),
-    ("Perfil 3", "Base de datos o Ingeniería del software"),
+    ("Perfil 3", "Ingeniería del software y Base de datos"),
 ]
 
 
