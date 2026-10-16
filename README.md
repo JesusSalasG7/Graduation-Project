@@ -159,6 +159,15 @@ proceso manual.
 > pasó, el botón lo corrige: desinstala `opencv-contrib-python` del
 > `.venv` y reinstala `opencv-python`.
 
+> ⚠️ Instalá las dependencias del panel **siempre** con
+> `pip install -r graphic_interface/requirements.txt`, nunca con un
+> `pip install customtkinter` suelto: eso trae la última versión (6.x),
+> que cambió el dibujado y los colores de los widgets respecto de la
+> 5.2.2 con la que se desarrolló y probó el panel. Si ya la instalaste,
+> volvé a correr el comando con el `-r` y queda en la versión fijada.
+> En Windows la ruta del venv es `.venv\Scripts\` en vez de `.venv/bin/`
+> (por ejemplo, `.venv\Scripts\pip install -r graphic_interface\requirements.txt`).
+
 Con el entorno instalado, arrancá el panel:
 
 ```bash

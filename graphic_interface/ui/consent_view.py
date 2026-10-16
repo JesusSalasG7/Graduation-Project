@@ -128,7 +128,12 @@ def outline_button_text(button: ctk.CTkButton, width: int = 1) -> Callable[..., 
     label.bind("<Configure>", redraw, add="+")
     canvas.bind("<Enter>", on_enter)
     canvas.bind("<Leave>", on_leave)
-    canvas.bind("<Button-1>", button._clicked)
+    # customtkinter 5.x dispara el comando con `_clicked` al presionar;
+    # 6.x lo renombró a `_on_release` y lo dispara al soltar.
+    if hasattr(button, "_on_release"):
+        canvas.bind("<ButtonRelease-1>", button._on_release)
+    else:
+        canvas.bind("<Button-1>", button._clicked)
     # El fondo del botón cambia al pasar el mouse por cualquier parte de él.
     button.bind("<Enter>", redraw, add="+")
     button.bind("<Leave>", redraw, add="+")
