@@ -65,7 +65,7 @@ APP_ICON_FILE = ASSETS_DIR / "app_icon.png"
 EXPERIENCE_PROFILES = [
     ("Perfil 1", "Programación 2"),
     ("Perfil 2", "Análisis y diseño de algoritmos"),
-    ("Perfil 3", "Ingeniería del software y Base de datos"),
+    ("Perfil 3", "Ingeniería del Software y Base de Datos"),
 ]
 
 
