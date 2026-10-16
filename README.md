@@ -25,6 +25,7 @@ respuestas a cuestionarios de comprensión/razonamiento.
    - [Consentimiento informado](#consentimiento-informado)
    - [Sesión guiada](#sesión-guiada)
    - [Pestaña Sesión: datos guardados y dataset](#pestaña-sesión-datos-guardados-y-dataset)
+   - [Juez de prompts (LLM-as-a-judge)](#juez-de-prompts-llm-as-a-judge)
 6. [Dónde quedan los datos](#dónde-quedan-los-datos)
 7. [Solución de problemas comunes](#solución-de-problemas-comunes)
 
@@ -71,9 +72,10 @@ Graduation-Project/
 │   ├── consent/           # Consentimiento informado: consent_pdf.py (llenado del PDF), consent_mailer.py (envío por correo)
 │   ├── sensors/           # Integración con cada sensor: NeuroSky, cámara, eye tracker, reloj (heart_rate_import.py)
 │   ├── games/             # Lanzar juegos y parchearlos con la solución de la IA
+│   ├── judge/             # Juez de prompts (LLM-as-a-judge): judge_config.py, judge_inputs.py, judge_prompt.py, judge_client.py, judge_runner.py
 │   ├── storage/           # Persistencia: participantes, consentimientos (consent_store.py), respuestas de cuestionarios, stage_capture.py
-│   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py, test_email_config.py
-│   ├── assets/            # Icono de la app y consentimiento/consentimiento_v1.0.pdf (carta original)
+│   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py, test_email_config.py, evaluate_prompts.py (juez)
+│   ├── assets/            # Icono de la app, consentimiento/consentimiento_v1.0.pdf (carta original) y juez/ (rubrica.md, especificaciones.md)
 │   ├── requirements.txt
 │   └── data/              # participants.json, quiz_results/, emotion_logs/ (NO va al repo)
 ├── Game-01/ … Game-07/    # Un juego por carpeta, cada uno con su propio .venv y requirements.txt
@@ -83,7 +85,10 @@ Graduation-Project/
 │   ├── NeuroSky/          # Driver (NeuroPy.py), script de prueba y guía del dispositivo
 │   └── requirements.txt   # Instrucciones DETALLADAS de instalación de estos sensores
 ├── data/
-│   └── build_dataset.py   # Genera el CSV consolidado de todas las sesiones exportadas
+│   ├── build_dataset.py   # Genera el CSV consolidado de todas las sesiones exportadas
+│   ├── dataset_prompts.json  # Dataset sintético de prompts para validar el juez
+│   ├── analyze_judge.py   # Análisis estadístico de los resultados del juez
+│   └── juez/              # Resultados del juez (llamadas.jsonl, resultados.csv, analisis/)
 ├── .env.example           # Plantilla de la configuración de correo (copiar a .env, que NO va al repo)
 └── .venv/                 # Entorno virtual único compartido por el panel y los 7 juegos
 ```
@@ -404,9 +409,9 @@ Cada participante es **anónimo dentro de la app** ("Participante 1",
   investigación. Con ellos la carta de consentimiento ya aparece
   completa y el participante solo tiene que firmar.
 - **Nivel de experiencia**: un perfil según las materias que ya aprobó:
-  - **Perfil 1**: Programación 2 o 3.
+  - **Perfil 1**: Programación 2.
   - **Perfil 2**: Análisis y diseño de algoritmos.
-  - **Perfil 3**: Base de datos o Ingeniería del software.
+  - **Perfil 3**: Ingeniería del software y Base de datos.
 
 Hacé clic en una fila de la tabla para marcarlo como el participante
 **activo** — la sesión guiada y la pestaña Sesión siempre operan
@@ -513,6 +518,62 @@ Con un participante activo, esta pestaña muestra:
   Una vez generado, **"🖥️ Ver dataset completo"** lo abre en una
   ventana aparte a pantalla completa para poder revisarlo con
   detalle.
+- **⚖️ Evaluar prompts (solo investigador)**: ver la sección siguiente.
+
+### Juez de prompts (LLM-as-a-judge)
+
+Un evaluador que usa Claude para puntuar, con una rúbrica fija, la calidad
+de los prompts. Es **solo para el investigador y para después de las
+sesiones**: ningún paso de la sesión guiada lo llama, y su botón queda
+deshabilitado mientras haya una sesión en curso.
+
+- **Entradas**: `data/dataset_prompts.json` (252 prompts sintéticos),
+  `graphic_interface/assets/juez/especificaciones.md` (una ficha de
+  referencia por desafío) y `graphic_interface/assets/juez/rubrica.md`
+  (dimensiones, nivel global, reglas, plantilla del prompt y formato de
+  salida).
+- **Qué ve el juez**: solo la ficha del desafío, la rúbrica, las reglas y
+  el texto del prompt. Nunca el nivel pretendido, el generador, el número
+  de palabras ni el id.
+- **Configuración**: `graphic_interface/judge/judge_config.py` (modelo
+  `claude-sonnet-5-5`, temperatura 0, 3 repeticiones, semilla del orden,
+  versión de la plantilla, reintentos).
+- **Clave**: usa el SDK oficial de Anthropic (no el CLI `claude` de la
+  sesión guiada, que no permite fijar la temperatura). Hay que definir
+  `ANTHROPIC_API_KEY` en el `.env` de la raíz (ver `.env.example`) o
+  exportarla en la terminal.
+- **Sin clave de API**: con `JUDGE_PROVIDER=cli` (en el `.env` o exportada)
+  el juez usa la suscripción de Claude a través del CLI `claude`. No tiene
+  costo adicional, pero el CLI no permite fijar la temperatura (hay más
+  variación entre repeticiones) y las llamadas cuentan contra el límite de
+  uso de la suscripción; si se alcanza, la corrida se detiene y se reanuda
+  después. Cada llamada registra el proveedor y las de uno no se mezclan
+  con las del otro.
+
+```bash
+# Cuenta llamadas y tokens sin usar la API
+.venv/bin/python graphic_interface/scripts/evaluate_prompts.py --estimar
+# Evalúa 10 prompts al azar y muestra los razonamientos del juez
+.venv/bin/python graphic_interface/scripts/evaluate_prompts.py --prueba 10
+# Evalúa todo el dataset (si se corta, al repetirlo sigue desde donde quedó)
+.venv/bin/python graphic_interface/scripts/evaluate_prompts.py
+# Análisis: kappa ponderado, Kruskal-Wallis, Spearman y consistencia
+.venv/bin/python data/analyze_judge.py
+```
+
+El botón **"⚖️ Evaluar prompts"** de la pestaña Sesión hace lo mismo que
+el comando sin argumentos: corre en segundo plano, muestra el progreso
+(evaluados / total) y lista los errores.
+
+**Salidas** en `data/juez/dataset_sintetico/`: `llamadas.jsonl` (una línea
+por llamada: id, repetición, modelo, versión de la plantilla, fecha,
+tokens, respuesta completa y puntajes), `resultados.csv` (una fila por
+prompt, con la mediana de cada puntaje y la diferencia máxima entre
+repeticiones) y `analisis/` (tablas en CSV y `resumen.md`).
+
+Si se cambia la rúbrica, la plantilla o una ficha, hay que subir
+`JUDGE_TEMPLATE_VERSION`: las evaluaciones hechas con la versión anterior
+quedan en `llamadas.jsonl` pero no se reutilizan.
 
 ## Dónde quedan los datos
 

@@ -89,6 +89,7 @@ from storage.stage_capture import (
     write_challenge_manifest,
     write_cuestionario_txt,
     write_session_index,
+    write_stage3_ai_files,
     write_stage3_files,
     write_stage_sensor_files,
     write_sync_timeline,
@@ -1700,7 +1701,7 @@ class SessionWizard:
                 status_label.configure(text="⚠️  Escribe un prompt antes de enviarlo.", text_color=self.c["WARNING"])
                 return
             self._close_statement_window()
-            self._save_stage3_files(text)
+            stage_folder = self._save_stage3_files(text)
             prompt_box.configure(state="disabled")
             send_button.configure(state="disabled", text="Generando respuesta...")
             status_label.configure(
@@ -1708,20 +1709,24 @@ class SessionWizard:
                      "(puede tardar uno o dos minutos)...",
                 text_color=self.c["TEXT_MUTED"],
             )
-            threading.Thread(target=self._run_isolated_prompt, args=(text,), daemon=True).start()
+            threading.Thread(target=self._run_isolated_prompt, args=(text, stage_folder), daemon=True).start()
 
         send_button.configure(command=on_send)
 
-    def _save_stage3_files(self, prompt_text: str):
+    def _save_stage3_files(self, prompt_text: str) -> Optional[Path]:
         """Guarda lo escrito en la Etapa 3 (prompt libre + registro de
         aperturas del enunciado) y, igual que las etapas 2/4/5 (ver
         _export_stage), el recorte de NeuroSky/Emotion/Eye de esta etapa --
         la frecuencia cardíaca se corta después, al cargar el reloj (ver
-        _snapshot_pending_heart_rate)."""
+        _snapshot_pending_heart_rate).
+
+        Devuelve la carpeta de este intento (None si no hay participante
+        activo), para dejar ahí también la respuesta de la IA (ver
+        _save_ai_response)."""
         participant = self.app.store.get_active()
         window = self._stage_timer.finish(3)
         if participant is None:
-            return
+            return None
         challenge_number = self.game_index + 1
         folder = stage_dir(participant, challenge_number, 3, attempt=self._attempt_number)
         write_stage3_files(folder, prompt_text, self._statement_log)
@@ -1730,12 +1735,42 @@ class SessionWizard:
         write_sync_timeline(folder, window, sync_sources)
         if warnings:
             self._stage_warnings[3] = warnings
+        return folder
 
-    def _run_isolated_prompt(self, participant_prompt: str):
+    def _save_ai_response(self, stage_folder: Optional[Path], challenge, result: ChallengeSolveResult):
+        """Deja en la carpeta del intento la respuesta de la IA aislada, el
+        código que se va a mostrar/aplicar y los metadatos de la llamada
+        (ver stage_capture.write_stage3_ai_files). Es solo registro: si
+        algo falla al escribir, la sesión sigue igual."""
+        if stage_folder is None:
+            return
         try:
-            result = generate_isolated_response(self.current_challenge, participant_prompt)
+            write_stage3_ai_files(
+                stage_folder, challenge_id=challenge.challenge_id,
+                provider=result.provider, model=result.model,
+                called_at=result.called_at, elapsed_seconds=result.elapsed_seconds,
+                raw_response=result.raw_response_text,
+                code=result.response_text if result.ok else "",
+                error="" if result.ok else (result.error or "Error desconocido"),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _run_isolated_prompt(self, participant_prompt: str, stage_folder: Optional[Path] = None):
+        challenge = self.current_challenge
+        saved = []
+
+        def save(result: ChallengeSolveResult):
+            self._save_ai_response(stage_folder, challenge, result)
+            saved.append(True)
+
+        try:
+            result = generate_isolated_response(challenge, participant_prompt, on_isolated_response=save)
         except Exception as exc:  # el hilo de fondo no debe tumbar la app
             result = ChallengeSolveResult(ok=False, error=str(exc))
+            if not saved:
+                # Falló antes de tener respuesta: igual queda el error registrado.
+                self._save_ai_response(stage_folder, challenge, result)
         self.app.after(0, lambda: self._show_stage4(result))
 
     # ---------------- Etapa 4 ----------------

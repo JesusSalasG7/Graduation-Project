@@ -518,6 +518,42 @@ def write_stage3_files(stage_folder: Path, prompt_text: str, statement_log: list
             writer.writerow([opened_at.isoformat(), closed_at.isoformat() if closed_at else "", duration])
 
 
+def write_stage3_ai_files(
+    stage_folder: Path, *, challenge_id: str, provider: str, model: str,
+    called_at: Optional[datetime], elapsed_seconds: float,
+    raw_response: str = "", code: str = "", error: str = "",
+) -> None:
+    """Etapa 3: lo que devolvió la IA aislada al prompt de este intento
+    (antes solo vivía en memoria).
+
+    - `respuesta_ia.txt`: la respuesta completa, tal cual llegó.
+    - `codigo_generado.py`: el código extraído de esa respuesta -- el mismo
+      texto que ve el participante en las Etapas 4/5 y que se aplica al
+      juego en la Etapa 6.
+    - `metadatos_ia.json`: proveedor, modelo, fecha y hora de la llamada,
+      duración y desafío; `error` trae el motivo si la llamada falló o no
+      se pudo extraer código (en ese caso no se escribe `codigo_generado.py`,
+      ni `respuesta_ia.txt` si no llegó ninguna respuesta).
+
+    Las sesiones grabadas antes de este registro no tienen estos archivos.
+    """
+    if raw_response:
+        (stage_folder / "respuesta_ia.txt").write_text(raw_response, encoding="utf-8")
+    if code:
+        (stage_folder / "codigo_generado.py").write_text(code, encoding="utf-8")
+    payload = {
+        "challenge_id": challenge_id,
+        "proveedor": provider,
+        "modelo": model,
+        "fecha_hora_llamada": called_at.isoformat(timespec="seconds") if called_at else None,
+        "duracion_segundos": round(elapsed_seconds, 2),
+        "error": error or None,
+    }
+    (stage_folder / "metadatos_ia.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+
 def write_sync_timeline(stage_folder: Path, window: StageWindow, per_source_info: dict) -> None:
     """sync_timeline.json: vincula por tiempo las distintas fuentes de esta
     etapa -- rango de la etapa y, por fuente, cantidad de filas / primer y

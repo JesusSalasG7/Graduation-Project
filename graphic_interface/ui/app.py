@@ -17,6 +17,8 @@ from ai.isolated_prompt import ai_provider_available
 from content.challenges import get_challenge
 from content.difficulty import get_difficulty
 from games.game_launcher import discover_games, open_in_vscode, play_game, repair_environment
+from judge import judge_client, judge_config, judge_runner
+from judge.judge_inputs import JudgeInputError, load_dataset_prompts
 from consent import consent_mailer
 from paths import ASSETS_DIR, DATA_DIR, PROJECT_ROOT
 from storage import consent_store
@@ -40,6 +42,8 @@ if str(DATASET_MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(DATASET_MODULE_DIR))
 from build_dataset import save_dataset  # noqa: E402
 
+JUDGE_BUTTON_TEXT = "⚖️  Evaluar prompts"
+
 # tkinterdnd2 habilita arrastrar-y-soltar el CSV de frecuencia cardíaca del
 # reloj (ver heart_rate_import.py) -- es una dependencia opcional: si no
 # está instalada (o el .venv todavía no se reparó, ver repair_environment),
@@ -59,9 +63,9 @@ APP_ICON_FILE = ASSETS_DIR / "app_icon.png"
 # que ya aprobó: (perfil, materias aprobadas). En participants.json (y en
 # el dataset) solo se guarda el nombre del perfil, ej. "Perfil 2".
 EXPERIENCE_PROFILES = [
-    ("Perfil 1", "Programación 2 o 3"),
+    ("Perfil 1", "Programación 2"),
     ("Perfil 2", "Análisis y diseño de algoritmos"),
-    ("Perfil 3", "Base de datos o Ingeniería del software"),
+    ("Perfil 3", "Ingeniería del Software y Base de Datos"),
 ]
 
 
@@ -165,6 +169,13 @@ class App(ctk.CTk, *_DND_MIXIN):
             self._app_icon = tk.PhotoImage(file=str(APP_ICON_FILE))
             self.iconphoto(True, self._app_icon)
         self.geometry(f"{wrap(1080)}x{wrap(680)}")
+
+        # Estado del juez (ver "Evaluar prompts" en la pestaña Sesión): su
+        # botón solo se habilita sin sesión guiada en curso.
+        self._session_active = False
+        self._judge_running = False
+        self._judge_stop_event = threading.Event()
+        self._judge_error_count = 0
         self.minsize(wrap(920), wrap(580))
         self.configure(fg_color=BG_APP)
         _enable_linux_wheel_scroll(self)
@@ -352,6 +363,13 @@ class App(ctk.CTk, *_DND_MIXIN):
                 "Selecciona un participante activo en la pestaña Participantes primero.",
             )
             return
+        if self._judge_running:
+            messagebox.showinfo(
+                "Evaluación de prompts en curso",
+                "El juez está evaluando prompts. Espera a que termine (o detenlo) "
+                "antes de comenzar una sesión.",
+            )
+            return
         # Sin consentimiento firmado no se llega a ninguna pantalla del
         # estudio; al firmar se vuelve a entrar acá.
         if not self._ensure_consent(active, self.enter_session_wizard):
@@ -383,6 +401,10 @@ class App(ctk.CTk, *_DND_MIXIN):
         # no se distraiga con el resto del escritorio.
         self._set_fullscreen(True)
         self.session_wizard_frame.tkraise()
+        # El juez es solo del investigador y para después de las sesiones:
+        # su botón queda deshabilitado mientras dure esta.
+        self._session_active = True
+        self._refresh_judge_button()
         self.session_wizard.start(enabled_devices)
 
     def _ask_session_devices(self, on_done):
@@ -461,6 +483,8 @@ class App(ctk.CTk, *_DND_MIXIN):
         ).pack(side="left")
 
     def exit_session_wizard(self):
+        self._session_active = False
+        self._refresh_judge_button()
         self._set_fullscreen(False)
         self.session_wizard_frame.lower()
         self._select_nav("session")
@@ -1356,6 +1380,59 @@ class App(ctk.CTk, *_DND_MIXIN):
         )
         self.dataset_status_label.pack(anchor="w", padx=18, pady=(0, 18))
 
+        # ---------------- Evaluar prompts (ver judge/) ----------------
+        # LLM-as-a-judge: solo para el investigador y DESPUÉS de las
+        # sesiones. Vive acá, fuera del asistente de la sesión guiada, y
+        # ningún paso de la sesión del participante lo llama.
+        judge_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        judge_card.pack(fill="x", pady=(14, 0))
+
+        ctk.CTkLabel(
+            judge_card, text="⚖️  Evaluar prompts (solo investigador)",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            judge_card,
+            text="Puntúa con Claude, usando la rúbrica fija, la calidad de los prompts del dataset "
+                 f"sintético ({judge_config.JUDGE_REPETITIONS} repeticiones por prompt, modelo "
+                 f"{judge_config.judge_model()}, vía {judge_client.provider_label()}). Si se corta, al "
+                 "volver a ejecutarlo sigue desde donde quedó. No se puede usar durante una sesión.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+
+        judge_row = ctk.CTkFrame(judge_card, fg_color="transparent")
+        judge_row.pack(fill="x", padx=18, pady=(0, 10))
+        self.judge_button = ctk.CTkButton(
+            judge_row, text=JUDGE_BUTTON_TEXT, height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            fg_color=ACCENT, hover_color=ACCENT_HOVER,
+            command=self._start_judge,
+        )
+        self.judge_button.pack(side="left")
+        self.judge_stop_button = ctk.CTkButton(
+            judge_row, text="⏹  Detener", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            state="disabled", command=self._stop_judge,
+        )
+        self.judge_stop_button.pack(side="left", padx=(8, 0))
+        self.judge_progress = ctk.CTkProgressBar(judge_row, height=scaled(8), progress_color=ACCENT)
+        self.judge_progress.set(0)
+        self.judge_progress.pack(side="left", fill="x", expand=True, padx=(16, 0))
+
+        self.judge_status_label = ctk.CTkLabel(
+            judge_card, text="Todavía no se ejecutó en esta sesión de la app.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        )
+        self.judge_status_label.pack(anchor="w", padx=18, pady=(0, 18))
+        # Lista de errores: recién se muestra cuando aparece el primero.
+        self.judge_errors_box = ctk.CTkTextbox(
+            judge_card, height=scaled(90), fg_color=BG_CARD_ALT, text_color=WARNING,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(10)), wrap="word", state="disabled",
+        )
+
         self._refresh_session_tab()
         self._refresh_session_data_matrix()
 
@@ -1411,6 +1488,111 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.guided_session_button.configure(
             text=self._guided_session_button_text(), state="normal" if active else "disabled",
         )
+
+    # ---------------- Evaluar prompts (LLM-as-a-judge) ----------------
+    def _refresh_judge_button(self):
+        """Habilitado solo si no hay una sesión guiada en curso ni una
+        evaluación corriendo."""
+        if not hasattr(self, "judge_button"):
+            return
+        blocked = self._session_active or self._judge_running
+        self.judge_button.configure(
+            state="disabled" if blocked else "normal",
+            text="Evaluando..." if self._judge_running else JUDGE_BUTTON_TEXT,
+        )
+        self.judge_stop_button.configure(state="normal" if self._judge_running else "disabled")
+
+    def _judge_status(self, text: str, color: str = TEXT_MUTED):
+        self.judge_status_label.configure(text=text, text_color=color)
+
+    def _start_judge(self):
+        if self._session_active or self._judge_running:
+            return
+        if not judge_client.provider_available():
+            self._judge_status(f"⚠️  {judge_client.provider_unavailable_reason()}", WARNING)
+            return
+        results_dir = judge_config.results_dir(judge_config.SOURCE_SYNTHETIC)
+        try:
+            records = load_dataset_prompts()
+            estimate = judge_runner.estimate_run(records, results_dir)
+        except JudgeInputError as exc:
+            self._judge_status(f"⚠️  {exc}", WARNING)
+            return
+        if estimate["llamadas_pendientes"]:
+            cost = "" if estimate["costo_usd"] is None else f" (≈ USD {estimate['costo_usd']:.2f})"
+            if not messagebox.askyesno(
+                "Evaluar prompts",
+                f"Se van a hacer {estimate['llamadas_pendientes']} llamadas a {judge_config.judge_model()} "
+                f"vía {judge_client.provider_label()}: unos {estimate['tokens_entrada']:,} tokens de entrada "
+                f"y {estimate['tokens_salida']:,} de salida{cost}.\n\n"
+                f"{estimate['llamadas_totales'] - estimate['llamadas_pendientes']} llamadas ya están "
+                "guardadas y no se repiten.\n\n¿Continuar?",
+            ):
+                return
+
+        self._judge_running = True
+        self._judge_stop_event = threading.Event()
+        self._refresh_judge_button()
+        self.judge_errors_box.pack_forget()
+        self.judge_errors_box.configure(state="normal")
+        self.judge_errors_box.delete("1.0", "end")
+        self.judge_errors_box.configure(state="disabled")
+        self._judge_error_count = 0
+        self._judge_status("Evaluando prompts...")
+        threading.Thread(target=self._run_judge, args=(records, results_dir), daemon=True).start()
+
+    def _stop_judge(self):
+        if self._judge_running:
+            self._judge_stop_event.set()
+            self.judge_stop_button.configure(state="disabled")
+            self._judge_status("Deteniendo: se esperan las llamadas que ya estaban en curso...")
+
+    def _run_judge(self, records, results_dir):
+        """Hilo aparte (cientos de llamadas a la API): la interfaz solo se
+        toca vía self.after, igual que _run_dataset_generation."""
+        def on_progress(done: int, total: int, error: str):
+            self.after(0, lambda: self._on_judge_progress(done, total, error))
+
+        try:
+            summary = judge_runner.run_judge(
+                records, results_dir=results_dir, on_progress=on_progress, stop_event=self._judge_stop_event,
+            )
+            error = ""
+        except Exception as exc:
+            summary, error = None, str(exc)
+        self.after(0, lambda: self._on_judge_finished(summary, error))
+
+    def _on_judge_progress(self, done: int, total: int, error: str):
+        self.judge_progress.set(done / total if total else 0)
+        if error:
+            self._judge_error_count += 1
+            if not self.judge_errors_box.winfo_ismapped():
+                self.judge_errors_box.pack(fill="x", padx=18, pady=(0, 18))
+            self.judge_errors_box.configure(state="normal")
+            self.judge_errors_box.insert("end", error + "\n")
+            self.judge_errors_box.see("end")
+            self.judge_errors_box.configure(state="disabled")
+        if not self._judge_stop_event.is_set():
+            errors = f" · {self._judge_error_count} errores" if self._judge_error_count else ""
+            self._judge_status(f"Evaluados: {done} / {total}{errors}")
+
+    def _on_judge_finished(self, summary, error: str):
+        self._judge_running = False
+        self._refresh_judge_button()
+        if error:
+            self._judge_status(f"⚠️  No se pudo evaluar: {error}", WARNING)
+            return
+        self.judge_progress.set(summary.evaluated_prompts / summary.total_prompts if summary.total_prompts else 0)
+        detail = (
+            f"{summary.evaluated_prompts} / {summary.total_prompts} prompts evaluados · "
+            f"{len(summary.errors)} errores · guardado en {summary.results_path}"
+        )
+        if summary.aborted:
+            self._judge_status(
+                f"⚠️  No terminó: {summary.aborted} {detail}. Vuelve a pulsar el botón para continuar.", WARNING,
+            )
+        else:
+            self._judge_status(f"✅  {detail}")
 
     # ---------------- Dataset consolidado ----------------
     def _generate_dataset(self):

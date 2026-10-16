@@ -36,3 +36,14 @@ requests==2.32.3
 pymupdf==1.28.2
 pillow>=10.0
 python-dotenv==1.2.4
+
+# Juez de prompts (LLM-as-a-judge, ver judge/ y scripts/evaluate_prompts.py):
+# SDK oficial de Anthropic, porque el CLI `claude` de la sesión guiada no
+# permite fijar la temperatura. Necesita ANTHROPIC_API_KEY (ver .env.example),
+# salvo con JUDGE_PROVIDER=cli, que evalúa con la suscripción de Claude;
+# la sesión guiada de los participantes sigue sin usarla.
+anthropic==1.13.0
+# Análisis de la validación del juez (ver data/analyze_judge.py): kappa
+# ponderado (scikit-learn), Kruskal-Wallis y Spearman (scipy).
+scipy==1.17.1
+scikit-learn==1.9.0
