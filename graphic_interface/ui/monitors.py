@@ -82,6 +82,21 @@ def researcher_monitor(widget) -> Monitor:
     return chosen
 
 
+def monitor_of(widget) -> Monitor:
+    """El monitor donde está `widget` (según el centro de su ventana).
+    Sirve para abrir ventanas del participante en su misma pantalla: con
+    varios monitores, `winfo_screenwidth()` es el ancho de TODO el
+    escritorio, no el de uno solo."""
+    widget.update_idletasks()
+    center_x = widget.winfo_rootx() + widget.winfo_width() // 2
+    center_y = widget.winfo_rooty() + widget.winfo_height() // 2
+    for monitor in list_monitors():
+        if (monitor.x <= center_x < monitor.x + monitor.width
+                and monitor.y <= center_y < monitor.y + monitor.height):
+            return monitor
+    return Monitor("pantalla", 0, 0, widget.winfo_screenwidth(), widget.winfo_screenheight())
+
+
 def _work_area() -> Optional[tuple[int, int, int, int]]:
     """(x, y, ancho, alto) del área útil del escritorio (sin la barra
     superior ni el dock de GNOME), de `_NET_WORKAREA`. None si no se puede."""

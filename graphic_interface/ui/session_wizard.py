@@ -110,8 +110,10 @@ from ui.monitors import (
     SLOT_GAZE,
     SLOT_NEUROSKY,
     SLOT_VIDEO,
+    monitor_of,
     researcher_layout,
     tk_geometry,
+    usable_area,
 )
 from ui.session_monitor import SessionMonitorWindow
 from ui.statement_view import fit_wraplength, render_statement
@@ -1696,10 +1698,13 @@ class SessionWizard:
         window.title(f"Enunciado -- {challenge.title}")
         win_w, win_h = wrap(560), wrap(680)
         # A un costado, no centrada -- para poder consultarla al lado del
-        # cuadro de texto en vez de taparlo.
+        # cuadro de texto en vez de taparlo. En el mismo monitor que la
+        # sesión guiada: con dos monitores, winfo_screenwidth() es el ancho
+        # de ambos juntos y la ventana terminaba en el otro.
         margin = scaled(24)
-        pos_x = max(self.app.winfo_screenwidth() - win_w - margin, 0)
-        pos_y = margin
+        mon_x, mon_y, mon_w, _ = usable_area(monitor_of(self.app))
+        pos_x = max(mon_x + mon_w - win_w - margin, mon_x)
+        pos_y = mon_y + margin
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
         # La sesión guiada corre en pantalla completa (ver
