@@ -41,6 +41,11 @@ _FAILED_RE = re.compile(r"CALIBRATION_FAILED\s+reason=(\S+)")
 # cuelga (cámara que nunca entrega frames, etc.).
 CALIBRATION_TIMEOUT_SECONDS = 60
 
+# Tamaño de la ventana de video del seguimiento continuo (camera_tracker.py
+# la escala a esto manteniendo la proporción de la cámara).
+CAMERA_VIDEO_WIDTH = 640
+CAMERA_VIDEO_HEIGHT = 480
+
 
 class CalibrationError(Exception):
     """La calibración no se pudo completar (sin rostro, ventana cerrada, timeout)."""
@@ -125,6 +130,7 @@ def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tu
 
 def start_camera_tracker(
     participant: Optional[dict], session_label: str, left_x: float, right_x: float, mirror: bool = True,
+    window_position: Optional[tuple[int, int]] = None,
 ) -> subprocess.Popen:
     """Lanza el seguimiento continuo (mirada + emoción, un solo proceso,
     una sola cámara) con los umbrales calibrados de run_calibration(),
@@ -135,6 +141,10 @@ def start_camera_tracker(
     dos CSV propios -- graphic_interface/data/emotion_logs/<NOMBRE_
     APELLIDO>.csv y graphic_interface/data/eye_logs/<NOMBRE_APELLIDO>.csv
     -- los mismos que usaban las herramientas separadas.
+
+    `window_position` (x, y) abre la ventana de video ahí, de
+    CAMERA_VIDEO_WIDTH x CAMERA_VIDEO_HEIGHT (ver monitors.py: el monitor
+    del investigador).
     """
     if not CAMERA_TRACKER_SCRIPT.exists():
         raise FileNotFoundError("No se encontró tools/camera_tracker.py")
@@ -146,6 +156,11 @@ def start_camera_tracker(
     ]
     if mirror:
         args.append("--mirror")
+    if window_position is not None:
+        args += [
+            "--window-x", str(window_position[0]), "--window-y", str(window_position[1]),
+            "--window-width", str(CAMERA_VIDEO_WIDTH), "--window-height", str(CAMERA_VIDEO_HEIGHT),
+        ]
 
     if participant:
         EMOTION_LOG_DIR.mkdir(parents=True, exist_ok=True)

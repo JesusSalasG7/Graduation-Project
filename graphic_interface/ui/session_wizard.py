@@ -61,7 +61,13 @@ from content.quiz import QuizQuestion
 from content.statement_quiz import get_statement_questions
 from games.game_launcher import discover_games, emotion_log_file
 from games.game_patch import launch_game_with_solution, launch_game_without_solution
-from sensors.camera_tracker_launcher import delete_camera_data, run_calibration, start_camera_tracker
+from sensors.camera_tracker_launcher import (
+    CAMERA_VIDEO_HEIGHT,
+    CAMERA_VIDEO_WIDTH,
+    delete_camera_data,
+    run_calibration,
+    start_camera_tracker,
+)
 from sensors.eye_tracker_launcher import eye_log_file
 from sensors.heart_rate_import import HeartRateDropFrame, import_heart_rate_for_challenge
 from sensors.neurosky_launcher import (
@@ -76,6 +82,13 @@ from sensors.neurosky_launcher import (
 from storage.participant_store import participant_label
 from storage.personal_records import load_personal_record
 from storage.quiz_results import save_quiz_answers
+from storage.session_timing import (
+    CLOSE_ABANDONED,
+    CLOSE_FINISHED,
+    CLOSE_INTERRUPTED,
+    CLOSE_SAVED,
+    SessionTimingLog,
+)
 from storage.stage_capture import (
     StageTimer,
     available_challenges,
@@ -94,6 +107,8 @@ from storage.stage_capture import (
     write_stage_sensor_files,
     write_sync_timeline,
 )
+from ui.monitors import corner_position, fit_height, researcher_monitor
+from ui.session_monitor import SessionMonitorWindow
 from ui.statement_view import fit_wraplength, render_statement
 
 FONT_FAMILY = "Segoe UI"
@@ -111,6 +126,17 @@ ALL_DEVICES = ("heart_rate", "neurosky", "camera")
 # colgo (el dispositivo se desconectó, perdió batería, etc.) -- ver
 # _neurosky_watchdog_tick.
 NEUROSKY_STALE_SECONDS = 8
+
+# Nombre corto de cada etapa para la ventana "Sesión en curso" del
+# investigador (ver SessionMonitorWindow / _update_session_monitor).
+STAGE_NAMES = {
+    1: "Ver el juego",
+    2: "El problema",
+    3: "Tu prompt",
+    4: "Resultado",
+    5: "Razonamiento",
+    6: "Solución en acción",
+}
 
 # Toda la tipografía de la sesión guiada se agranda respecto al resto de
 # la app (pedido explícito: mejor legibilidad durante la sesión). 1.5x,
@@ -246,8 +272,53 @@ class SessionWizard:
         # elija el evaluador; el default de todos habilitados es solo un
         # respaldo por si algo llegara a llamar start() sin pasarlo.
         self._enabled_devices: set[str] = set(ALL_DEVICES)
+        # Ventana "Sesión en curso" del investigador (cronómetro + desafío y
+        # etapa actuales), en el monitor del investigador -- ver
+        # SessionMonitorWindow. Se abre en start().
+        self._session_monitor: Optional[SessionMonitorWindow] = None
+        # Tiempos de la sesión guiada acumulados entre sesiones (cuántas
+        # veces se retomó, cuánto duró cada sesión y cada etapa, y el total
+        # de los 7 juegos) -- ver storage/session_timing.py. Se abre en
+        # start() para el participante activo.
+        self._timing: Optional[SessionTimingLog] = None
 
     # ---------------- utilidades ----------------
+    def _update_session_monitor(self, stage_text: str, starts_session: bool = False):
+        if self._session_monitor is None:
+            return
+        total = len(GUIDED_SESSION_GAME_ORDER)
+        game = self.current_game.display_name if self.current_game is not None else "—"
+        self._session_monitor.set_position(
+            f"Desafío {self.game_index + 1} de {total} · {game}", stage_text, starts_session=starts_session,
+        )
+
+    def _update_session_monitor_stage(self, stage: int):
+        # "Reintentar este desafío" repite las Etapas 3 a 6.
+        attempt = self._attempt_number if stage >= 3 else None
+        text = f"Etapa {stage} de 6 · {STAGE_NAMES[stage]}"
+        if attempt is not None and attempt > 1:
+            text += f" (intento {attempt})"
+        # El cronómetro arranca con el juego: la Etapa 1 del primer
+        # desafío que se juega en esta sesión (si se retoma una sesión
+        # guardada, es el desafío donde se retoma, y el total sigue desde
+        # lo acumulado).
+        self._update_session_monitor(text, starts_session=stage == 1)
+        if self._timing is not None:
+            game = self.current_game.name if self.current_game is not None else ""
+            self._timing.start_stage(self.game_index + 1, game, stage, attempt)
+
+    def _pause_session_timer(self, reason: str):
+        """"Guardar progreso"/"Terminar sesión guiada": el tiempo del
+        participante se detiene acá, antes de la pantalla del reloj."""
+        if self._timing is not None:
+            self._timing.pause()
+        if self._session_monitor is not None:
+            self._session_monitor.pause(reason)
+
+    def _close_session_timing(self, how: str):
+        if self._timing is not None:
+            self._timing.close(how)
+            self._timing = None
     def _clear(self):
         for child in self.container.winfo_children():
             child.destroy()
@@ -281,6 +352,11 @@ class SessionWizard:
         _cleanup_neurosky_interactive) -- para no trabar la salida.
         """
         self._close_statement_window()
+        # Si no se cerró antes con "Guardar progreso"/"Terminar sesión", se
+        # salió sin guardar: esa sesión queda registrada pero no suma.
+        self._close_session_timing(CLOSE_ABANDONED)
+        if self._session_monitor is not None:
+            self._session_monitor.finish()
         delete_data = not self._session_completed
         neurosky_active = self._neurosky_process is not None or self._neurosky_window is not None
         camera_active = self._camera_process is not None or self._camera_window is not None
@@ -344,6 +420,10 @@ class SessionWizard:
         de un par de segundos) para garantizar que termine antes de que
         App.destroy() se lleve puesta la ventana.
         """
+        self._close_session_timing(CLOSE_INTERRUPTED)
+        if self._session_monitor is not None:
+            self._session_monitor.close()
+            self._session_monitor = None
         if self._camera_process is not None or self._camera_window is not None:
             self._stop_camera_process()
             delete_camera_data(self.app.store.get_active())
@@ -665,6 +745,17 @@ class SessionWizard:
         self.game_index = saved_index
         self._session_completed = False
         self._enabled_devices = set(enabled_devices) if enabled_devices is not None else set(ALL_DEVICES)
+        if self._session_monitor is not None:
+            self._session_monitor.close()
+        self._close_session_timing(CLOSE_INTERRUPTED)
+        if participant:
+            self._timing = SessionTimingLog(participant_session_dir(participant), participant["number"])
+        self._session_monitor = SessionMonitorWindow(
+            self.app, self.c, scaled, wrap,
+            participant_label(participant) if participant else "sin participante activo",
+            previous_total_s=self._timing.counted_total_seconds() if self._timing else 0,
+            session_number=self._timing.counted_sessions() + 1 if self._timing else 1,
+        )
         self._show_next_setup_screen(after=None)
 
     def _show_next_setup_screen(self, after: Optional[str]):
@@ -978,14 +1069,15 @@ class SessionWizard:
 
         window = ctk.CTkToplevel(self.app)
         window.title("Datos del Neurosky")
-        win_w, win_h = wrap(640), wrap(460)
-        # Arriba a la derecha, no centrada -- si quedara centrada sobre la
+        # Arriba a la derecha del monitor del investigador (ver
+        # monitors.py), no centrada -- si quedara centrada sobre la
         # ventana principal (que arranca maximizada), CUALQUIER click ahí
         # (p.ej. "Listo") reenfoca/levanta la principal y la tapa entera,
-        # dando la impresión de que dejó de recibir datos.
-        margin = scaled(24)
-        pos_x = max(self.app.winfo_screenwidth() - win_w - margin, 0)
-        pos_y = margin
+        # dando la impresión de que dejó de recibir datos. La altura se
+        # recorta para que entre junto con la de la cámara debajo.
+        monitor = researcher_monitor(self.app)
+        win_w, win_h = wrap(640), fit_height(monitor, wrap(460))
+        pos_x, pos_y = corner_position(monitor, "top-right", win_w, win_h)
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible": es una ventana de monitoreo que tiene que
@@ -1200,10 +1292,9 @@ class SessionWizard:
 
         window = ctk.CTkToplevel(self.app)
         window.title("Datos de la Cámara")
-        win_w, win_h = wrap(520), wrap(360)
-        margin = scaled(24)
-        pos_x = max(self.app.winfo_screenwidth() - win_w - margin, 0)
-        pos_y = max(self.app.winfo_screenheight() - win_h - margin, 0)
+        monitor = researcher_monitor(self.app)
+        win_w, win_h = wrap(520), fit_height(monitor, wrap(360))
+        pos_x, pos_y = corner_position(monitor, "bottom-right", win_w, win_h)
         window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible" por el mismo motivo que la ventana del
@@ -1306,7 +1397,13 @@ class SessionWizard:
 
         participant = self.app.store.get_active()
         try:
-            process = start_camera_tracker(participant, "sesion_guiada", left_x, right_x)
+            # El video del seguimiento va abajo a la izquierda del monitor
+            # del investigador, debajo de la ventana "Sesión en curso".
+            monitor = researcher_monitor(self.app)
+            video_x, video_y = corner_position(monitor, "bottom-left", CAMERA_VIDEO_WIDTH, CAMERA_VIDEO_HEIGHT)
+            process = start_camera_tracker(
+                participant, "sesion_guiada", left_x, right_x, window_position=(video_x, video_y - 40),
+            )
         except Exception as exc:
             self._set_camera_status(
                 f"⚠️  Calibrado, pero no se pudo iniciar el seguimiento: {exc}", color=self.c["WARNING"],
@@ -1500,6 +1597,7 @@ class SessionWizard:
         game = self.current_game
 
         self._header(self.container, "ETAPA 1 DE 6 · VER EL JUEGO", game.display_name)
+        self._update_session_monitor_stage(1)
         self._exit_button(self.container)
 
         body = ctk.CTkFrame(self.container, fg_color="transparent")
@@ -1549,6 +1647,7 @@ class SessionWizard:
         self._stage_timer.start(2)
 
         self._header(self.container, "ETAPA 2 DE 6 · EL PROBLEMA", challenge.title)
+        self._update_session_monitor_stage(2)
         self._exit_button(self.container)
 
         left, right, buttons_row = self._split_columns(self.container)
@@ -1647,6 +1746,7 @@ class SessionWizard:
         self._statement_log = []
 
         self._header(self.container, "ETAPA 3 DE 6 · TU PROMPT", "Escribe el prompt para resolverlo")
+        self._update_session_monitor_stage(3)
         self._exit_button(self.container)
         self._render_pending_warnings(self.container)
 
@@ -1782,6 +1882,7 @@ class SessionWizard:
         self._stage_timer.start(4)
 
         self._header(self.container, "ETAPA 4 DE 6 · RESULTADO", challenge.title)
+        self._update_session_monitor_stage(4)
         self._exit_button(self.container)
         self._render_pending_warnings(self.container)
 
@@ -1850,6 +1951,7 @@ class SessionWizard:
         self._stage_timer.start(5)
 
         self._header(self.container, "ETAPA 5 DE 6 · RAZONAMIENTO", challenge.title)
+        self._update_session_monitor_stage(5)
         self._exit_button(self.container)
         self._render_pending_warnings(self.container)
 
@@ -1910,6 +2012,7 @@ class SessionWizard:
         is_last = self.game_index >= len(GUIDED_SESSION_GAME_ORDER) - 1
 
         self._header(self.container, "ETAPA 6 DE 6 · SOLUCIÓN EN ACCIÓN", challenge.title)
+        self._update_session_monitor_stage(6)
         self._exit_button(self.container)
         self._render_pending_warnings(self.container)
 
@@ -1968,14 +2071,18 @@ class SessionWizard:
             # leyendo, así que sí corresponde pedir la carpeta del reloj
             # antes de cerrar la sesión -- salvo que el reloj no se haya
             # habilitado para esta sesión (ver self._enabled_devices).
+            self._pause_session_timer("sesión terminada")
             self._show_heart_rate_import_or_skip(self._advance_or_finish)
 
         def on_save_progress():
             # Acá el evaluador corta la sesión a propósito -- es el punto
             # donde tiene sentido pedir la carpeta del reloj de este
             # desafío antes de guardar el progreso y salir.
+            self._pause_session_timer("progreso guardado")
+
             def after_finish():
                 self._save_progress(self.game_index + 1)
+                self._close_session_timing(CLOSE_SAVED)
                 messagebox.showinfo(
                     "Progreso guardado",
                     "Guardamos tu progreso. La próxima vez que entres a la sesión\n"
@@ -2040,6 +2147,7 @@ class SessionWizard:
         self._clear()
         challenge_number = self.game_index + 1
         self._header(self.container, "IMPORTAR RELOJ", f"Desafío {challenge_number} · Frecuencia cardíaca")
+        self._update_session_monitor("Importando los datos del reloj")
         self._exit_button(self.container)
         self._render_pending_warnings(self.container)
 
@@ -2182,6 +2290,7 @@ class SessionWizard:
         if self.game_index >= len(GUIDED_SESSION_GAME_ORDER):
             self._session_completed = True
             self._clear_progress()
+            self._close_session_timing(CLOSE_FINISHED)
             if participant is not None:
                 completed = available_challenges(participant_session_dir(participant))
                 write_session_index(participant_session_dir(participant), completed)

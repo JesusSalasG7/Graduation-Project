@@ -496,6 +496,13 @@ def main():
     parser.add_argument("--participant-id", default="", help="ID del participante activo (opcional)")
     parser.add_argument("--participant-name", default="", help="Nombre del participante activo (opcional)")
     parser.add_argument("--session-label", default="", help="Etiqueta de la sesión, ej. nombre del juego")
+    parser.add_argument("--window-x", type=int, default=None, help="Posición X de la ventana de video (opcional)")
+    parser.add_argument("--window-y", type=int, default=None, help="Posición Y de la ventana de video (opcional)")
+    parser.add_argument(
+        "--window-width", type=int, default=None,
+        help="Ancho máximo de la ventana de video; se escala manteniendo la proporción (opcional)",
+    )
+    parser.add_argument("--window-height", type=int, default=None, help="Alto máximo de la ventana de video (opcional)")
 
     # Eye Tracker
     parser.add_argument(
@@ -584,6 +591,17 @@ def main():
     screen_width, screen_height = _detect_screen_size()
 
     cv2.namedWindow(side_window_name, cv2.WINDOW_NORMAL)
+
+    # Con --window-x/--window-y (el panel lo pasa para ubicarla en el
+    # monitor del investigador) la ventana de video se crea ya en esa
+    # posición, escalada a lo sumo a --window-width x --window-height.
+    if args.window_x is not None and args.window_y is not None:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+        frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+        frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+        scale = min((args.window_width or frame_w) / frame_w, (args.window_height or frame_h) / frame_h, 1.0)
+        cv2.resizeWindow(window_name, int(frame_w * scale), int(frame_h * scale))
+        cv2.moveWindow(window_name, args.window_x, args.window_y)
 
     # Si vinieron los dos umbrales calibrados (ver --calibrate), el corte
     # izquierda/derecha queda centrado en el rango real de movimiento de
