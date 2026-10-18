@@ -256,3 +256,7 @@ consentimiento_P*_v*.pdf
 # (datos de participantes) no van al repo. Los del dataset sintético
 # (data/juez/dataset_sintetico/) si se pueden versionar.
 data/juez/sesiones/
+
+# Lecturas de NeuroSky grabadas con tools/NeuroSky/test_neurosky.py
+# (datos de sesiones/pruebas, no deben ir al repo)
+tools/NeuroSky/*.csv
