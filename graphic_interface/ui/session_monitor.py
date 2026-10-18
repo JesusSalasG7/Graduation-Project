@@ -21,14 +21,14 @@ from typing import Optional
 import customtkinter as ctk
 
 from storage.session_timing import format_duration
-from ui.monitors import corner_position, researcher_monitor
+from ui.monitors import SLOT_TIMER, researcher_layout, tk_geometry
 
 FONT_FAMILY = "Segoe UI"
 
 
 class SessionMonitorWindow:
     def __init__(
-        self, app, colors: dict, scaled, wrap, participant_text: str,
+        self, app, colors: dict, scaled, participant_text: str,
         previous_total_s: float = 0, session_number: int = 1,
     ):
         self.app = app
@@ -42,9 +42,9 @@ class SessionMonitorWindow:
 
         window = ctk.CTkToplevel(app)
         window.title("Sesión en curso")
-        win_w, win_h = wrap(540), wrap(260)
-        x, y = corner_position(researcher_monitor(app), "top-left", win_w, win_h)
-        window.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        slot = researcher_layout(app)[SLOT_TIMER]
+        win_w = slot[2]
+        window.geometry(tk_geometry(slot))
         window.configure(fg_color=colors["BG_CARD"])
         # Mismo motivo que las ventanas del NeuroSky y la cámara: la sesión
         # guiada corre en pantalla completa y la taparía.

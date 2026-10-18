@@ -62,8 +62,6 @@ from content.statement_quiz import get_statement_questions
 from games.game_launcher import discover_games, emotion_log_file
 from games.game_patch import launch_game_with_solution, launch_game_without_solution
 from sensors.camera_tracker_launcher import (
-    CAMERA_VIDEO_HEIGHT,
-    CAMERA_VIDEO_WIDTH,
     delete_camera_data,
     run_calibration,
     start_camera_tracker,
@@ -107,7 +105,14 @@ from storage.stage_capture import (
     write_stage_sensor_files,
     write_sync_timeline,
 )
-from ui.monitors import corner_position, fit_height, researcher_monitor
+from ui.monitors import (
+    SLOT_CAMERA_LOG,
+    SLOT_GAZE,
+    SLOT_NEUROSKY,
+    SLOT_VIDEO,
+    researcher_layout,
+    tk_geometry,
+)
 from ui.session_monitor import SessionMonitorWindow
 from ui.statement_view import fit_wraplength, render_statement
 
@@ -751,7 +756,7 @@ class SessionWizard:
         if participant:
             self._timing = SessionTimingLog(participant_session_dir(participant), participant["number"])
         self._session_monitor = SessionMonitorWindow(
-            self.app, self.c, scaled, wrap,
+            self.app, self.c, scaled,
             participant_label(participant) if participant else "sin participante activo",
             previous_total_s=self._timing.counted_total_seconds() if self._timing else 0,
             session_number=self._timing.counted_sessions() + 1 if self._timing else 1,
@@ -1069,16 +1074,12 @@ class SessionWizard:
 
         window = ctk.CTkToplevel(self.app)
         window.title("Datos del Neurosky")
-        # Arriba a la derecha del monitor del investigador (ver
-        # monitors.py), no centrada -- si quedara centrada sobre la
-        # ventana principal (que arranca maximizada), CUALQUIER click ahí
-        # (p.ej. "Listo") reenfoca/levanta la principal y la tapa entera,
-        # dando la impresión de que dejó de recibir datos. La altura se
-        # recorta para que entre junto con la de la cámara debajo.
-        monitor = researcher_monitor(self.app)
-        win_w, win_h = wrap(640), fit_height(monitor, wrap(460))
-        pos_x, pos_y = corner_position(monitor, "top-right", win_w, win_h)
-        window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+        # En su lugar del monitor del investigador (ver
+        # monitors.researcher_layout), no centrada -- si quedara centrada
+        # sobre la ventana principal (que arranca maximizada), CUALQUIER
+        # click ahí (p.ej. "Listo") reenfoca/levanta la principal y la tapa
+        # entera, dando la impresión de que dejó de recibir datos.
+        window.geometry(tk_geometry(researcher_layout(self.app)[SLOT_NEUROSKY]))
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible": es una ventana de monitoreo que tiene que
         # seguir a la vista durante TODA la sesión, sin importar que
@@ -1292,10 +1293,7 @@ class SessionWizard:
 
         window = ctk.CTkToplevel(self.app)
         window.title("Datos de la Cámara")
-        monitor = researcher_monitor(self.app)
-        win_w, win_h = wrap(520), fit_height(monitor, wrap(360))
-        pos_x, pos_y = corner_position(monitor, "bottom-right", win_w, win_h)
-        window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+        window.geometry(tk_geometry(researcher_layout(self.app)[SLOT_CAMERA_LOG]))
         window.configure(fg_color=self.c["BG_CARD"])
         # "Siempre visible" por el mismo motivo que la ventana del
         # Neurosky: la sesión guiada corre en pantalla completa.
@@ -1397,12 +1395,13 @@ class SessionWizard:
 
         participant = self.app.store.get_active()
         try:
-            # El video del seguimiento va abajo a la izquierda del monitor
-            # del investigador, debajo de la ventana "Sesión en curso".
-            monitor = researcher_monitor(self.app)
-            video_x, video_y = corner_position(monitor, "bottom-left", CAMERA_VIDEO_WIDTH, CAMERA_VIDEO_HEIGHT)
+            # El video y la ventana "Mirada: izquierda o derecha" van en
+            # sus lugares del monitor del investigador (ver
+            # monitors.researcher_layout).
+            layout = researcher_layout(self.app)
             process = start_camera_tracker(
-                participant, "sesion_guiada", left_x, right_x, window_position=(video_x, video_y - 40),
+                participant, "sesion_guiada", left_x, right_x,
+                video_geometry=layout[SLOT_VIDEO], gaze_geometry=layout[SLOT_GAZE],
             )
         except Exception as exc:
             self._set_camera_status(

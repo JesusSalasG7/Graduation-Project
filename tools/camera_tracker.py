@@ -287,22 +287,64 @@ def _side_rect(name: str, screen_width: int, screen_height: int):
     return half_w, 0, screen_width, screen_height
 
 
+def _geometry(value: str) -> tuple[int, int, int, int]:
+    """"x,y,ancho,alto" -> (x, y, ancho, alto), para --*-geometry."""
+    parts = [int(v) for v in value.split(",")]
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("se espera x,y,ancho,alto")
+    return tuple(parts)
+
+
+def _show_placed(window_name: str, image, placements: dict) -> None:
+    """imshow, y la primera vez ubica la ventana en su (x, y, ancho, alto)
+    de `placements` (que se vacía para esa ventana)."""
+    cv2.imshow(window_name, image)
+    geometry = placements.pop(window_name, None)
+    if geometry is not None:
+        x, y, w, h = geometry
+        cv2.waitKey(1)
+        cv2.moveWindow(window_name, x, y)
+        cv2.resizeWindow(window_name, w, h)
+
+
+def _put_centered(canvas, text: str, center_x: int, center_y: int, scale: float, color, thickness: int):
+    (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+    cv2.putText(
+        canvas, text, (center_x - text_w // 2, center_y + text_h // 2),
+        cv2.FONT_HERSHEY_SIMPLEX, scale, color, thickness, cv2.LINE_AA,
+    )
+
+
 def _draw_side_window(screen_width, screen_height, active_side: str, direction: str):
     canvas = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
 
-    x1, y1, x2, y2 = _side_rect(active_side, screen_width, screen_height)
-    overlay = canvas.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), (60, 60, 0), -1)
-    cv2.addWeighted(overlay, 0.35, canvas, 0.65, 0, canvas)
-    cv2.line(canvas, (screen_width // 2, 0), (screen_width // 2, screen_height), (90, 90, 90), 2)
+    if active_side in ("izquierda", "derecha"):
+        x1, y1, x2, y2 = _side_rect(active_side, screen_width, screen_height)
+        overlay = canvas.copy()
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), (120, 120, 0), -1)
+        cv2.addWeighted(overlay, 0.55, canvas, 0.45, 0, canvas)
+    cv2.line(canvas, (screen_width // 2, 0), (screen_width // 2, screen_height), (110, 110, 110), 3)
 
-    cv2.putText(
-        canvas, active_side, (screen_width // 2 - 80, screen_height // 2),
-        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2,
-    )
+    # El texto escala con la ventana: el investigador la mira de lejos, en
+    # otro monitor. La mitad activa muestra el lado en grande; la otra, en
+    # gris, para que se vea a qué lado corresponde cada mitad.
+    half_w = screen_width // 2
+    big = max(screen_height / 170, 0.9)
+    for name, center_x in (("izquierda", half_w // 2), ("derecha", half_w + half_w // 2)):
+        active = name == active_side
+        text = name.upper()
+        scale = big if active else big * 0.55
+        # Que la palabra no se salga de su mitad.
+        (text_w, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+        scale *= min(1.0, half_w * 0.85 / max(text_w, 1))
+        _put_centered(
+            canvas, text, center_x, screen_height // 2, scale,
+            (255, 255, 255) if active else (90, 90, 90), max(int(scale * 2.2), 2) if active else max(int(scale * 1.5), 1),
+        )
+    small = max(screen_height / 900, 0.5)
     cv2.putText(
         canvas, f"direccion detallada: {direction}", (20, screen_height - 20),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1,
+        cv2.FONT_HERSHEY_SIMPLEX, small, (170, 170, 170), max(int(small * 2), 1), cv2.LINE_AA,
     )
     return canvas
 
@@ -496,13 +538,14 @@ def main():
     parser.add_argument("--participant-id", default="", help="ID del participante activo (opcional)")
     parser.add_argument("--participant-name", default="", help="Nombre del participante activo (opcional)")
     parser.add_argument("--session-label", default="", help="Etiqueta de la sesión, ej. nombre del juego")
-    parser.add_argument("--window-x", type=int, default=None, help="Posición X de la ventana de video (opcional)")
-    parser.add_argument("--window-y", type=int, default=None, help="Posición Y de la ventana de video (opcional)")
     parser.add_argument(
-        "--window-width", type=int, default=None,
-        help="Ancho máximo de la ventana de video; se escala manteniendo la proporción (opcional)",
+        "--video-geometry", type=_geometry, default=None,
+        help="x,y,ancho,alto de la ventana de video; se escala manteniendo la proporción (opcional)",
     )
-    parser.add_argument("--window-height", type=int, default=None, help="Alto máximo de la ventana de video (opcional)")
+    parser.add_argument(
+        "--gaze-geometry", type=_geometry, default=None,
+        help="x,y,ancho,alto de la ventana 'Mirada: izquierda o derecha' (opcional)",
+    )
 
     # Eye Tracker
     parser.add_argument(
@@ -588,20 +631,30 @@ def main():
     frame_count = 0
     window_name = "Camera Tracker - Vibe Coding"
     side_window_name = "Mirada: izquierda o derecha"
-    screen_width, screen_height = _detect_screen_size()
+    # Con --gaze-geometry / --video-geometry (el panel las pasa para
+    # ubicarlas en el monitor del investigador, ver
+    # graphic_interface/ui/monitors.py) cada ventana se crea ya en su
+    # lugar y con su tamaño; la de mirada se dibuja directamente a ese
+    # tamaño.
+    # WINDOW_GUI_NORMAL saca la barra de herramientas de Qt, que si no
+    # le quita lugar a la imagen y la achica. Qt ignora moveWindow antes
+    # de que la ventana se muestre, así que se ubica después de su primer
+    # imshow (ver _show_placed).
+    placements: dict[str, tuple[int, int, int, int]] = {}
+    if args.gaze_geometry is not None:
+        screen_width, screen_height = args.gaze_geometry[2:]
+        cv2.namedWindow(side_window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL)
+        placements[side_window_name] = args.gaze_geometry
+        # Arranca a la vista (sin rostro todavía) para que el investigador
+        # la tenga ubicada desde el principio.
+        _show_placed(side_window_name, _draw_side_window(screen_width, screen_height, "", "sin rostro"), placements)
+    else:
+        screen_width, screen_height = _detect_screen_size()
+        cv2.namedWindow(side_window_name, cv2.WINDOW_NORMAL)
 
-    cv2.namedWindow(side_window_name, cv2.WINDOW_NORMAL)
-
-    # Con --window-x/--window-y (el panel lo pasa para ubicarla en el
-    # monitor del investigador) la ventana de video se crea ya en esa
-    # posición, escalada a lo sumo a --window-width x --window-height.
-    if args.window_x is not None and args.window_y is not None:
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-        frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
-        frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
-        scale = min((args.window_width or frame_w) / frame_w, (args.window_height or frame_h) / frame_h, 1.0)
-        cv2.resizeWindow(window_name, int(frame_w * scale), int(frame_h * scale))
-        cv2.moveWindow(window_name, args.window_x, args.window_y)
+    if args.video_geometry is not None:
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_NORMAL)
+        placements[window_name] = args.video_geometry
 
     # Si vinieron los dos umbrales calibrados (ver --calibrate), el corte
     # izquierda/derecha queda centrado en el rango real de movimiento de
@@ -657,7 +710,7 @@ def main():
                 side = side_tracker.update(gaze_x)
                 side_times[side] += dt
                 side_canvas = _draw_side_window(screen_width, screen_height, side, direction)
-                cv2.imshow(side_window_name, side_canvas)
+                _show_placed(side_window_name, side_canvas, placements)
 
                 if frame_count % args.eye_interval == 0:
                     eye_estimator.report(gaze_x, gaze_y, side)
@@ -667,7 +720,7 @@ def main():
 
             if args.mirror:
                 frame = cv2.flip(frame, 1)
-            cv2.imshow(window_name, frame)
+            _show_placed(window_name, frame, placements)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

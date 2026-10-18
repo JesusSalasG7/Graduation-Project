@@ -32,9 +32,6 @@ _INTERNAL_PREFIXES = ("eDP", "LVDS", "DSI")
 # " 0: +*HDMI-1 1920/530x1080/300+0+0  HDMI-1"
 _MONITOR_RE = re.compile(r"^\s*\d+:\s+\S+\s+(\d+)/\d+x(\d+)/\d+([+-]\d+)([+-]\d+)\s+(\S+)")
 
-# Separación entre las ventanas y con el borde del monitor.
-MARGIN = 24
-
 
 @dataclass(frozen=True)
 class Monitor:
@@ -85,20 +82,82 @@ def researcher_monitor(widget) -> Monitor:
     return chosen
 
 
-def corner_position(monitor: Monitor, corner: str, width: int, height: int) -> tuple[int, int]:
-    """Esquina (`top-left`, `top-right`, `bottom-left`, `bottom-right`) del
-    monitor donde va una ventana de `width`x`height`."""
-    left = monitor.x + MARGIN
-    right = monitor.x + max(monitor.width - width - MARGIN, 0)
-    top = monitor.y + MARGIN
-    bottom = monitor.y + max(monitor.height - height - MARGIN, 0)
-    x = left if corner.endswith("left") else right
-    y = top if corner.startswith("top") else bottom
-    return x, y
+def _work_area() -> Optional[tuple[int, int, int, int]]:
+    """(x, y, ancho, alto) del área útil del escritorio (sin la barra
+    superior ni el dock de GNOME), de `_NET_WORKAREA`. None si no se puede."""
+    try:
+        output = subprocess.run(
+            ["xprop", "-root", "_NET_WORKAREA"], capture_output=True, text=True, timeout=3,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    numbers = [int(n) for n in re.findall(r"\d+", output.partition("=")[2])[:4]]
+    return tuple(numbers) if len(numbers) == 4 else None
 
 
-def fit_height(monitor: Monitor, height: int, rows: int = 2) -> int:
-    """`height` recortado para que `rows` ventanas apiladas entren en el
-    monitor (el título de cada ventana suma ~40px que Tk no cuenta)."""
-    available = (monitor.height - MARGIN * (rows + 1)) // rows - 40
-    return min(height, max(available, 200))
+def usable_area(monitor: Monitor) -> tuple[int, int, int, int]:
+    """El monitor recortado al área útil: si no, el gestor de ventanas
+    corre las ventanas que caen debajo del dock o de la barra superior y
+    terminan tapándose entre sí."""
+    x, y, w, h = monitor.x, monitor.y, monitor.width, monitor.height
+    area = _work_area()
+    if area is not None:
+        ax, ay, aw, ah = area
+        left, top = max(x, ax), max(y, ay)
+        right, bottom = min(x + w, ax + aw), min(y + h, ay + ah)
+        if right - left > 400 and bottom - top > 300:
+            return left, top, right - left, bottom - top
+    return x, y, w, h
+
+
+# Alto aproximado de la barra de título que agrega el gestor de ventanas:
+# la posición que se pide es la del marco, pero el tamaño es el del
+# contenido.
+TITLE_BAR = 40
+GAP = 12
+
+# Ventanas del monitor del investigador.
+SLOT_TIMER = "timer"
+SLOT_GAZE = "gaze"
+SLOT_VIDEO = "video"
+SLOT_NEUROSKY = "neurosky"
+SLOT_CAMERA_LOG = "camera_log"
+
+
+def researcher_layout(widget) -> dict[str, tuple[int, int, int, int]]:
+    """{ventana: (x, y, ancho, alto)} sobre el monitor del investigador,
+    sin superponerse:
+
+        +-----------+---------------------------------+
+        |  Sesión   |  Mirada: izquierda o derecha    |
+        |  en curso |  (la más grande)                |
+        +-----------+----------------+----------------+
+        |  Video    |  Datos del     |  Datos de la   |
+        |  cámara   |  NeuroSky      |  Cámara        |
+        +-----------+----------------+----------------+
+
+    (x, y) es la esquina del marco de la ventana; (ancho, alto) el
+    contenido, ya descontada la barra de título."""
+    ax, ay, aw, ah = usable_area(researcher_monitor(widget))
+    left_w = min(640, (aw - 3 * GAP) // 3)
+    right_w = aw - 3 * GAP - left_w
+    rows_h = ah - 3 * GAP
+    top_h = round(rows_h * 0.46)
+    bottom_h = rows_h - top_h
+    top_y = ay + GAP
+    bottom_y = top_y + top_h + GAP
+    left_x = ax + GAP
+    right_x = left_x + left_w + GAP
+    half_w = (right_w - GAP) // 2
+    return {
+        SLOT_TIMER: (left_x, top_y, left_w, top_h - TITLE_BAR),
+        SLOT_GAZE: (right_x, top_y, right_w, top_h - TITLE_BAR),
+        SLOT_VIDEO: (left_x, bottom_y, left_w, bottom_h - TITLE_BAR),
+        SLOT_NEUROSKY: (right_x, bottom_y, half_w, bottom_h - TITLE_BAR),
+        SLOT_CAMERA_LOG: (right_x + half_w + GAP, bottom_y, right_w - half_w - GAP, bottom_h - TITLE_BAR),
+    }
+
+
+def tk_geometry(slot: tuple[int, int, int, int]) -> str:
+    x, y, w, h = slot
+    return f"{w}x{h}+{x}+{y}"

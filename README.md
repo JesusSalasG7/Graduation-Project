@@ -518,14 +518,23 @@ guiada lo cierra y vuelve al panel.
 **Monitor del investigador.** Las ventanas de monitoreo se abren
 siempre visibles en el monitor 1: por defecto el primer monitor externo
 conectado (no la pantalla de la laptop). Se puede elegir otro con
-`RESEARCHER_MONITOR` en el `.env` (ver `.env.example`). Se reparten así:
+`RESEARCHER_MONITOR` en el `.env` (ver `.env.example`). Se reparten en
+una grilla que ocupa el área útil del monitor (sin la barra superior ni
+el dock), sin taparse entre sí:
 
-| Ventana | Posición |
-|---|---|
-| ⏱️ Sesión en curso (cronómetro) | arriba a la izquierda |
-| Video del Camera Tracker | abajo a la izquierda |
-| 🧠 Datos del Neurosky | arriba a la derecha |
-| 📷 Datos de la Cámara | abajo a la derecha |
+```
++-------------+-----------------------------------+
+|  ⏱️ Sesión   |  Mirada: izquierda o derecha      |
+|  en curso   |  (la más grande)                  |
++-------------+-----------------+-----------------+
+|  Video del  |  🧠 Datos del    |  📷 Datos de la  |
+|  Camera     |  Neurosky       |  Cámara         |
+|  Tracker    |                 |                 |
++-------------+-----------------+-----------------+
+```
+
+En la ventana de mirada, la mitad hacia donde mira el participante se
+ilumina y muestra el lado en letras grandes.
 
 La ventana **Sesión en curso** se abre al iniciar la sesión guiada y
 muestra el tiempo total del participante, cuánto lleva la sesión
