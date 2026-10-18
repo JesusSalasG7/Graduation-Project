@@ -272,7 +272,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             messagebox.showinfo(
                 "Participante sin consentimiento",
                 f"El {participant_label(participant)} indicó que no desea participar en el "
-                "estudio, así que no puede iniciar la sesión ni los juegos.",
+                "estudio, así que no puede iniciar la sesión guiada.",
             )
             return False
 
@@ -533,6 +533,11 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         self._nav_buttons["games"] = self._nav_button(nav, "🕹️  Juegos", "games")
         self._nav_buttons["participants"] = self._nav_button(nav, "🧑‍🤝‍🧑  Participantes", "participants")
+        # Desplegable bajo "Participantes" con cuántos participantes hay de
+        # cada perfil. Se arma vacío y oculto: lo llena
+        # _refresh_profile_dropdown y lo abre/cierra _select_nav.
+        self._profile_dropdown = ctk.CTkFrame(nav, fg_color=BG_CARD, corner_radius=8)
+        self._profile_dropdown_open = False
         self._nav_buttons["session"] = self._nav_button(nav, "⏱️  Sesión", "session")
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
@@ -576,7 +581,55 @@ class App(ctk.CTk, *_DND_MIXIN):
         btn.pack(fill="x", pady=3)
         return btn
 
+    def _set_profile_dropdown(self, open_: bool):
+        self._profile_dropdown_open = open_
+        if open_:
+            self._profile_dropdown.pack(fill="x", padx=(14, 0), pady=(0, 3), after=self._nav_buttons["participants"])
+        else:
+            self._profile_dropdown.pack_forget()
+
+    def _profile_counts(self) -> list[tuple[str, int]]:
+        """(perfil, cantidad) de los perfiles que tienen al menos un
+        participante, en el orden de EXPERIENCE_PROFILES. Los niveles
+        anteriores a los perfiles (ej. "Avanzado") van al final."""
+        counts: dict[str, int] = {}
+        for p in self.store.list_participants():
+            level = p.get("attributes", {}).get("nivel_experiencia") or "Sin perfil"
+            counts[level] = counts.get(level, 0) + 1
+        ordered = [profile for profile, _ in EXPERIENCE_PROFILES if profile in counts]
+        ordered += sorted(level for level in counts if level not in ordered)
+        return [(level, counts[level]) for level in ordered]
+
+    def _refresh_profile_dropdown(self):
+        for child in self._profile_dropdown.winfo_children():
+            child.destroy()
+        rows = self._profile_counts()
+        if not rows:
+            ctk.CTkLabel(
+                self._profile_dropdown, text="Sin participantes aún",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            ).pack(anchor="w", padx=12, pady=8)
+            return
+        for i, (level, count) in enumerate(rows):
+            row = ctk.CTkFrame(self._profile_dropdown, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=(8 if i == 0 else 2, 8 if i == len(rows) - 1 else 2))
+            ctk.CTkLabel(
+                row, text=level, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)),
+                text_color="#c9cdd9",
+            ).pack(side="left")
+            ctk.CTkLabel(
+                row, text=str(count), font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
+                fg_color=BG_CARD_ALT, corner_radius=8, text_color="white", width=scaled(28),
+            ).pack(side="right")
+
     def _select_nav(self, key):
+        # "Participantes" abre su desplegable al entrar a la pestaña y lo
+        # cierra si se vuelve a presionar estando ya en ella.
+        if key == "participants":
+            already_there = self._nav_buttons["participants"].cget("fg_color") == ACCENT
+            self._set_profile_dropdown(not (already_there and self._profile_dropdown_open))
+        else:
+            self._set_profile_dropdown(False)
         frames = {
             "games": self.tab_games,
             "participants": self.tab_participants,
@@ -877,16 +930,15 @@ class App(ctk.CTk, *_DND_MIXIN):
         threading.Thread(target=worker, daemon=True).start()
 
     def _play(self, game):
-        active = self.store.get_active()
-        if active is None:
+        # Jugar suelto desde "Juegos" no pasa por el consentimiento: la
+        # carta solo se exige para la sesión guiada (enter_session_wizard).
+        if self.store.get_active() is None:
             proceed = messagebox.askyesno(
                 "Sin participante activo",
                 "No hay un participante activo seleccionado. ¿Deseas iniciar el juego de todas formas?",
             )
             if not proceed:
                 return
-        elif not self._ensure_consent(active, lambda: self._play(game)):
-            return
         try:
             play_game(game)
         except FileNotFoundError as exc:
@@ -1047,6 +1099,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._refresh_consent_status()
         count = len(self.store.list_participants())
         self._nav_buttons["participants"].configure(text=f"🧑‍🤝‍🧑  Participantes ({count})")
+        self._refresh_profile_dropdown()
 
     def _open_add_participant_modal(self):
         modal = ctk.CTkToplevel(self)

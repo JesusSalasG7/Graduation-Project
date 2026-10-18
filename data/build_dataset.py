@@ -5,7 +5,9 @@ atención/meditación), Emotion Tracker (emoción dominante + el porcentaje de
 CADA categoría + valencia/arousal de EmotiEffLib, ver
 tools/emotion_recognizer.py), Eye
 Tracker (mirada cruda + miradas izquierda/derecha agregadas), frecuencia
-cardíaca del reloj, y el resultado de los cuestionarios -- una fila por
+cardíaca del reloj, el resultado de los cuestionarios y los tiempos del
+cronómetro de la sesión guiada (tiempos_sesion.json, ver
+graphic_interface/storage/session_timing.py) -- una fila por
 (participante, desafío, etapa, intento), con listas de lecturas crudas en
 las columnas "*_List" (mismo criterio que el dataset de referencia
 Data_Completa_Editada.csv que se uso como modelo).
@@ -48,6 +50,7 @@ if str(GRAPHIC_INTERFACE_DIR) not in sys.path:
     sys.path.insert(0, str(GRAPHIC_INTERFACE_DIR))
 
 from ai.challenge_solver import GUIDED_SESSION_GAME_ORDER  # noqa: E402
+from storage.session_timing import COUNTED_CLOSES, TIMING_FILENAME  # noqa: E402
 from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, list_stage_attempts, sessions_root  # noqa: E402
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "dataset_sesiones.csv"
@@ -123,6 +126,71 @@ def _timing_columns(stage_folder: Path) -> dict:
     except ValueError:
         pass
     return {"Hora_Inicio": started or "", "Hora_Fin": ended or "", "Duracion_Segundos": duration}
+
+
+def _session_timing(participant_dir: Path) -> dict:
+    """tiempos_sesion.json del participante, con solo las sesiones que
+    suman al total (las cerradas con "Guardar progreso"/"Terminar sesión";
+    ver session_timing.py) y sus etapas. {} si no hay registro (sesiones
+    grabadas antes de que existiera el cronómetro)."""
+    payload = _read_json_safe(participant_dir / TIMING_FILENAME)
+    if not payload:
+        return {}
+    counted = [s for s in payload.get("sesiones", []) if s.get("cierre") in COUNTED_CLOSES]
+    # Número de sesión "real" (1 = la primera, 2 = la primera vez que se
+    # retomó...), sin contar las salidas sin guardar ni las interrumpidas.
+    ordinal = {s["numero"]: i for i, s in enumerate(counted, start=1)}
+    stages = [
+        dict(stage, sesion_ordinal=ordinal[stage["sesion"]])
+        for stage in payload.get("etapas", [])
+        if stage.get("sesion") in ordinal and stage.get("duracion_s") is not None
+    ]
+    return {"resumen": payload.get("resumen", {}), "etapas": stages}
+
+
+def _participant_timing_columns(timing: dict) -> dict:
+    summary = timing.get("resumen", {})
+    if not summary:
+        return {}
+    completed = bool(summary.get("completo_los_7_juegos"))
+    return {
+        "Cronometro_Sesiones": summary.get("sesiones_contadas", ""),
+        "Cronometro_Veces_Retomada": summary.get("veces_retomada", ""),
+        "Cronometro_Tiempo_Total_Segundos": summary.get("tiempo_total_s", ""),
+        "Cronometro_Completo_7_Juegos": completed,
+        "Cronometro_Tiempo_7_Juegos_Segundos": summary.get("tiempo_total_s", "") if completed else "",
+    }
+
+
+def _challenge_timing_columns(timing: dict, challenge_number: int) -> dict:
+    """Tiempo del desafío y de cada una de sus 6 etapas (sumando los
+    intentos de "Reintentar") -- las Etapas 1 y 6 no tienen fila propia en
+    el dataset, así que van como columnas del desafío."""
+    stages = [s for s in timing.get("etapas", []) if s.get("desafio") == challenge_number]
+    if not stages:
+        return {}
+    cols = {"Cronometro_Desafio_Segundos": sum(s["duracion_s"] for s in stages)}
+    for stage in range(1, 7):
+        cols[f"Cronometro_Desafio_Etapa{stage}_Segundos"] = sum(
+            s["duracion_s"] for s in stages if s.get("etapa") == stage
+        )
+    return cols
+
+
+def _stage_timing_columns(timing: dict, challenge_number: int, stage: int, attempt: int) -> dict:
+    """La etapa de esta fila según el cronómetro. Las etapas 1-2 no llevan
+    intento en el registro (no se repiten al reintentar)."""
+    matches = [
+        s for s in timing.get("etapas", [])
+        if s.get("desafio") == challenge_number and s.get("etapa") == stage
+        and (s.get("intento") or 1) == attempt
+    ]
+    if not matches:
+        return {}
+    return {
+        "Cronometro_Sesion": matches[-1]["sesion_ordinal"],
+        "Cronometro_Etapa_Segundos": sum(s["duracion_s"] for s in matches),
+    }
 
 
 def _neurosky_columns(stage_folder: Path) -> dict:
@@ -259,7 +327,7 @@ def _device_status_columns(stage: int, stage_status: dict) -> dict:
 
 def _build_row(
     participant_number: int, experience_level: str, challenge_number: int, game_name: str,
-    stage: int, attempt: int, stage_folder: Path, stage_status: dict,
+    stage: int, attempt: int, stage_folder: Path, stage_status: dict, timing: dict,
 ) -> dict:
     row = {
         "Participante_ID": participant_number,
@@ -270,6 +338,9 @@ def _build_row(
         "Intento": attempt,
     }
     row.update(_timing_columns(stage_folder))
+    row.update(_participant_timing_columns(timing))
+    row.update(_challenge_timing_columns(timing, challenge_number))
+    row.update(_stage_timing_columns(timing, challenge_number, stage, attempt))
     row.update(_neurosky_columns(stage_folder))
     row.update(_emotion_columns(stage_folder))
     row.update(_eye_columns(stage_folder))
@@ -300,6 +371,7 @@ def build_dataset() -> pd.DataFrame:
         if participant_number is None:
             continue
         experience_level = experience_levels.get(participant_number, "")
+        timing = _session_timing(participant_dir)
 
         for challenge_dir in sorted(participant_dir.glob("Desafio_*")):
             match = _CHALLENGE_DIR_RE.match(challenge_dir.name)
@@ -321,12 +393,12 @@ def build_dataset() -> pd.DataFrame:
                         stage_folder = stage_root / f"intento_{attempt}"
                         rows.append(_build_row(
                             participant_number, experience_level, challenge_number, game_name,
-                            stage, attempt, stage_folder, stage_status,
+                            stage, attempt, stage_folder, stage_status, timing,
                         ))
                 elif stage_root.is_dir():
                     rows.append(_build_row(
                         participant_number, experience_level, challenge_number, game_name,
-                        stage, 1, stage_root, stage_status,
+                        stage, 1, stage_root, stage_status, timing,
                     ))
 
     return pd.DataFrame(rows)

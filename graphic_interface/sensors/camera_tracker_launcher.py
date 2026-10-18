@@ -125,6 +125,8 @@ def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tu
 
 def start_camera_tracker(
     participant: Optional[dict], session_label: str, left_x: float, right_x: float, mirror: bool = True,
+    video_geometry: Optional[tuple[int, int, int, int]] = None,
+    gaze_geometry: Optional[tuple[int, int, int, int]] = None,
 ) -> subprocess.Popen:
     """Lanza el seguimiento continuo (mirada + emoción, un solo proceso,
     una sola cámara) con los umbrales calibrados de run_calibration(),
@@ -135,6 +137,10 @@ def start_camera_tracker(
     dos CSV propios -- graphic_interface/data/emotion_logs/<NOMBRE_
     APELLIDO>.csv y graphic_interface/data/eye_logs/<NOMBRE_APELLIDO>.csv
     -- los mismos que usaban las herramientas separadas.
+
+    `video_geometry` y `gaze_geometry` (x, y, ancho, alto) ubican la
+    ventana de video y la de "Mirada: izquierda o derecha" (ver
+    monitors.researcher_layout: el monitor del investigador).
     """
     if not CAMERA_TRACKER_SCRIPT.exists():
         raise FileNotFoundError("No se encontró tools/camera_tracker.py")
@@ -146,6 +152,10 @@ def start_camera_tracker(
     ]
     if mirror:
         args.append("--mirror")
+    if video_geometry is not None:
+        args += ["--video-geometry", ",".join(str(v) for v in video_geometry)]
+    if gaze_geometry is not None:
+        args += ["--gaze-geometry", ",".join(str(v) for v in gaze_geometry)]
 
     if participant:
         EMOTION_LOG_DIR.mkdir(parents=True, exist_ok=True)

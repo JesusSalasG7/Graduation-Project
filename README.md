@@ -66,14 +66,14 @@ Graduation-Project/
 ├── graphic_interface/     # Panel principal (GUI, orquesta toda la sesión guiada)
 │   ├── main.py            # Punto de entrada (python graphic_interface/main.py)
 │   ├── paths.py           # Rutas compartidas (raíz del proyecto, tools/, data/, assets/)
-│   ├── ui/                # Interfaz: app.py (ventana principal), session_wizard.py (Etapas 1-6), consent_view.py, statement_view.py
+│   ├── ui/                # Interfaz: app.py (ventana principal), session_wizard.py (Etapas 1-6), consent_view.py, statement_view.py, session_monitor.py (cronómetro del investigador), monitors.py (monitor del investigador)
 │   ├── ai/                # IA: ai_backend.py (Claude/Gemini), isolated_prompt.py (Etapa 3), challenge_solver.py (cuestionarios 4-5)
 │   ├── content/           # Contenido estático: challenges.py, statement_quiz.py, quiz.py, difficulty.py
 │   ├── consent/           # Consentimiento informado: consent_pdf.py (llenado del PDF), consent_mailer.py (envío por correo)
 │   ├── sensors/           # Integración con cada sensor: NeuroSky, cámara, eye tracker, reloj (heart_rate_import.py)
 │   ├── games/             # Lanzar juegos y parchearlos con la solución de la IA
 │   ├── judge/             # Juez de prompts (LLM-as-a-judge): judge_config.py, judge_inputs.py, judge_prompt.py, judge_client.py, judge_runner.py
-│   ├── storage/           # Persistencia: participantes, consentimientos (consent_store.py), respuestas de cuestionarios, stage_capture.py
+│   ├── storage/           # Persistencia: participantes, consentimientos (consent_store.py), respuestas de cuestionarios, stage_capture.py, tiempos de la sesión guiada (session_timing.py)
 │   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py, test_email_config.py, evaluate_prompts.py (juez)
 │   ├── assets/            # Icono de la app, consentimiento/consentimiento_v1.0.pdf (carta original) y juez/ (rubrica.md, especificaciones.md)
 │   ├── requirements.txt
@@ -422,6 +422,10 @@ Cada participante es **anónimo dentro de la app** ("Participante 1",
   - **Perfil 2**: Análisis y diseño de algoritmos.
   - **Perfil 3**: Ingeniería del software y Base de datos.
 
+Al presionar **Participantes** en la barra lateral se despliega, debajo
+del botón, cuántos participantes hay de cada perfil (solo los perfiles
+que tienen al menos uno). Presionarlo otra vez lo cierra.
+
 Hacé clic en una fila de la tabla para marcarlo como el participante
 **activo** — la sesión guiada y la pestaña Sesión siempre operan
 sobre ese participante activo.
@@ -435,9 +439,10 @@ vuelve a mandarla por correo.
 ### Consentimiento informado
 
 La primera vez que un participante va a entrar al estudio — al tocar
-**"🚀 Iniciar sesión guiada"** o **▶ Jugar** con él como participante
-activo — aparece la carta de consentimiento a ventana completa, y no
-se llega a ninguna pantalla del estudio sin firmarla:
+**"🚀 Iniciar sesión guiada"** con él como participante activo —
+aparece la carta de consentimiento a ventana completa, y no se llega a
+ninguna pantalla del estudio sin firmarla. Jugar suelto desde la
+pestaña **Juegos** (**▶ Jugar**) no pide la carta:
 
 - A la izquierda se ve la carta original
   (`graphic_interface/assets/consentimiento/consentimiento_v1.0.pdf`)
@@ -453,7 +458,7 @@ se llega a ninguna pantalla del estudio sin firmarla:
 - **"No deseo participar"** cierra el flujo con un agradecimiento, sin
   guardar ningún dato personal: el participante queda marcado como
   `No participa`, deja de ser el activo y no puede iniciar la sesión
-  ni los juegos.
+  guiada.
 - **"← Volver al panel (sin firmar)"** (o cerrar la app) no registra
   nada: el consentimiento se vuelve a pedir la próxima vez.
 
@@ -510,6 +515,57 @@ pestaña Sesión). El flujo es:
 Presionar ESC durante cualquier minijuego lanzado desde la sesión
 guiada lo cierra y vuelve al panel.
 
+**Monitor del investigador.** Las ventanas de monitoreo se abren
+siempre visibles en el monitor 1: por defecto el primer monitor externo
+conectado (no la pantalla de la laptop). Se puede elegir otro con
+`RESEARCHER_MONITOR` en el `.env` (ver `.env.example`). Se reparten en
+una grilla que ocupa el área útil del monitor (sin la barra superior ni
+el dock), sin taparse entre sí:
+
+```
++-------------+-----------------------------------+
+|  ⏱️ Sesión   |  Mirada: izquierda o derecha      |
+|  en curso   |  (la más grande)                  |
++-------------+-----------------+-----------------+
+|  Video del  |  🧠 Datos del    |  📷 Datos de la  |
+|  Camera     |  Neurosky       |  Cámara         |
+|  Tracker    |                 |                 |
++-------------+-----------------+-----------------+
+```
+
+En la ventana de mirada, la mitad hacia donde mira el participante se
+ilumina y muestra el lado en letras grandes.
+
+La ventana **Sesión en curso** se abre al iniciar la sesión guiada y
+muestra el tiempo total del participante, cuánto lleva la sesión
+actual (y cuántas veces se retomó), en qué desafío/juego y en qué
+etapa está, y cuánto lleva en esa etapa. El cronómetro arranca con la
+Etapa 1 del primer juego que se juega en esa sesión.
+
+**"💾 Guardar progreso"** y **"🏁 Terminar sesión guiada"** pausan el
+cronómetro en el momento en que se presionan (el tiempo de la pantalla
+del reloj no cuenta). Al retomar, el total sigue desde donde quedó
+hasta terminar los 7 juegos. Al salir, la ventana queda con los tiempos
+finales hasta que la cerrás.
+
+**Registro de tiempos.** Todo esto queda guardado, etapa por etapa, en
+`~/Escritorio/Sesiones_participantes/Participante_N/tiempos_sesion.json`:
+
+- `resumen`: veces que se retomó, tiempo total, si completó los 7
+  juegos (y el tiempo total de los 7), y por desafío el tiempo total y
+  el de cada etapa (sumando los intentos de "Reintentar").
+- `sesiones`: cada sesión con inicio, fin, duración, desafíos jugados y
+  cómo se cerró: `guardar_progreso`, `sesion_terminada`,
+  `salida_sin_guardar` (✕ Salir sin guardar el progreso) o
+  `interrumpida` (la app se cerró de golpe).
+- `etapas`: cada etapa con su sesión, desafío, juego, intento, inicio,
+  fin y duración.
+
+Solo las sesiones cerradas con "Guardar progreso" o "Terminar sesión
+guiada" suman al total: en las otras el progreso no se guardó y esos
+desafíos se vuelven a jugar, así que contarlas duplicaría tiempo. Igual
+quedan en `sesiones` y `etapas` para consultarlas.
+
 ### Pestaña Sesión: datos guardados y dataset
 
 Con un participante activo, esta pestaña muestra:
@@ -527,6 +583,27 @@ Con un participante activo, esta pestaña muestra:
   Una vez generado, **"🖥️ Ver dataset completo"** lo abre en una
   ventana aparte a pantalla completa para poder revisarlo con
   detalle.
+
+  Los tiempos del cronómetro (`tiempos_sesion.json`, ver
+  [Sesión guiada](#sesión-guiada)) van en las columnas `Cronometro_*`.
+  Solo cuentan las sesiones que suman al total, y quedan vacías para
+  participantes grabados antes de que existiera el cronómetro:
+
+  | Columna | Qué es |
+  |---|---|
+  | `Cronometro_Sesiones` | Sesiones del participante (1 = sin retomar) |
+  | `Cronometro_Veces_Retomada` | Veces que retomó la sesión guiada |
+  | `Cronometro_Tiempo_Total_Segundos` | Tiempo total acumulado del participante |
+  | `Cronometro_Completo_7_Juegos` | Si ya terminó los 7 juegos |
+  | `Cronometro_Tiempo_7_Juegos_Segundos` | Tiempo total de los 7 juegos (vacío si no terminó) |
+  | `Cronometro_Desafio_Segundos` | Tiempo total de ese desafío |
+  | `Cronometro_Desafio_Etapa1_Segundos` … `Etapa6_Segundos` | Tiempo de cada etapa del desafío, sumando los intentos (las Etapas 1 y 6 no tienen fila propia) |
+  | `Cronometro_Sesion` | En qué sesión (1, 2…) se hizo la etapa de esa fila |
+  | `Cronometro_Etapa_Segundos` | Duración de la etapa de esa fila según el cronómetro |
+
+  `Duracion_Segundos` (la columna que ya existía) mide la ventana de
+  sensores de la etapa, que se corta al exportar. Por eso puede diferir
+  un poco de `Cronometro_Etapa_Segundos`.
 - **⚖️ Evaluar prompts (solo investigador)**: ver la sección siguiente.
 
 ### Juez de prompts (LLM-as-a-judge)
@@ -589,6 +666,7 @@ quedan en `llamadas.jsonl` pero no se reutilizan.
 | Qué | Dónde |
 |---|---|
 | Datos de cada sesión (sensores, cuestionarios, prompts) | `~/Escritorio/Sesiones_participantes/Participante_N/Desafio_N/Etapa_N/...` |
+| Tiempos de la sesión guiada (sesiones, etapas, total de los 7 juegos) | `~/Escritorio/Sesiones_participantes/Participante_N/tiempos_sesion.json` |
 | Nombre/apellido de los participantes (dato personal) | `~/Escritorio/Participantes/participantes.csv` |
 | Consentimientos firmados (PDF con nombre, C.I. y firma) | `~/Escritorio/Participantes/consentimientos/consentimiento_P001_v1.0.pdf` |
 | Registro de consentimientos (nombre, C.I., correo, fecha/hora de firma, versión del documento, estado del envío por correo) | `~/Escritorio/Participantes/consentimientos/registro.json` |
