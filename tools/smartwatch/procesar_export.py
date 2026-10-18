@@ -29,7 +29,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-EXERCISE_CSV_GLOB = "com.samsung.shealth.exercise.*.csv"
+EXERCISE_TABLE_NAME = "com.samsung.shealth.exercise"
+EXERCISE_CSV_GLOB = f"{EXERCISE_TABLE_NAME}.*.csv"
 LIVE_DATA_COLUMN = "com.samsung.health.exercise.live_data"
 DATAUUID_COLUMN = "com.samsung.health.exercise.datauuid"
 START_TIME_COLUMN = "com.samsung.health.exercise.start_time"
@@ -53,7 +54,12 @@ def read_exercise_rows(export_dir: Path) -> list[dict]:
     rows: list[dict] = []
     for csv_path in csv_files:
         with csv_path.open(encoding="utf-8-sig", newline="") as f:
-            f.readline()  # primera línea = metadata de la tabla (nombre, versión, num. columnas); se descarta
+            # Primera línea = metadata de la tabla (nombre, versión, num. columnas).
+            # El glob también atrapa otras tablas (p.ej. exercise.extension), con
+            # columnas distintas; solo se lee la tabla principal de ejercicios.
+            table_name = f.readline().split(",", 1)[0].strip()
+            if table_name != EXERCISE_TABLE_NAME:
+                continue
             reader = csv.DictReader(f)
             rows.extend(reader)
     return rows
