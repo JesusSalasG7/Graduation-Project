@@ -27,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog
 from typing import Callable, Optional
+from urllib.parse import unquote, urlparse
 
 import customtkinter as ctk
 
@@ -265,31 +266,103 @@ def _update_challenge_manifest_heart_rate(
     write_challenge_manifest(challenge_folder, participant, challenge_number, stage_status)
 
 
-def register_drop_target(widget, on_drop_path: Callable[[str], None]) -> bool:
-    """Intenta registrar `widget` como zona de destino de arrastrar-y-soltar
-    con tkinterdnd2. Devuelve False (sin lanzar excepción) si la librería no
-    está instalada o el registro falla por cualquier motivo -- la pantalla
-    debe seguir funcionando solo con el botón "Seleccionar archivo"."""
+def parse_dropped_paths(widget, data: str) -> list:
+    """Convierte el `event.data` de un drop de tkdnd en una lista de rutas.
+
+    tkdnd entrega una lista Tcl (las rutas con espacios vienen entre
+    llaves), así que se separa con splitlist en vez de a mano. Además
+    cubre lo que algunos gestores de archivos mandan sin normalizar:
+    prefijo "file://", escapes "%20" y acentos mal decodificados."""
     try:
-        from tkinterdnd2 import DND_FILES
+        items = list(widget.tk.splitlist(data))
+    except Exception:
+        items = data.split()
+    paths = []
+    for item in items:
+        item = str(item).strip()
+        if not item:
+            continue
+        if item.startswith("file://"):
+            item = unquote(urlparse(item).path)
+        if not Path(item).exists():
+            # tkdnd decodifica dos veces el UTF-8 de la URI en Linux: una
+            # ruta con acentos llega como "MÃºsica" en vez de "Música".
+            try:
+                fixed = item.encode("latin-1").decode("utf-8")
+                if Path(fixed).exists():
+                    item = fixed
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                pass
+        paths.append(item)
+    return paths
+
+
+def resolve_export_folder(path: Path) -> Path:
+    """Si se soltó algo de ADENTRO del export (el CSV de frecuencia
+    cardíaca, la carpeta "jsons/", etc.) en vez de la carpeta completa,
+    sube hasta la carpeta del export. Si no la encuentra devuelve la ruta
+    tal cual y la validación explica el problema."""
+    candidate = path if path.is_dir() else path.parent
+    for folder in [candidate, *candidate.parents][:4]:
+        try:
+            find_heart_rate_csv(folder)
+            return folder
+        except (HeartRateValidationError, OSError):
+            continue
+    return path
+
+
+def _all_descendants(widget):
+    yield widget
+    for child in widget.winfo_children():
+        yield from _all_descendants(child)
+
+
+def register_drop_target(
+    widget, on_drop_path: Callable[[str], None],
+    on_enter: Optional[Callable[[], None]] = None, on_leave: Optional[Callable[[], None]] = None,
+) -> bool:
+    """Intenta registrar `widget` (y todos sus hijos, para que soltar sobre
+    un texto o un botón también cuente) como zona de destino de
+    arrastrar-y-soltar con tkinterdnd2. Devuelve False (sin lanzar
+    excepción) si la librería no está instalada o el registro falla -- la
+    pantalla debe seguir funcionando solo con el botón "Seleccionar
+    carpeta"."""
+    try:
+        from tkinterdnd2 import COPY, DND_FILES
     except ImportError:
         return False
 
+    def _on_enter(event):
+        if on_enter:
+            on_enter()
+        return COPY
+
+    def _on_position(event):
+        return COPY
+
+    def _on_leave(event):
+        if on_leave:
+            on_leave()
+
+    def _on_drop(event):
+        if on_leave:
+            on_leave()
+        paths = parse_dropped_paths(widget, event.data)
+        if paths:
+            # Se procesa fuera del evento de drop: si el handler tarda o
+            # falla, el gestor de archivos no se queda esperando la
+            # respuesta del drop (y el arrastre no queda "colgado").
+            widget.after_idle(lambda: on_drop_path(paths[0]))
+        return COPY
+
     try:
-        widget.drop_target_register(DND_FILES)
-
-        def _on_drop(event):
-            # event.data puede traer varias rutas separadas por espacio y
-            # entre llaves si el nombre tiene espacios -- nos quedamos con
-            # la primera.
-            raw = event.data.strip()
-            if raw.startswith("{") and "}" in raw:
-                raw = raw[1:raw.index("}")]
-            else:
-                raw = raw.split()[0]
-            on_drop_path(raw)
-
-        widget.dnd_bind("<<Drop>>", _on_drop)
+        for target in _all_descendants(widget):
+            target.drop_target_register(DND_FILES)
+            target.dnd_bind("<<DropEnter>>", _on_enter)
+            target.dnd_bind("<<DropPosition>>", _on_position)
+            target.dnd_bind("<<DropLeave>>", _on_leave)
+            target.dnd_bind("<<Drop>>", _on_drop)
         return True
     except Exception:
         return False
@@ -337,12 +410,6 @@ class HeartRateDropFrame(ctk.CTkFrame):
         )
         self.zone_label.pack(expand=True)
 
-        drop_ok = register_drop_target(self.drop_zone, self._handle_dropped_path)
-        if not drop_ok:
-            self.zone_label.configure(
-                text="📂  Arrastrar y soltar no disponible en este equipo -- usa el botón de abajo.",
-            )
-
         button_row = ctk.CTkFrame(self, fg_color="transparent")
         button_row.pack(fill="x", padx=18, pady=(0, 10))
         ctk.CTkButton(
@@ -358,16 +425,35 @@ class HeartRateDropFrame(ctk.CTkFrame):
         )
         self.status_label.pack(anchor="w", padx=18, pady=(0, 16))
 
+        # Se registra el panel completo (no solo el recuadro gris) y recién
+        # acá, con todos los hijos ya creados: soltar la carpeta sobre el
+        # título, el texto o el botón también tiene que funcionar.
+        self._zone_text = "📂  Suelta la carpeta acá"
+        drop_ok = register_drop_target(
+            self, self._handle_dropped_path, on_enter=self._highlight_on, on_leave=self._highlight_off,
+        )
+        if not drop_ok:
+            self._zone_text = "📂  Arrastrar y soltar no disponible en este equipo -- usa el botón de abajo."
+            self.zone_label.configure(text=self._zone_text)
+
+    def _highlight_on(self):
+        self.drop_zone.configure(border_width=2, border_color=self.c.get("ACCENT", self.c["BORDER"]))
+        self.zone_label.configure(text="📥  Suelta para cargar la carpeta")
+
+    def _highlight_off(self):
+        self.drop_zone.configure(border_width=0)
+        self.zone_label.configure(text=self._zone_text)
+
     def _open_folder_picker(self):
         path_str = filedialog.askdirectory(title="Seleccionar carpeta del export de Samsung Health")
         if path_str:
             self._handle_dropped_path(path_str)
 
     def _handle_dropped_path(self, path_str: str):
-        path = Path(path_str)
+        path = resolve_export_folder(Path(path_str.strip()).expanduser())
         try:
             csv_path = validate_heart_rate_export_folder(path)
-        except HeartRateValidationError as exc:
+        except (HeartRateValidationError, OSError) as exc:
             self._accepted_path = None
             self.status_label.configure(text=f"⚠️  {exc}", text_color=self.c["WARNING"])
             return
