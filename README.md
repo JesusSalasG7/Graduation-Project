@@ -542,6 +542,11 @@ actual (y cuántas veces se retomó), en qué desafío/juego y en qué
 etapa está, y cuánto lleva en esa etapa. El cronómetro arranca con la
 Etapa 1 del primer juego que se juega en esa sesión.
 
+Debajo muestra el **desglose por etapa** del desafío actual: el tiempo
+de cada una de las 6 etapas, con la etapa en curso resaltada (▶) y
+contando en vivo. Los intentos de "Reintentar" se suman a su etapa, y
+el desglose se reinicia al pasar al siguiente juego.
+
 **"💾 Guardar progreso"** y **"🏁 Terminar sesión guiada"** pausan el
 cronómetro en el momento en que se presionan (el tiempo de la pantalla
 del reloj no cuenta). Al retomar, el total sigue desde donde quedó

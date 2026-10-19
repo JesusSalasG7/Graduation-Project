@@ -115,7 +115,7 @@ from ui.monitors import (
     tk_geometry,
     usable_area,
 )
-from ui.session_monitor import SessionMonitorWindow
+from ui.session_monitor import STAGE_NAMES, SessionMonitorWindow
 from ui.statement_view import fit_wraplength, render_statement
 
 FONT_FAMILY = "Segoe UI"
@@ -133,17 +133,6 @@ ALL_DEVICES = ("heart_rate", "neurosky", "camera")
 # colgo (el dispositivo se desconectó, perdió batería, etc.) -- ver
 # _neurosky_watchdog_tick.
 NEUROSKY_STALE_SECONDS = 8
-
-# Nombre corto de cada etapa para la ventana "Sesión en curso" del
-# investigador (ver SessionMonitorWindow / _update_session_monitor).
-STAGE_NAMES = {
-    1: "Ver el juego",
-    2: "El problema",
-    3: "Tu prompt",
-    4: "Resultado",
-    5: "Razonamiento",
-    6: "Solución en acción",
-}
 
 # Toda la tipografía de la sesión guiada se agranda respecto al resto de
 # la app (pedido explícito: mejor legibilidad durante la sesión). 1.5x,
@@ -290,13 +279,14 @@ class SessionWizard:
         self._timing: Optional[SessionTimingLog] = None
 
     # ---------------- utilidades ----------------
-    def _update_session_monitor(self, stage_text: str, starts_session: bool = False):
+    def _update_session_monitor(self, stage_text: str, starts_session: bool = False, stage: Optional[int] = None):
         if self._session_monitor is None:
             return
         total = len(GUIDED_SESSION_GAME_ORDER)
         game = self.current_game.display_name if self.current_game is not None else "—"
         self._session_monitor.set_position(
             f"Desafío {self.game_index + 1} de {total} · {game}", stage_text, starts_session=starts_session,
+            challenge_key=self.game_index, stage=stage,
         )
 
     def _update_session_monitor_stage(self, stage: int):
@@ -309,7 +299,7 @@ class SessionWizard:
         # desafío que se juega en esta sesión (si se retoma una sesión
         # guardada, es el desafío donde se retoma, y el total sigue desde
         # lo acumulado).
-        self._update_session_monitor(text, starts_session=stage == 1)
+        self._update_session_monitor(text, starts_session=stage == 1, stage=stage)
         if self._timing is not None:
             game = self.current_game.name if self.current_game is not None else ""
             self._timing.start_stage(self.game_index + 1, game, stage, attempt)
