@@ -25,6 +25,16 @@ from ui.monitors import SLOT_TIMER, researcher_layout, tk_geometry
 
 FONT_FAMILY = "Segoe UI"
 
+# Nombre corto de cada etapa (ver session_wizard._update_session_monitor_stage).
+STAGE_NAMES = {
+    1: "Ver el juego",
+    2: "El problema",
+    3: "Tu prompt",
+    4: "Resultado",
+    5: "Razonamiento",
+    6: "Solución en acción",
+}
+
 
 class SessionMonitorWindow:
     def __init__(
@@ -39,6 +49,11 @@ class SessionMonitorWindow:
         self._stage_started_at: Optional[float] = None
         self._stopped_at: Optional[float] = None
         self._tick_job = None
+        # Desglose por etapa del desafío actual: segundos ya cerrados de
+        # cada etapa (sumando reintentos) y la etapa que está corriendo.
+        self._challenge_key = None
+        self._stage_totals: dict[int, float] = {}
+        self._current_stage: Optional[int] = None
 
         window = ctk.CTkToplevel(app)
         window.title("Sesión en curso")
@@ -81,7 +96,29 @@ class SessionMonitorWindow:
             window, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)),
             text_color=colors["TEXT_MUTED"], anchor="w",
         )
-        self._stage_time_label.pack(anchor="w", fill="x", padx=16, pady=(0, 12))
+        self._stage_time_label.pack(anchor="w", fill="x", padx=16, pady=(0, 8))
+
+        breakdown = ctk.CTkFrame(window, fg_color=colors["BG_CARD_ALT"], corner_radius=8)
+        breakdown.pack(fill="x", padx=16, pady=(0, 12))
+        breakdown.grid_columnconfigure(0, weight=1)
+        row_font = ctk.CTkFont(family=FONT_FAMILY, size=scaled(11))
+        time_font = ctk.CTkFont(family="monospace", size=scaled(11))
+        self._stage_rows: dict[int, tuple[ctk.CTkLabel, ctk.CTkLabel]] = {}
+        for stage, name in STAGE_NAMES.items():
+            name_label = ctk.CTkLabel(breakdown, text=f"   {stage} · {name}", font=row_font, anchor="w", height=scaled(18))
+            time_label = ctk.CTkLabel(breakdown, text="—", font=time_font, anchor="e", height=scaled(18))
+            name_label.grid(row=stage - 1, column=0, sticky="w", padx=(10, 0), pady=(6 if stage == 1 else 0, 0))
+            time_label.grid(row=stage - 1, column=1, sticky="e", padx=(0, 10), pady=(6 if stage == 1 else 0, 0))
+            self._stage_rows[stage] = (name_label, time_label)
+        bold = ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold")
+        ctk.CTkLabel(breakdown, text="   Total del desafío", font=bold, anchor="w", height=scaled(20)).grid(
+            row=len(STAGE_NAMES), column=0, sticky="w", padx=(10, 0), pady=(4, 6),
+        )
+        self._challenge_total_label = ctk.CTkLabel(
+            breakdown, text="—", font=ctk.CTkFont(family="monospace", size=scaled(11), weight="bold"),
+            anchor="e", height=scaled(20),
+        )
+        self._challenge_total_label.grid(row=len(STAGE_NAMES), column=1, sticky="e", padx=(0, 10), pady=(4, 6))
 
         self.window: Optional[ctk.CTkToplevel] = window
         self._tick()
@@ -93,9 +130,14 @@ class SessionMonitorWindow:
             text += f" (retomada {resumed} {'vez' if resumed == 1 else 'veces'})"
         return text
 
-    def set_position(self, challenge_text: str, stage_text: str, starts_session: bool = False):
+    def set_position(
+        self, challenge_text: str, stage_text: str, starts_session: bool = False,
+        challenge_key=None, stage: Optional[int] = None,
+    ):
         """Actualiza desafío/etapa y reinicia el tiempo de la etapa.
         `starts_session` arranca el cronómetro (solo la primera vez).
+        `challenge_key`/`stage` alimentan el desglose por etapa: un
+        `challenge_key` distinto al anterior lo reinicia (cambio de juego).
         Con el cronómetro pausado solo cambia el texto."""
         if self.window is None:
             return
@@ -108,8 +150,44 @@ class SessionMonitorWindow:
             self._session_started_at = now
             self._total_label.configure(text_color="white")
         if self._session_started_at is not None:
+            self._close_current_stage(now)
+            if challenge_key is not None and challenge_key != self._challenge_key:
+                self._challenge_key = challenge_key
+                self._stage_totals = {}
+            self._current_stage = stage
             self._stage_started_at = now
         self._tick(reschedule=False)
+
+    def _close_current_stage(self, now: float):
+        """Pasa el tiempo de la etapa en curso a su total del desglose."""
+        if self._current_stage is not None and self._stage_started_at is not None:
+            self._stage_totals[self._current_stage] = (
+                self._stage_totals.get(self._current_stage, 0) + now - self._stage_started_at
+            )
+        self._current_stage = None
+
+    def _stage_seconds(self, stage: int, now: float) -> Optional[float]:
+        seconds = self._stage_totals.get(stage)
+        if stage == self._current_stage and self._stage_started_at is not None:
+            seconds = (seconds or 0) + now - self._stage_started_at
+        return seconds
+
+    def _render_breakdown(self, now: float):
+        total = 0.0
+        for stage, (name_label, time_label) in self._stage_rows.items():
+            seconds = self._stage_seconds(stage, now)
+            running = stage == self._current_stage
+            marker = "▶" if running else "  "
+            name_label.configure(
+                text=f"{marker} {stage} · {STAGE_NAMES[stage]}",
+                text_color=self.c["ACCENT"] if running else ("white" if seconds is not None else self.c["TEXT_MUTED"]),
+            )
+            time_label.configure(
+                text=format_duration(seconds) if seconds is not None else "—",
+                text_color=self.c["ACCENT"] if running else ("white" if seconds is not None else self.c["TEXT_MUTED"]),
+            )
+            total += seconds or 0
+        self._challenge_total_label.configure(text=format_duration(total) if self._stage_totals or self._current_stage else "—")
 
     def pause(self, reason: str):
         """Detiene el cronómetro ("Guardar progreso"/"Terminar sesión")."""
@@ -117,6 +195,8 @@ class SessionMonitorWindow:
             return
         self._stopped_at = time.monotonic()
         self._tick(reschedule=False)
+        self._close_current_stage(self._stopped_at)
+        self._render_breakdown(self._stopped_at)
         self._total_label.configure(text_color=self.c["WARNING"])
         self._stage_time_label.configure(text=f"⏸  En pausa · {reason}")
 
@@ -156,5 +236,6 @@ class SessionMonitorWindow:
             self._stage_time_label.configure(
                 text=f"En esta etapa: {format_duration(now - self._stage_started_at)}",
             )
+        self._render_breakdown(now)
         if reschedule and self._stopped_at is None:
             self._tick_job = self.app.after(1000, self._tick)
