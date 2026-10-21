@@ -30,7 +30,7 @@ from ui.consent_view import (
 )
 from ui.analysis_view import AnalysisView
 from ui.device_test import DeviceTester
-from ui.session_wizard import SessionWizard
+from ui.session_wizard import SessionWizard, played_challenges, saved_game_index
 from ui.statement_view import render_statement
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
@@ -414,9 +414,10 @@ class App(ctk.CTk, *_DND_MIXIN):
                 return
         self._ask_session_devices(self._begin_session_wizard)
 
-    def _begin_session_wizard(self, enabled_devices):
-        if enabled_devices is None:
+    def _begin_session_wizard(self, choice):
+        if choice is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
+        enabled_devices, start_index = choice
         # La sesión necesita la cámara y el NeuroSky libres: se corta
         # cualquier prueba de "Probar dispositivos" que siga abierta.
         self.device_tester.stop_all(wait=True)
@@ -433,18 +434,22 @@ class App(ctk.CTk, *_DND_MIXIN):
         # su botón queda deshabilitado mientras dure esta.
         self._session_active = True
         self._refresh_judge_button()
-        self.session_wizard.start(enabled_devices)
+        self.session_wizard.start(enabled_devices, start_index)
 
     def _ask_session_devices(self, on_done):
         """Modal previo a entrar a la sesión guiada: que dispositivos se
         van a usar esta vez -- todos tildados por defecto. Si se destilda
         alguno, la sesión guiada sigue funcionando igual, solo sin pedir
         ni procesar los datos de ese dispositivo (ver SessionWizard.
-        _enabled_devices / _show_next_setup_screen). `on_done` recibe el
-        set de dispositivos elegidos, o None si se canceló."""
+        _enabled_devices / _show_next_setup_screen). Además permite elegir
+        el desafío inicial, para participantes cuyo flujo se alteró y
+        tienen que arrancar en uno específico (por defecto, el del
+        progreso guardado). `on_done` recibe (set de dispositivos, índice
+        del desafío inicial en GUIDED_SESSION_GAME_ORDER), o None si se
+        canceló."""
         modal = ctk.CTkToplevel(self)
         modal.title("Dispositivos de esta sesión")
-        modal.geometry(f"{wrap(440)}x{wrap(360)}")
+        modal.geometry(f"{wrap(440)}x{wrap(520)}")
         modal.configure(fg_color=BG_CARD)
         modal.transient(self)
         modal.resizable(False, False)
@@ -453,13 +458,13 @@ class App(ctk.CTk, *_DND_MIXIN):
         modal.lift()
         modal.focus_force()
 
-        def finish(devices):
+        def finish(choice):
             try:
                 modal.grab_release()
             except Exception:
                 pass
             modal.destroy()
-            on_done(devices)
+            on_done(choice)
 
         modal.protocol("WM_DELETE_WINDOW", lambda: finish(None))
         modal.grab_set()
@@ -495,6 +500,50 @@ class App(ctk.CTk, *_DND_MIXIN):
                 fg_color=ACCENT, hover_color=ACCENT_HOVER,
             ).pack(anchor="w", padx=44, pady=7)
 
+        # Desafío inicial: por defecto el del progreso guardado; el
+        # evaluador puede elegir otro si el flujo de este participante se
+        # alteró (ver SessionWizard.start / next_pending_index).
+        active = self.store.get_active()
+        saved_index = saved_game_index(active)
+        played = played_challenges(active)
+        challenge_options = []
+        for index, game_name in enumerate(GUIDED_SESSION_GAME_ORDER):
+            challenge = get_challenge(game_name)
+            label = f"Desafío {index + 1} · {challenge.title if challenge else game_name}"
+            if index + 1 in played:
+                label += "  ✓ ya jugado"
+            elif index == saved_index:
+                label += "  (progreso guardado)"
+            challenge_options.append(label)
+
+        ctk.CTkLabel(
+            modal, text="🎯  Desafío inicial",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=24, pady=(18, 4))
+        challenge_var = ctk.StringVar(value=challenge_options[saved_index])
+        replay_warning = ctk.CTkLabel(
+            modal, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=WARNING,
+            wraplength=wrap(380), justify="left",
+        )
+
+        def on_challenge_selected(label):
+            index = challenge_options.index(label)
+            replay_warning.configure(
+                text="⚠️  Este desafío ya tiene datos guardados -- se van a sobrescribir."
+                if index + 1 in played else
+                "Después se sigue con los desafíos pendientes, en orden."
+                if index != saved_index else "",
+            )
+
+        ctk.CTkOptionMenu(
+            modal, values=challenge_options, variable=challenge_var, width=wrap(380),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+            command=on_challenge_selected,
+        ).pack(anchor="w", padx=24)
+        replay_warning.pack(anchor="w", padx=24, pady=(6, 0))
+        on_challenge_selected(challenge_var.get())
+
         buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
         buttons_row.pack(pady=(22, 0))
         ctk.CTkButton(
@@ -507,7 +556,10 @@ class App(ctk.CTk, *_DND_MIXIN):
             buttons_row, text="Continuar  ▶", width=scaled(150), height=scaled(34), corner_radius=8,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
-            command=lambda: finish({device for device, var in device_vars.items() if var.get()}),
+            command=lambda: finish((
+                {device for device, var in device_vars.items() if var.get()},
+                challenge_options.index(challenge_var.get()),
+            )),
         ).pack(side="left")
 
     def exit_session_wizard(self):

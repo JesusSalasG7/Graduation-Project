@@ -128,6 +128,39 @@ PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
 # de configuración (ver _show_next_setup_screen).
 ALL_DEVICES = ("heart_rate", "neurosky", "camera")
 
+
+def saved_game_index(participant: Optional[dict]) -> int:
+    """Índice (en GUIDED_SESSION_GAME_ORDER) donde retoma la sesión
+    guiada según el progreso guardado -- 0 si no hay o es inválido."""
+    saved_index = 0
+    if participant:
+        saved_index = participant.get("attributes", {}).get(PROGRESS_ATTRIBUTE, 0)
+    if not isinstance(saved_index, int) or not (0 <= saved_index < len(GUIDED_SESSION_GAME_ORDER)):
+        saved_index = 0
+    return saved_index
+
+
+def played_challenges(participant: Optional[dict]) -> set[int]:
+    """Números de desafío (1-based) que ya tienen datos exportados en disco
+    para este participante (ver stage_capture.available_challenges)."""
+    if not participant:
+        return set()
+    return set(available_challenges(participant_session_dir(participant)))
+
+
+def next_pending_index(current_index: int, played: set[int]) -> Optional[int]:
+    """Siguiente desafío sin jugar después de `current_index`, siguiendo
+    GUIDED_SESSION_GAME_ORDER y volviendo al principio si hace falta --
+    así un participante que empezó en un desafío elegido por el evaluador
+    (ver App._ask_session_devices) igual termina jugando los 7. None si ya
+    no queda ninguno pendiente (la sesión guiada está completa)."""
+    total = len(GUIDED_SESSION_GAME_ORDER)
+    for offset in range(1, total):
+        index = (current_index + offset) % total
+        if index + 1 not in played:
+            return index
+    return None
+
 # El script imprime una línea por segundo mientras hay datos (ver
 # test_neurosky.py); si pasan más de esto sin ninguna línea nueva, algo se
 # colgo (el dispositivo se desconectó, perdió batería, etc.) -- ver
@@ -169,6 +202,10 @@ class SessionWizard:
         self.app = app
         self.c = colors
         self.game_index = 0
+        # True si el evaluador eligió un desafío inicial distinto del
+        # progreso guardado (ver start()) -- solo cambia el texto de la
+        # Bienvenida.
+        self._start_overridden = False
         self.current_game = None
         self.current_challenge = None
         self.current_result: ChallengeSolveResult | None = None
@@ -728,18 +765,20 @@ class SessionWizard:
         ).pack(anchor="w", padx=12, pady=8)
 
     # ---------------- flujo ----------------
-    def start(self, enabled_devices: Optional[set[str]] = None):
+    def start(self, enabled_devices: Optional[set[str]] = None, start_index: Optional[int] = None):
         """`enabled_devices` es el subconjunto de ALL_DEVICES elegido por
         el evaluador en el modal previo (ver App._ask_session_devices) --
         None (todos habilitados) es solo un respaldo, por si algo llama a
-        start() sin pasarlo."""
+        start() sin pasarlo. `start_index` es el desafío inicial elegido en
+        ese mismo modal, para participantes que no siguen el orden normal
+        -- None retoma desde el progreso guardado."""
         participant = self.app.store.get_active()
-        saved_index = 0
-        if participant:
-            saved_index = participant.get("attributes", {}).get(PROGRESS_ATTRIBUTE, 0)
-        if not isinstance(saved_index, int) or not (0 <= saved_index < len(GUIDED_SESSION_GAME_ORDER)):
-            saved_index = 0
-        self.game_index = saved_index
+        saved_index = saved_game_index(participant)
+        if isinstance(start_index, int) and 0 <= start_index < len(GUIDED_SESSION_GAME_ORDER):
+            self.game_index = start_index
+        else:
+            self.game_index = saved_index
+        self._start_overridden = self.game_index != saved_index
         self._session_completed = False
         self._enabled_devices = set(enabled_devices) if enabled_devices is not None else set(ALL_DEVICES)
         if self._session_monitor is not None:
@@ -1506,6 +1545,12 @@ class SessionWizard:
             return
         self.app.store.set_attribute(participant["id"], PROGRESS_ATTRIBUTE, next_game_index)
 
+    def _played_challenges(self) -> set[int]:
+        """Desafíos ya jugados, contando siempre el actual -- solo se
+        consulta al cerrarlo (Etapa 6 / _advance_or_finish), aunque algún
+        dispositivo deshabilitado no haya dejado nada en disco."""
+        return played_challenges(self.app.store.get_active()) | {self.game_index + 1}
+
     def _clear_progress(self):
         participant = self.app.store.get_active()
         if participant is None:
@@ -1527,10 +1572,15 @@ class SessionWizard:
             wrapper, text=f"Bienvenido/a, {display_name}",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(24), weight="bold"),
         ).pack()
-        if self.game_index > 0:
-            intro_text = (
+        if self._start_overridden or self.game_index > 0:
+            first_line = (
+                f"Hoy comenzás en el desafío {self.game_index + 1} de {len(GUIDED_SESSION_GAME_ORDER)}."
+                if self._start_overridden else
                 f"Retomás donde dejaste, en el desafío {self.game_index + 1} de "
-                f"{len(GUIDED_SESSION_GAME_ORDER)}.\n\n"
+                f"{len(GUIDED_SESSION_GAME_ORDER)}."
+            )
+            intro_text = (
+                f"{first_line}\n\n"
                 "Vas a resolver una serie de desafíos de programación escribiendo\n"
                 "tu propio prompt para pedirle a una IA que lo resuelva. Cada\n"
                 "desafío tiene 6 etapas:\n\n"
@@ -2003,7 +2053,9 @@ class SessionWizard:
         result = self.current_result
         challenge = self.current_challenge
         game = self.current_game
-        is_last = self.game_index >= len(GUIDED_SESSION_GAME_ORDER) - 1
+        # "Último" = no queda ningún otro desafío sin jugar (no
+        # necesariamente el 7, si se empezó en otro, ver next_pending_index).
+        is_last = next_pending_index(self.game_index, self._played_challenges()) is None
 
         self._header(self.container, "ETAPA 6 DE 6 · SOLUCIÓN EN ACCIÓN", challenge.title)
         self._update_session_monitor_stage(6)
@@ -2075,7 +2127,8 @@ class SessionWizard:
             self._pause_session_timer("progreso guardado")
 
             def after_finish():
-                self._save_progress(self.game_index + 1)
+                next_index = next_pending_index(self.game_index, self._played_challenges())
+                self._save_progress(next_index if next_index is not None else self.game_index + 1)
                 self._close_session_timing(CLOSE_SAVED)
                 messagebox.showinfo(
                     "Progreso guardado",
@@ -2280,8 +2333,8 @@ class SessionWizard:
 
     def _advance_or_finish(self):
         participant = self.app.store.get_active()
-        self.game_index += 1
-        if self.game_index >= len(GUIDED_SESSION_GAME_ORDER):
+        next_index = next_pending_index(self.game_index, self._played_challenges())
+        if next_index is None:
             self._session_completed = True
             self._clear_progress()
             self._close_session_timing(CLOSE_FINISHED)
@@ -2290,4 +2343,5 @@ class SessionWizard:
                 write_session_index(participant_session_dir(participant), completed)
             self._exit_guided_session()
             return
+        self.game_index = next_index
         self._start_current_game()
