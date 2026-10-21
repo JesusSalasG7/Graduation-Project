@@ -124,7 +124,8 @@ def run_calibration(on_output: Callable[[str], None], mirror: bool = True) -> tu
 
 
 def start_camera_tracker(
-    participant: Optional[dict], session_label: str, left_x: float, right_x: float, mirror: bool = True,
+    participant: Optional[dict], session_label: str, left_x: Optional[float], right_x: Optional[float],
+    mirror: bool = True,
     video_geometry: Optional[tuple[int, int, int, int]] = None,
     gaze_geometry: Optional[tuple[int, int, int, int]] = None,
 ) -> subprocess.Popen:
@@ -138,6 +139,10 @@ def start_camera_tracker(
     APELLIDO>.csv y graphic_interface/data/eye_logs/<NOMBRE_APELLIDO>.csv
     -- los mismos que usaban las herramientas separadas.
 
+    `left_x`/`right_x` en None arranca sin calibrar (camera_tracker.py usa
+    su corte izquierda/derecha por defecto) -- lo usa la prueba suelta de
+    ui/device_test.py.
+
     `video_geometry` y `gaze_geometry` (x, y, ancho, alto) ubican la
     ventana de video y la de "Mirada: izquierda o derecha" (ver
     monitors.researcher_layout: el monitor del investigador).
@@ -148,8 +153,9 @@ def start_camera_tracker(
     args = [
         str(camera_tracker_python()), "-u", str(CAMERA_TRACKER_SCRIPT),
         "--session-label", session_label,
-        "--left-x", str(left_x), "--right-x", str(right_x),
     ]
+    if left_x is not None and right_x is not None:
+        args += ["--left-x", str(left_x), "--right-x", str(right_x)]
     if mirror:
         args.append("--mirror")
     if video_geometry is not None:

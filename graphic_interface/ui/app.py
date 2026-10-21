@@ -28,6 +28,7 @@ from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_read
 from ui.consent_view import (
     EMAIL_RE, RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, normalize_ci, open_consent_viewer,
 )
+from ui.device_test import DeviceTester
 from ui.session_wizard import SessionWizard
 from ui.statement_view import render_statement
 
@@ -240,6 +241,18 @@ class App(ctk.CTk, *_DND_MIXIN):
             },
         )
 
+        # "Probar dispositivos" (pestaña Sesión): reusa el modal de sudo
+        # del wizard para vincular el NeuroSky.
+        self.device_tester = DeviceTester(
+            self,
+            {
+                "ACCENT": ACCENT, "ACCENT_HOVER": ACCENT_HOVER,
+                "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT,
+                "BORDER": BORDER, "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING,
+            },
+            FONT_FAMILY, scaled, self.session_wizard._ask_sudo_password_blocking,
+        )
+
         # Consentimiento informado: igual que la sesión guiada, un frame a
         # ventana completa que tapa sidebar y contenido -- mientras está
         # arriba no hay nada más para clickear (ver _ensure_consent).
@@ -392,6 +405,9 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _begin_session_wizard(self, enabled_devices):
         if enabled_devices is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
+        # La sesión necesita la cámara y el NeuroSky libres: se corta
+        # cualquier prueba de "Probar dispositivos" que siga abierta.
+        self.device_tester.stop_all(wait=True)
         # La app entera arranca maximizada (ver __init__); esto solo
         # cubre el caso de que el usuario la haya desmaximizado a mano.
         self._maximize()
@@ -871,6 +887,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # datos capturados y trata de desvincular el dispositivo antes de
         # que la ventana desaparezca (ver SessionWizard.cleanup_incomplete_session).
         self.session_wizard.cleanup_incomplete_session()
+        self.device_tester.stop_all(wait=True)
         self.destroy()
 
     def _repair_environment(self):
@@ -1322,6 +1339,36 @@ class App(ctk.CTk, *_DND_MIXIN):
             fg_color=BG_CARD_ALT, hover_color=BORDER,
             command=self._view_consent,
         ).pack(anchor="w", padx=18, pady=(0, 18))
+
+        # ---------------- Probar dispositivos (ver ui/device_test.py) ----------------
+        devices_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        devices_card.pack(fill="x", pady=(0, 14))
+        ctk.CTkLabel(
+            devices_card, text="🔌  Probar dispositivos",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            devices_card,
+            text="Revisa que el NeuroSky y la cámara (Emotion + Eye Tracker) funcionen sin entrar a "
+                 "una sesión. No se guarda nada a nombre de ningún participante; al iniciar una "
+                 "sesión guiada las pruebas abiertas se cierran solas.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+        devices_row = ctk.CTkFrame(devices_card, fg_color="transparent")
+        devices_row.pack(fill="x", padx=18, pady=(0, 18))
+        ctk.CTkButton(
+            devices_row, text="🧠  Probar NeuroSky", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=lambda: self.device_tester.open_neurosky(),
+        ).pack(side="left")
+        ctk.CTkButton(
+            devices_row, text="📷  Probar cámara (Emotion + Eye)", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=lambda: self.device_tester.open_camera(),
+        ).pack(side="left", padx=(8, 0))
 
         # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
         # Matriz de lo que ya se exportó para el participante activo, leyendo
