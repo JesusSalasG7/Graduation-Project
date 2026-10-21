@@ -28,6 +28,7 @@ from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_read
 from ui.consent_view import (
     EMAIL_RE, RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, normalize_ci, open_consent_viewer,
 )
+from ui.analysis_view import AnalysisView
 from ui.device_test import DeviceTester
 from ui.session_wizard import SessionWizard
 from ui.statement_view import render_statement
@@ -216,14 +217,25 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tab_games = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_participants = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_session = ctk.CTkFrame(self.content, fg_color=BG_APP)
+        self.tab_analysis = ctk.CTkFrame(self.content, fg_color=BG_APP)
         for frame in (
-            self.tab_games, self.tab_participants, self.tab_session,
+            self.tab_games, self.tab_participants, self.tab_session, self.tab_analysis,
         ):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self._build_games_tab()
         self._build_participants_tab()
         self._build_session_tab()
+        # Pestaña Análisis (ver ui/analysis_view.py y analisis/README.md).
+        self.analysis_view = AnalysisView(
+            self.tab_analysis,
+            {
+                "ACCENT": ACCENT, "ACCENT_HOVER": ACCENT_HOVER,
+                "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT, "BORDER": BORDER,
+                "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING, "DANGER": DANGER,
+            },
+            FONT_FAMILY, scaled,
+        )
         self._select_nav("games")
 
         # Sesión guiada: un frame que ocupa TODA la ventana (sidebar +
@@ -555,6 +567,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._profile_dropdown = ctk.CTkFrame(nav, fg_color=BG_CARD, corner_radius=8)
         self._profile_dropdown_open = False
         self._nav_buttons["session"] = self._nav_button(nav, "⏱️  Sesión", "session")
+        self._nav_buttons["analysis"] = self._nav_button(nav, "📈  Análisis", "analysis")
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
@@ -650,6 +663,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             "games": self.tab_games,
             "participants": self.tab_participants,
             "session": self.tab_session,
+            "analysis": self.tab_analysis,
         }
         for name, btn in self._nav_buttons.items():
             active = name == key
@@ -664,6 +678,10 @@ class App(ctk.CTk, *_DND_MIXIN):
             # pestaña -- lee de disco, así que refleja lo que se haya
             # exportado desde la última vez que se miró esta vista.
             self._refresh_session_data_matrix()
+        if key == "analysis":
+            # Calcula las features la primera vez que se entra; después,
+            # solo con el botón "Recalcular" de la pestaña.
+            self.analysis_view.refresh_if_needed()
 
     # ---------------- Juegos ----------------
     def _build_games_tab(self):
