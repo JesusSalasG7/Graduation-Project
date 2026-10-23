@@ -53,11 +53,28 @@ def _migrate_legacy_participant_folder(number: int) -> None:
             return
 
 
+# Sesión de prueba (ver SessionWizard.start(trial=True)): mientras dure,
+# todo lo que se exporta va a una carpeta temporal en vez del Escritorio,
+# y se borra al salir. None = carpeta real de las sesiones.
+_sessions_root_override: Optional[Path] = None
+
+
+def set_sessions_root_override(path: Optional[Path]) -> None:
+    global _sessions_root_override
+    _sessions_root_override = Path(path) if path is not None else None
+
+
 def sessions_root() -> Path:
+    if _sessions_root_override is not None:
+        return _sessions_root_override
     return Path.home() / "Escritorio" / SESSIONS_DIR_NAME
 
 
 def participant_session_dir(participant: dict) -> Path:
+    if participant["number"] == 0 and _sessions_root_override is None:
+        # El 0 es el participante ficticio de la sesión de prueba: nunca
+        # debe dejar una carpeta en el Escritorio.
+        raise RuntimeError("La sesión de prueba no puede guardar en la carpeta real de sesiones.")
     _migrate_legacy_participant_folder(participant["number"])
     path = sessions_root() / participant_folder_name(participant)
     path.mkdir(parents=True, exist_ok=True)

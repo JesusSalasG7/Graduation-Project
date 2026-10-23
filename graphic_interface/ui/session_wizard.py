@@ -47,6 +47,8 @@ import signal
 import subprocess
 import threading
 import time
+import shutil
+import tempfile
 import tkinter
 from datetime import datetime
 from pathlib import Path
@@ -92,6 +94,7 @@ from storage.stage_capture import (
     available_challenges,
     challenge_dir,
     participant_session_dir,
+    set_sessions_root_override,
     slice_emotion,
     slice_eye,
     slice_neurosky,
@@ -127,6 +130,14 @@ PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
 # selección. El orden importa: es el orden en que aparecen sus pantallas
 # de configuración (ver _show_next_setup_screen).
 ALL_DEVICES = ("heart_rate", "neurosky", "camera")
+
+# Sesión de prueba (botón "Sesión de prueba" de la pestaña Sesión): simula
+# la sesión de un participante sin elegir uno ni guardar nada. Usa este
+# participante ficticio, que nunca entra en participants.json; los
+# participantes reales se numeran desde 1, así que el 0 no choca con
+# ninguno.
+TRIAL_PARTICIPANT = {"id": "prueba", "number": 0, "attributes": {}}
+TRIAL_LABEL = "Sesión de prueba"
 
 
 def saved_game_index(participant: Optional[dict]) -> int:
@@ -243,6 +254,10 @@ class SessionWizard:
         # Neurosky, NO es hija de self.container, así que _clear() no la
         # toca -- se cierra a mano al avanzar a la Etapa 4 o al salir.
         self._statement_window: Optional[ctk.CTkToplevel] = None
+        # Sesión de prueba: carpeta temporal donde se exporta todo mientras
+        # dura (ver start(trial=True) / _end_trial).
+        self._trial = False
+        self._trial_dir: Optional[Path] = None
 
         # Camera Tracker (Emotion Tracker + Eye Tracker fusionados en un
         # solo proceso, ver tools/camera_tracker.py): se calibra/verifica
@@ -357,9 +372,39 @@ class SessionWizard:
         for child in self.container.winfo_children():
             child.destroy()
 
+    def _participant(self) -> Optional[dict]:
+        """Participante de esta sesión: el activo, o el ficticio de la
+        sesión de prueba (que no está en participants.json)."""
+        return TRIAL_PARTICIPANT if self._trial else self.app.store.get_active()
+
+    def _start_trial(self):
+        """Todo lo que la sesión exporta (etapas, manifiestos, tiempos) va
+        a una carpeta temporal en vez de ~/Escritorio/Sesiones_participantes.
+        Se borran antes los CSV de sensores que una prueba anterior haya
+        dejado (si la app se cerró de golpe)."""
+        self._end_trial()
+        delete_camera_data(TRIAL_PARTICIPANT)
+        self._trial = True
+        self._trial_dir = Path(tempfile.mkdtemp(prefix="sesion_prueba_"))
+        set_sessions_root_override(self._trial_dir)
+
+    def _end_trial(self):
+        """Vuelve a la carpeta real de sesiones y borra la temporal."""
+        self._trial = False
+        set_sessions_root_override(None)
+        if self._trial_dir is not None:
+            shutil.rmtree(self._trial_dir, ignore_errors=True)
+            self._trial_dir = None
+
     def _header(self, parent, step_text: str, title: str):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.pack(fill="x", padx=36, pady=(30, 4))
+        if self._trial:
+            ctk.CTkLabel(
+                row, text="🧪  SESIÓN DE PRUEBA · no se guarda nada",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
+                text_color=self.c["WARNING"],
+            ).pack(anchor="w", pady=(0, 2))
         ctk.CTkLabel(
             row, text=step_text, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             text_color=self.c["ACCENT"],
@@ -391,9 +436,16 @@ class SessionWizard:
         self._close_session_timing(CLOSE_ABANDONED)
         if self._session_monitor is not None:
             self._session_monitor.finish()
-        delete_data = not self._session_completed
+        # La sesión de prueba nunca guarda: sus datos se borran siempre.
+        delete_data = self._trial or not self._session_completed
+        # Se fija ahora: el hilo de limpieza de la cámara corre después de
+        # cerrar la prueba, y no debe terminar borrando los CSV del
+        # participante activo real.
+        participant = self._participant()
         neurosky_active = self._neurosky_process is not None or self._neurosky_window is not None
         camera_active = self._camera_process is not None or self._camera_window is not None
+        if self._trial:
+            self._end_trial()
         self.app.exit_session_wizard()
         if neurosky_active:
             threading.Thread(
@@ -407,7 +459,7 @@ class SessionWizard:
         # Cámara".
         if camera_active:
             threading.Thread(
-                target=self._cleanup_camera_interactive, args=(delete_data,), daemon=True,
+                target=self._cleanup_camera_interactive, args=(delete_data, participant), daemon=True,
             ).start()
 
     def _cleanup_neurosky_interactive(self, delete_data: bool):
@@ -431,14 +483,14 @@ class SessionWizard:
             self._log_neurosky("[AVISO] No se pudo liberar el rfcomm -- puedes hacerlo a mano después.")
         self._close_neurosky_window()
 
-    def _cleanup_camera_interactive(self, delete_data: bool):
+    def _cleanup_camera_interactive(self, delete_data: bool, participant: Optional[dict]):
         """Corre en un hilo de fondo (ver _exit_guided_session): para el
         Camera Tracker (Emotion + Eye fusionados), borra sus CSV (emoción
         + mirada) si la sesión quedó incompleta, y cierra la ventana
         "Datos de la Cámara"."""
         self._stop_camera_process()
         if delete_data:
-            delete_camera_data(self.app.store.get_active())
+            delete_camera_data(participant)
         self._close_camera_window()
 
     def cleanup_incomplete_session(self):
@@ -460,8 +512,10 @@ class SessionWizard:
             self._session_monitor = None
         if self._camera_process is not None or self._camera_window is not None:
             self._stop_camera_process()
-            delete_camera_data(self.app.store.get_active())
+            delete_camera_data(self._participant())
             self._close_camera_window()
+        if self._trial:
+            self._end_trial()
         if self._neurosky_process is None and self._neurosky_window is None:
             return
         self._stop_neurosky_process()
@@ -668,8 +722,8 @@ class SessionWizard:
     def _save_answers(self, stage: str, questions: list[QuizQuestion], answers: dict[int, ctk.IntVar]):
         if not questions:
             return
-        participant = self.app.store.get_active()
-        if participant is None:
+        participant = self._participant()
+        if participant is None or self._trial:
             return
         save_quiz_answers(
             participant["number"], self.current_game.name, stage,
@@ -694,7 +748,7 @@ class SessionWizard:
         la Cámara no se usaron, directamente no se le pasa su DataFrame a
         write_stage_sensor_files (ver ahí por qué None -- "no se usó" --
         es distinto de un CSV vacío)."""
-        participant = self.app.store.get_active()
+        participant = self._participant()
         window = self._stage_timer.finish(stage_number)
         if participant is None or self.current_game is None:
             return
@@ -765,14 +819,22 @@ class SessionWizard:
         ).pack(anchor="w", padx=12, pady=8)
 
     # ---------------- flujo ----------------
-    def start(self, enabled_devices: Optional[set[str]] = None, start_index: Optional[int] = None):
+    def start(
+        self, enabled_devices: Optional[set[str]] = None, start_index: Optional[int] = None,
+        trial: bool = False,
+    ):
         """`enabled_devices` es el subconjunto de ALL_DEVICES elegido por
         el evaluador en el modal previo (ver App._ask_session_devices) --
         None (todos habilitados) es solo un respaldo, por si algo llama a
         start() sin pasarlo. `start_index` es el desafío inicial elegido en
         ese mismo modal, para participantes que no siguen el orden normal
-        -- None retoma desde el progreso guardado."""
-        participant = self.app.store.get_active()
+        -- None retoma desde el progreso guardado. `trial` = sesión de
+        prueba: participante ficticio, nada se guarda (ver _start_trial)."""
+        if trial:
+            self._start_trial()
+        else:
+            self._end_trial()
+        participant = self._participant()
         saved_index = saved_game_index(participant)
         if isinstance(start_index, int) and 0 <= start_index < len(GUIDED_SESSION_GAME_ORDER):
             self.game_index = start_index
@@ -786,9 +848,12 @@ class SessionWizard:
         self._close_session_timing(CLOSE_INTERRUPTED)
         if participant:
             self._timing = SessionTimingLog(participant_session_dir(participant), participant["number"])
+        if self._trial:
+            monitor_label = TRIAL_LABEL
+        else:
+            monitor_label = participant_label(participant) if participant else "sin participante activo"
         self._session_monitor = SessionMonitorWindow(
-            self.app, self.c, scaled,
-            participant_label(participant) if participant else "sin participante activo",
+            self.app, self.c, scaled, monitor_label,
             previous_total_s=self._timing.counted_total_seconds() if self._timing else 0,
             session_number=self._timing.counted_sessions() + 1 if self._timing else 1,
         )
@@ -1424,7 +1489,7 @@ class SessionWizard:
             "Iniciando el seguimiento...",
         )
 
-        participant = self.app.store.get_active()
+        participant = self._participant()
         try:
             # El video y la ventana "Mirada: izquierda o derecha" van en
             # sus lugares del monitor del investigador (ver
@@ -1540,8 +1605,8 @@ class SessionWizard:
         self._show_next_setup_screen(after="camera")
 
     def _save_progress(self, next_game_index: int):
-        participant = self.app.store.get_active()
-        if participant is None:
+        participant = self._participant()
+        if participant is None or self._trial:
             return
         self.app.store.set_attribute(participant["id"], PROGRESS_ATTRIBUTE, next_game_index)
 
@@ -1549,25 +1614,28 @@ class SessionWizard:
         """Desafíos ya jugados, contando siempre el actual -- solo se
         consulta al cerrarlo (Etapa 6 / _advance_or_finish), aunque algún
         dispositivo deshabilitado no haya dejado nada en disco."""
-        return played_challenges(self.app.store.get_active()) | {self.game_index + 1}
+        return played_challenges(self._participant()) | {self.game_index + 1}
 
     def _clear_progress(self):
-        participant = self.app.store.get_active()
-        if participant is None:
+        participant = self._participant()
+        if participant is None or self._trial:
             return
         self.app.store.clear_attribute(participant["id"], PROGRESS_ATTRIBUTE)
 
     def _show_welcome(self):
         self._clear()
-        participant = self.app.store.get_active()
+        participant = self._participant()
         wrapper = ctk.CTkFrame(self.container, fg_color="transparent")
         wrapper.pack(expand=True)
 
         ctk.CTkLabel(
             wrapper, text="👋", font=ctk.CTkFont(size=scaled(48)),
         ).pack(pady=(0, 10))
-        record = load_personal_record(participant["number"])
-        display_name = f"{record[0]} {record[1]}".strip() if record else participant_label(participant)
+        if self._trial:
+            display_name = "participante de prueba"
+        else:
+            record = load_personal_record(participant["number"])
+            display_name = f"{record[0]} {record[1]}".strip() if record else participant_label(participant)
         ctk.CTkLabel(
             wrapper, text=f"Bienvenido/a, {display_name}",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(24), weight="bold"),
@@ -1721,7 +1789,9 @@ class SessionWizard:
         ventana aparte con el enunciado completo del desafío -- para que
         el participante pueda consultarlo mientras escribe su prompt sin
         perder de vista lo que ya escribió. No es modal (no bloquea la
-        ventana principal) y se puede mover/redimensionar libremente.
+        ventana principal) y se puede mover, pero la barra de título solo
+        ofrece CERRAR: sin minimizar (se perdería detrás de la sesión en
+        pantalla completa) ni maximizar (taparía el cuadro del prompt).
         """
         if self._statement_window is not None:
             try:
@@ -1735,7 +1805,21 @@ class SessionWizard:
         self._statement_log.append({"opened_at": datetime.now(), "closed_at": None})
 
         window = ctk.CTkToplevel(self.app)
+        # Oculta mientras se configura: el tipo de ventana tiene que estar
+        # puesto antes de que el gestor de ventanas la muestre.
+        window.withdraw()
         window.title(f"Enunciado -- {challenge.title}")
+        # Solo el botón de cerrar: una ventana "transient" (diálogo de la
+        # principal) no lleva minimizar ni maximizar en Windows ni en
+        # GNOME; en X11 además se declara tipo "dialog", y sin cambio de
+        # tamaño el gestor tampoco ofrece maximizar.
+        window.transient(self.app)
+        window.resizable(False, False)
+        if window.tk.call("tk", "windowingsystem") == "x11":
+            try:
+                window.attributes("-type", "dialog")
+            except Exception:
+                pass
         win_w, win_h = wrap(560), wrap(680)
         # A un costado, no centrada -- para poder consultarla al lado del
         # cuadro de texto en vez de taparlo. En el mismo monitor que la
@@ -1762,6 +1846,25 @@ class SessionWizard:
             window.destroy()
 
         window.protocol("WM_DELETE_WINDOW", on_close)
+
+        def no_minimizar(event):
+            # Respaldo si algún gestor la minimiza igual (p. ej. con un
+            # atajo de teclado): se vuelve a mostrar enseguida.
+            if event.widget is not window or self._statement_window is not window:
+                return
+
+            def restaurar():
+                try:
+                    if window.winfo_exists() and window.state() == "iconic":
+                        window.deiconify()
+                except Exception:  # se cerró mientras tanto
+                    pass
+
+            window.after(50, restaurar)
+
+        window.bind("<Unmap>", no_minimizar)
+        window.deiconify()
+        window.lift()
         self._statement_window = window
 
     def _log_statement_closed(self):
@@ -1867,7 +1970,7 @@ class SessionWizard:
         Devuelve la carpeta de este intento (None si no hay participante
         activo), para dejar ahí también la respuesta de la IA (ver
         _save_ai_response)."""
-        participant = self.app.store.get_active()
+        participant = self._participant()
         window = self._stage_timer.finish(3)
         if participant is None:
             return None
@@ -2252,7 +2355,7 @@ class SessionWizard:
         etapa 2/3/4/5 ya exportada (NeuroSky/Emotion/Eye) pero sin
         heart_rate.csv, porque su ventana ya se había perdido para cuando
         se pedía el reloj."""
-        participant = self.app.store.get_active()
+        participant = self._participant()
         if participant is None or self.current_game is None:
             return
         challenge_number = self.game_index + 1
@@ -2295,7 +2398,7 @@ class SessionWizard:
         pending = self._pending_heart_rate_challenges
         self._pending_heart_rate_challenges = []
 
-        participant = self.app.store.get_active()
+        participant = self._participant()
         if participant is None or not pending:
             on_done()
             return
@@ -2332,7 +2435,7 @@ class SessionWizard:
         on_done()
 
     def _advance_or_finish(self):
-        participant = self.app.store.get_active()
+        participant = self._participant()
         next_index = next_pending_index(self.game_index, self._played_challenges())
         if next_index is None:
             self._session_completed = True

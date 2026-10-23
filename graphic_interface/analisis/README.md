@@ -1,259 +1,201 @@
 # Módulo de análisis EEG (`analisis/`)
 
-Calcula, a partir de las señales de NeuroSky que ya registra la sesión
-guiada, las features de carga cognitiva **EEG1** y **EEG2** descritas en el
-artículo *"No Vibe Without Comprehension"*, y las muestra en la pestaña
-**📈 Análisis** del panel. Por ahora solo procesa y reporta: no entrena
-ningún modelo.
+Mide la carga cognitiva durante el *vibe coding* con el NeuroSky (un solo
+canal frontal, Fp1) y la relaciona con la comprensión. Replica la
+metodología del artículo de referencia, que usa dos indicadores:
 
-## 1. Propósito
+- **EEG1 = Alfa / Theta**: baja cuando aumenta la carga cognitiva.
+- **EEG2 = Theta** (mediana de la potencia): sube con la demanda de
+  memoria de trabajo.
 
-El artículo usa dos índices EEG como indicadores de la carga cognitiva de
-quien programa con IA:
+Los resultados se ven en la pestaña **📈 Análisis** del panel y se
+exportan a `data/analisis/` (en el `.gitignore`: son datos de
+participantes).
 
-- **EEG1 = θ / (α + β)**: esfuerzo mental y control atencional.
-- **EEG2 = θ / α**: carga de la memoria de trabajo.
+## 1. Etapas
 
-Este módulo calcula esos índices (más **α/θ** como control) para cada etapa
-de la sesión guiada. Así se puede comparar la carga cognitiva entre leer el
-enunciado, escribir el prompt, evaluar la respuesta de la IA y entender su
-razonamiento. También deja preparada la conexión con una puntuación de
-comprensión (0–6) para entrenar clasificadores más adelante.
+| Etapa | Descripción | Etiqueta en gráficos | Cuestionario |
+| --- | --- | --- | --- |
+| Etapa 2 | Lectura del problema | Etapa 2 / Problema | Sí |
+| Etapa 3 | Escribir el prompt | Etapa 3 / Prompt | **No** |
+| Etapa 4 | Lectura de la solución | Etapa 4 / Solución | Sí |
+| Etapa 5 | Lectura del razonamiento | Etapa 5 / Razonamiento | Sí |
+
+Cualquier otra etapa que aparezca en el dataset se ignora (y se avisa en
+la pestaña), salvo que se configure como `ETAPA_LINEA_BASE`.
 
 ## 2. Datos de entrada
 
-**Fuente:** `data/dataset_sesiones.csv`, el dataset consolidado que genera
-`data/build_dataset.py` (pestaña Sesión → "Generar dataset"). Cada fila es
-**participante × desafío × etapa × intento**, solo de las etapas 2 a 5 (la
-1 y la 6 no capturan sensores).
+`data/dataset_sesiones.csv`, generado por `data/build_dataset.py`. Cada
+fila es **participante × desafío × etapa × intento**. Las columnas usadas:
 
-Las columnas `NeuroSky_*_List` son texto con forma de lista de Python
-(`"[1434041, 1308949, ...]"`), con una muestra por segundo aproximadamente.
-El módulo las convierte a números con `ast.literal_eval`.
-
-| Columna | Uso | Motivo |
-| --- | --- | --- |
-| `NeuroSky_Theta_List` | Feature principal | θ, numerador de EEG1 y EEG2 |
-| `NeuroSky_LowAlpha_List`, `NeuroSky_HighAlpha_List` | Feature principal | Se suman para obtener α |
-| `NeuroSky_LowBeta_List`, `NeuroSky_HighBeta_List` | Feature principal | Se suman para obtener β |
-| `NeuroSky_PoorSignal_List` | Filtro de calidad | Indica si el electrodo tenía buen contacto en cada muestra |
-| `NeuroSky_Delta_List` | Control de artefactos | Los parpadeos y movimientos en la frente inflan δ |
-| `NeuroSky_Attention_List`, `NeuroSky_Meditation_List` | Opcional, se reporta aparte | Índices eSense **propietarios** de NeuroSky: no se sabe cómo se calculan, por eso no se mezclan con EEG1/EEG2 |
-| `NeuroSky_LowGamma_List`, `NeuroSky_MidGamma_List` | Se ignoran | Gamma, en un electrodo frontal, está dominada por ruido muscular (frente, mandíbula) |
-| `NeuroSky_*_Promedio` | Se ignoran | Incluyen las muestras con mala señal; aquí se recalcula todo desde las listas ya filtradas |
-
-También se copian las columnas de identificación `Participante_ID`,
-`Nivel_Experiencia`, `Desafio`, `Juego`, `Etapa` e `Intento`.
-
-## 3. Pipeline paso a paso
-
-Se aplica a cada fila del dataset, es decir, a cada etapa de cada intento.
-
-1. **Parseo y alineación.** Las listas se convierten a números y se alinean
-   por índice (la muestra *i* de cada banda es el mismo segundo). Si tienen
-   largos distintos, se recortan a la más corta y se registra una
-   advertencia en la columna `Advertencias`.
-2. **Filtro de calidad.** Se conservan solo las muestras con
-   `PoorSignal <= 0` (umbral configurable). Las de 200 (electrodo sin
-   contacto) se descartan siempre. La etapa se marca como **datos
-   insuficientes** si quedan menos de 10 muestras válidas o menos del 50 %
-   del total. *Motivo:* con mal contacto, las potencias de banda son ruido.
-3. **Bandas combinadas**, por muestra:
-   - α = LowAlpha + HighAlpha
-   - β = LowBeta + HighBeta
-4. **Transformación logarítmica**, `log(x + 1)` sobre θ, α, β y δ.
-   *Motivo:* las potencias de NeuroSky varían en varios órdenes de magnitud
-   y tienen colas largas. El logaritmo evita que unos pocos picos dominen
-   las medias. El `+1` evita `log(0)`.
-5. **Índices por muestra**, sobre las bandas ya transformadas:
-   - EEG1 = θ / (α + β)
-   - EEG2 = θ / α
-   - AlphaTheta = α / θ
-
-   Si un denominador es 0, el índice de esa muestra queda vacío (NaN) en
-   lugar de producir un infinito.
-6. **Agregados por etapa:** media, mediana, desviación estándar (muestral),
-   mínimo y máximo de EEG1, EEG2 y AlphaTheta; mediana de log θ; media de
-   log δ como indicador de artefactos; muestras válidas y % descartado.
-7. **Normalización contra la línea base.** No se grabó una etapa de
-   reposo, así que la línea base es la **Etapa 2 (leer el enunciado) del
-   mismo participante y desafío**, en su primer intento:
-
-   `cambio_% = (valor_etapa − valor_base) / valor_base × 100`
-
-   *Motivo:* las potencias absolutas varían mucho entre personas (grosor
-   del cráneo, colocación del electrodo). El cambio % expresa cada etapa
-   respecto al propio participante. Si la línea base no existe o tiene datos
-   insuficientes, el cambio % queda vacío y se avisa en la pestaña.
-8. **Z-score y Min-Max dentro de cada participante**, en columnas
-   separadas, usando solo sus etapas con datos suficientes:
-   - `z = (x − media) / desviación estándar` (poblacional, ddof = 0)
-   - `minmax = (x − mín) / (máx − mín)`, de 0 a 1
-
-   Si todas las etapas del participante valen lo mismo, ambos dan 0.
-9. **eSense.** Media y mediana de Attention y Meditation sobre las
-   muestras válidas. También se descartan los 0, porque indican que el
-   chip todavía no había calculado el valor.
-
-Al final, el **indicador de δ alta** marca una etapa si la media de log δ
-supera en más de 2 desviaciones estándar la media del participante.
-
-## 4. Interpretación de resultados
-
-- **EEG1 alto:** más θ en relación con α + β, lo que se asocia a mayor
-  esfuerzo mental o mayor demanda de control atencional.
-- **EEG2 alto:** más θ en relación con α, lo que se asocia a mayor carga
-  de la memoria de trabajo. α suele bajar cuando la persona se concentra.
-- **Valores bajos:** menor esfuerzo o carga, o un estado más relajado
-  (α alta).
-- **Miden esfuerzo, no comprensión.** Un participante puede esforzarse
-  mucho y no entender, o entender sin esfuerzo. La relación con la
-  comprensión es justamente lo que se quiere estudiar más adelante.
-- **Solo son comparables dentro del mismo participante**, o entre
-  participantes después de normalizar (cambio %, z-score o Min-Max). Los
-  valores crudos de dos personas distintas no deben compararse
-  directamente.
-- Como los cocientes se calculan sobre bandas en escala logarítmica, sus
-  valores varían poco (por ejemplo, EEG1 ≈ 0,51–0,56 en los datos
-  actuales). Un cambio del 1–5 % ya es una diferencia apreciable dentro de
-  un participante.
-
-## 5. Salidas
-
-### Tabla de features (CSV)
-
-El botón **💾 Exportar CSV** guarda `data/analisis/eeg_features.csv`, con
-una fila por participante × desafío × etapa × intento. La carpeta está en
-el `.gitignore` porque son datos de participantes.
-
-| Columna | Descripción |
+| Rol | Columna |
 | --- | --- |
-| `Participante_ID`, `Nivel_Experiencia`, `Desafio`, `Juego`, `Etapa`, `Intento` | Identificación, copiada del dataset |
-| `Muestras_Totales` | Muestras de la etapa después de alinear las listas |
-| `Muestras_Validas` | Muestras que pasaron el filtro de PoorSignal |
-| `Pct_Descartado` | % de muestras descartadas |
-| `Datos_Insuficientes` | True si quedaron menos del mínimo de muestras o de % válido |
-| `Advertencias` | Avisos de la etapa (listas recortadas, datos insuficientes, columnas faltantes) |
-| `EEG1_Media`, `EEG1_Mediana`, `EEG1_DE`, `EEG1_Min`, `EEG1_Max` | Agregados de EEG1 = θ/(α+β) |
-| `EEG2_Media` … `EEG2_Max` | Agregados de EEG2 = θ/α |
-| `AlphaTheta_Media` … `AlphaTheta_Max` | Agregados de α/θ |
-| `Theta_Mediana` | Mediana de log(θ + 1) |
-| `Delta_Media` | Media de log(δ + 1): indicador de artefactos |
-| `eSense_Attention_Media`, `eSense_Attention_Mediana` | Atención eSense (propietario NeuroSky) |
-| `eSense_Meditation_Media`, `eSense_Meditation_Mediana` | Meditación eSense (propietario NeuroSky) |
-| `<feature>_Cambio_Pct` | Cambio % contra la línea base, para `EEG1_Media`, `EEG1_Mediana`, `EEG2_Media`, `EEG2_Mediana`, `AlphaTheta_Media`, `AlphaTheta_Mediana` y `Theta_Mediana` |
-| `Linea_Base_Disponible` | True si la fila tiene línea base válida y datos suficientes |
-| `<feature>_Z` | Z-score de esas mismas 7 features dentro del participante |
-| `<feature>_MinMax` | Min-Max (0–1) de esas mismas 7 features dentro del participante |
-| `Delta_Media_Z` | Z-score de `Delta_Media` dentro del participante |
-| `Delta_Atipica` | True si `Delta_Media_Z` > 2: posibles parpadeos o artefactos |
-| `Comprension_Puntaje` | Puntuación de comprensión 0–6. Vacía por ahora (ver sección 9) |
-| `Comprension_Alta` | Puntaje binarizado (> 3,5). Vacía por ahora |
+| Participante | `Participante_ID` |
+| Etapa | `Etapa` (entero 2–5; se normaliza a "Etapa N") |
+| Duración | `Duracion_Segundos` (si falta, `Hora_Fin − Hora_Inicio`; si tampoco hay, el número de muestras) |
+| Puntaje | `Cuestionario_Correctas` / `Cuestionario_Total` × 100 (7 preguntas por cuestionario) |
+| Bandas | `NeuroSky_Theta_List`, `NeuroSky_LowAlpha_List`, `NeuroSky_HighAlpha_List`, `NeuroSky_LowBeta_List`, `NeuroSky_HighBeta_List` |
+| Calidad | `NeuroSky_PoorSignal_List` (0 = buena señal, 200 = sin contacto) |
+| Control de artefactos | `NeuroSky_Delta_List` |
+| Complementarias | `NeuroSky_Attention_List`, `NeuroSky_Meditation_List` |
 
-### Pestaña "📈 Análisis"
+Las listas vienen como texto con forma de lista de Python (`"[1, 2, 3]"`),
+con ~1 muestra por segundo, alineadas por índice. Si las listas de una
+fila tienen largos distintos, se recortan a la más corta y se avisa.
+Gamma no se lee: en Fp1 está dominada por ruido muscular.
 
-- **Selector de participante:** "Todos" o un participante. Filtra el
-  gráfico, la tabla y los indicadores.
-- **🔄 Recalcular:** vuelve a leer el dataset (por ejemplo, después de
-  regenerarlo). Las features se calculan solas la primera vez que se abre
-  la pestaña.
-- **💾 Exportar CSV:** guarda la tabla completa de features.
-- **Cómo leer estos valores:** nota de que EEG1/EEG2 miden esfuerzo, no
-  comprensión, y de cuándo son comparables.
-- **Calidad de la señal:** % de muestras descartadas por etapa, lista de
-  etapas con datos insuficientes, etapas con δ atípicamente alta y filas
-  sin línea base.
-- **Gráfico EEG1 y EEG2 por etapa:** barras con el cambio % medio contra la
-  línea base (la Etapa 2 vale 0 por definición) y, encima de cada barra,
-  el valor medio de EEG1/EEG2. Bajo cada etapa se indica *n*, las filas
-  promediadas. Solo usa filas con datos suficientes. Si no hubiera línea
-  base, grafica los valores medios y lo avisa.
-- **Tabla de features por etapa:** las columnas principales. Las filas con
-  datos insuficientes se ven en naranja y las de δ alta en rojo. El CSV
-  trae todas las columnas.
+**Unidad de análisis:** todos los desafíos e intentos de un participante
+en la misma etapa se juntan, para tener un valor por participante y etapa.
+El puntaje es la suma de aciertos dividida por la suma de preguntas de
+todos los cuestionarios de esa etapa.
 
-## 6. Parámetros configurables
+## 3. Pipeline (`pipeline.py`)
 
-Están en `graphic_interface/analisis/config.py`. Se cambian editando la
-constante; las funciones las reciben agrupadas en `AnalysisConfig`.
+1. **Cargar y expandir:** se filtran las Etapas 2–5 y cada fila se pasa a
+   formato largo (una fila por participante, etapa y segundo).
+2. **Control de calidad:** se conservan las muestras con
+   `PoorSignal ≤ UMBRAL_POOR_SIGNAL` (0 por defecto; 49 equivale a "< 50")
+   y con Theta > 0 y Alfa > 0. El reporte por participante y etapa incluye
+   las muestras totales, las válidas y el % válido. Una etapa es de **baja
+   calidad** si tiene menos del 50 % o menos de 30 muestras válidas, y se
+   excluye si `EXCLUIR_BAJA_CALIDAD`. Como control de artefactos, también
+   se informa el % de muestras con log Delta por encima de la media + 2 DE
+   del participante.
+3. **Indicadores por muestra:** alpha = LowAlpha + HighAlpha;
+   EEG1 = alpha / Theta; EEG2 = Theta. Opcionales: theta_beta =
+   Theta / (LowBeta + HighBeta) y engagement = beta / (alpha + Theta).
+4. **Logaritmo natural** de cada indicador, porque las potencias de
+   NeuroSky están muy sesgadas.
+5. **Normalización z por participante:** media y DE muestral (ddof = 1)
+   de cada indicador logarítmico con **todas** las muestras válidas del
+   participante en las Etapas 2–5. Con `ETAPA_LINEA_BASE` definida, la
+   referencia es solo esa etapa, que luego no aparece en los resultados.
+6. **Agregación:** la **mediana** de los z por participante y etapa, más la
+   duración, el promedio de Attention y Meditation (sin los 0, que indican
+   que el chip aún no calculó el valor) y el % de muestras válidas.
+7. **Puntajes:** se unen por participante y etapa. La Etapa 3 queda en NaN.
 
-| Parámetro | Constante | Valor por defecto |
-| --- | --- | --- |
-| Umbral de PoorSignal (se conserva ≤ umbral; 200 siempre se descarta) | `POOR_SIGNAL_THRESHOLD` | `0` |
-| Mínimo de muestras válidas por etapa | `MIN_VALID_SAMPLES` | `10` |
-| Mínimo de fracción válida por etapa | `MIN_VALID_FRACTION` | `0.5` (50 %) |
-| Etapa de línea base | `BASELINE_STAGE` | `2` (leer el enunciado, mismo desafío) |
-| Umbral de la alerta de δ (z-score) | `DELTA_ALERT_Z` | `2.0` |
-| Umbral de binarización de la comprensión | `COMPREHENSION_THRESHOLD` | `3.5` |
-| Dataset de entrada | `DATASET_FILE` | `data/dataset_sesiones.csv` |
-| CSV de salida | `FEATURES_OUT_FILE` | `data/analisis/eeg_features.csv` |
+Salida principal: `resultados_por_etapa.csv` con `participante, etapa,
+EEG1_z, EEG2_z, theta_beta_z, engagement_z, duracion_s, attention_prom,
+meditation_prom, puntaje, pct_muestras_validas`. También se genera
+`reporte_calidad.csv`.
 
-## 7. Limitaciones
+### Vista por desafío (`por_desafio.py`)
 
-- **Un solo electrodo en Fp1** (frente, lado izquierdo). El artículo mide θ
-  en sitios frontales y centrales de la línea media (Fz/Cz), donde la
-  actividad θ ligada a la carga cognitiva es más clara. Fp1 es una
-  aproximación.
-- **Contaminación por parpadeos y movimientos oculares.** Fp1 está justo
-  sobre el ojo, y los parpadeos agregan potencia de baja frecuencia (δ y θ),
-  lo que puede inflar EEG1 y EEG2. La alerta de δ ayuda a detectarlos, pero
-  no los elimina.
-- **Bandas calculadas por el chip de NeuroSky** (ThinkGear), no con una PSD
-  de Welch sobre la señal cruda. No se controlan la ventana, el solapamiento
-  ni los límites exactos de cada banda.
-- **Sin ICA ni otra limpieza de artefactos**: con un solo canal no es
-  posible separar componentes.
-- **Unidades relativas:** las potencias de NeuroSky no tienen unidad física
-  (no son µV²). Solo tienen sentido las comparaciones relativas, por eso se
-  normaliza dentro de cada participante.
-- **Línea base no ideal:** la Etapa 2 no es un reposo, porque el
-  participante está leyendo. El cambio % mide "respecto a leer el
-  enunciado", no "respecto al reposo".
-- **Muestra pequeña** (4 participantes al momento de escribir esto): los
-  promedios por etapa son descriptivos, no inferenciales.
+`resultados_por_desafio.csv` tiene una fila por participante × desafío ×
+etapa, con las mismas columnas más `desafio`, `juego` y `n_muestras`. No
+cambia el procesamiento: usa las mismas muestras filtradas y el mismo z
+(calculado con todas las muestras del participante) y solo agrupa también
+por desafío (mediana). El puntaje es el % de aciertos de ese desafío. Una
+celda con menos de `MIN_MUESTRAS_VALIDAS` muestras queda sin z, y
+`pct_muestras_validas` queda vacío porque la calidad se reporta por
+etapa. En la pestaña, el selector "Desafío" recalcula los gráficos y la
+tabla de resultados con un solo desafío. La tabla estadística sigue usando
+todos los desafíos juntos.
 
-## 8. Estructura del código
+## 4. Interpretación
 
-| Archivo | Contenido |
-| --- | --- |
-| `analisis/config.py` | Parámetros y rutas (`AnalysisConfig`) |
-| `analisis/eeg_features.py` | Funciones puras del pipeline: parseo, alineación, filtro, bandas, log, cocientes, agregados, línea base, z-score, Min-Max, alerta de δ y `build_feature_table` |
-| `analisis/report.py` | Funciones puras de resumen para la interfaz: filtro por participante, resumen por etapa e indicadores de calidad |
-| `analisis/comprehension.py` | Punto de extensión: columnas de comprensión, binarización, interfaz `ComprehensionClassifier` y `training_table` |
-| `analisis/loader.py` | Única parte que toca disco: lee el dataset, arma la tabla y exporta el CSV |
-| `analisis/tests/test_eeg_features.py` | Pruebas unitarias con datos sintéticos (`unittest`) |
-| `ui/analysis_view.py` | Pestaña "Análisis": controles, nota, calidad, gráfico (matplotlib) y tabla |
-| `ui/app.py` | Solo registra la pestaña: botón "📈 Análisis" en el menú lateral, su frame y el cálculo al abrirla por primera vez |
+- z = 0 es el nivel habitual del participante. Los valores son relativos a
+  cada persona, nunca absolutos.
+- **EEG1_z bajo** (negativo) = mayor carga; alto = menor carga o más
+  relajación.
+- **EEG2_z alto** (positivo) = mayor carga de memoria de trabajo o
+  esfuerzo; bajo = menor demanda.
+- **Alta carga** = EEG1_z < 0 y EEG2_z > 0 a la vez. Si se contradicen, el
+  resultado es **no concluyente** (columna "Lectura" de la pestaña).
+- Attention y Meditation son algoritmos propietarios. Se muestran solo
+  como complementarios y no sustituyen a EEG1 ni a EEG2.
+- La Etapa 3 implica teclear, lo que puede añadir ruido muscular.
 
-Para correr las pruebas desde la raíz del proyecto:
+## 5. Estadística (`estadistica.py`)
+
+Todas las pruebas usan α = 0,05 e informan el tamaño de efecto junto al
+valor p. Los resultados se exportan en `resultados_estadisticos.csv`.
+
+- **Entre etapas:** Friedman para EEG1_z y EEG2_z con las Etapas 2–5, solo
+  con los participantes que tienen datos en las 4 (se informa n), y W de
+  Kendall = χ² / (n·(k − 1)). Si es significativa, se hace Wilcoxon por
+  pares con corrección de Holm y r = Z/√n.
+- **EEG–comprensión:** Spearman entre EEG1_z / EEG2_z y el puntaje, en cada
+  etapa con cuestionario y agrupando las tres. El agrupado repite
+  participantes, así que sus observaciones no son independientes.
+- **Alta vs baja:** en cada etapa con cuestionario, se divide por la
+  mediana del puntaje (≥ mediana = alta) y se aplica Mann-Whitney U con
+  r = Z/√N.
+- **Modelo lineal mixto:** `puntaje ~ EEG1_z + EEG2_z + etapa +
+  (1 | participante)`, solo con 15 participantes o más (`statsmodels`).
+  Con menos, no se ajusta y se marca "muestra pequeña: resultados
+  exploratorios".
+
+## 6. Gráficos (`graficos.py`)
+
+Se exportan en PNG a 300 dpi y se muestran en la pestaña. EEG1 va en
+morado (#7F77DD) y EEG2 en verde azulado (#1D9E75); el grupo de
+comparación, en gris (#B4B2A9). El eje Y de las barras es "z (0 = nivel
+habitual del participante)", con una línea sólida en 0 y límites
+simétricos. Junto al eje hay dos flechas de texto que explican qué
+significa subir o bajar en cada indicador. Debajo de cada figura se
+genera un texto de interpretación (reglas en `patron_carga`: EEG1 < 0 y
+EEG2 > 0 = mayor carga, el patrón inverso = menor carga, si se
+contradicen = no concluyente, y |mediana| < 0,2 en ambos = cercano al
+nivel habitual).
+
+Barras: altura = mediana del grupo, un punto oscuro por participante
+(con jitter) y el valor de la mediana encima o debajo. `MOSTRAR_RIC =
+True` agrega barras de error Q1–Q3.
+
+1. `perfil_etapas.png`: barras por etapa (Etapas 2–5) en dos paneles.
+   Incluye cuántos participantes van en la misma dirección que la mediana.
+2. `comprension_alta_vs_baja.png`: barras agrupadas alta (≥ mediana del
+   puntaje de la etapa, en color) vs baja (gris) en las Etapas 2, 4 y 5,
+   con el p de Mann-Whitney (* p<0,05, ** p<0,01, n.s.).
+3. `eeg_vs_comprension.png`: dispersión de 2 × 3, con ρ de Spearman y p
+   en el título. Debajo, una frase como "a menor carga, mejor
+   comprensión" (+ "tendencia no significativa" si p ≥ 0,05).
+4. `resumen_etapas.png`: EEG1 y EEG2 por etapa en un solo gráfico, más
+   la etapa de mayor carga (mayor EEG2_z − EEG1_z).
+
+Vista por participante (selector "Participante" de la pestaña): las
+Figuras 1 y 4 muestran solo los valores z de esa persona, con la escala
+ajustada a ellos y su propia etapa de mayor carga. La Figura 2 muestra su
+% de aciertos (alta o baja frente a la mediana del grupo) junto a su
+EEG en las Etapas 2, 4 y 5. La Figura 3 sigue siendo del grupo, porque
+la correlación necesita a todos, y marca a la persona con un anillo
+naranja. Los PNG exportados son siempre los del grupo.
+
+`TIPO_GRAFICO = "boxplot"` o `"lineas"` reactiva los gráficos anteriores
+(boxplots o líneas por participante).
+
+## 7. Parámetros (`config.py`)
+
+`RUTA_DATASET`, `RUTA_SALIDA`, `UMBRAL_POOR_SIGNAL` (0),
+`MIN_MUESTRAS_VALIDAS` (30), `MIN_PCT_VALIDO` (50), `EXCLUIR_BAJA_CALIDAD`
+(True), `ETAPAS_ANALISIS`, `ETAPAS_CON_CUESTIONARIO`,
+`ETAPA_SIN_CUESTIONARIO`, `ETAPA_LINEA_BASE` (None),
+`DESCRIPCION_CORTA_ETAPA`, `DESCRIPCION_ETAPA`, `DELTA_Z_ARTEFACTO` (2),
+`ALFA` (0,05), `MIN_PARTICIPANTES_MODELO_MIXTO` (15), los colores,
+`TIPO_GRAFICO` ("barras"), `MOSTRAR_RIC` (False) y `UMBRAL_CERCANO_Z` (0,2). Las
+funciones los reciben agrupados en `ConfigAnalisis`.
+
+## 8. Limitaciones
+
+- Un solo electrodo en Fp1, sobre el ojo: los parpadeos inflan las bandas
+  lentas (Delta y Theta). Por eso se filtra por PoorSignal, se usa la
+  mediana y Delta se reporta como control.
+- Las bandas las calcula el chip de NeuroSky (no hay PSD propia) y no
+  tienen unidades físicas. Solo valen las comparaciones dentro de cada
+  participante.
+- No hay una etapa de reposo grabada: la referencia del z es el promedio
+  de las propias Etapas 2–5.
+- Con la muestra actual (10 participantes) los resultados son
+  exploratorios.
+
+## 9. Uso
 
 ```
+# Pruebas (raíz del proyecto)
 .venv/bin/python -m unittest discover -s graphic_interface/analisis/tests -t graphic_interface
+# Correr el análisis y exportar sin abrir la interfaz
+.venv/bin/python graphic_interface/analisis/loader.py
 ```
-
-La única dependencia nueva es `matplotlib` (en `requirements.txt`), usada
-solo para el gráfico. Si faltara, la pestaña funciona igual y muestra un
-aviso en lugar del gráfico.
-
-## 9. Próximos pasos: comprensión y clasificadores
-
-El punto de extensión está en `analisis/comprehension.py`:
-
-1. **Cargar las puntuaciones.** Armar un diccionario
-   `{(participante, desafío, etapa, intento): puntaje}` con valores de 0 a
-   6 y pasarlo a `attach_comprehension(features, scores)`. Hoy `loader.py`
-   la llama sin puntuaciones, por eso las columnas salen vacías. Ese es el
-   lugar donde conectar la fuente real (por ejemplo, los cuestionarios o el
-   juez de prompts).
-2. **Binarización.** `binarize_comprehension` convierte el puntaje en
-   comprensión alta (> 3,5) o baja. El umbral se cambia en
-   `COMPREHENSION_THRESHOLD`. Un puntaje fuera de 0–6 produce un error.
-3. **Datos de entrenamiento.** `training_table(features, columnas)` devuelve
-   `X` (las features elegidas, por ejemplo `EEG1_Media_Z` y `EEG2_Media_Z`)
-   e `y` (`Comprension_Alta`), solo con las filas que tienen puntaje y datos
-   suficientes.
-4. **Clasificador.** Cualquier objeto con `fit(X, y)` y `predict(X)` cumple
-   la interfaz `ComprehensionClassifier`, por ejemplo un modelo de
-   scikit-learn, que ya está en `requirements.txt`. Conviene validarlo
-   dejando un participante fuera en cada vuelta (*leave-one-subject-out*),
-   para no evaluar con datos de la misma persona con la que se entrenó.

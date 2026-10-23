@@ -414,7 +414,29 @@ class App(ctk.CTk, *_DND_MIXIN):
                 return
         self._ask_session_devices(self._begin_session_wizard)
 
-    def _begin_session_wizard(self, choice):
+    def enter_trial_session(self):
+        """Sesión de prueba: simula la sesión de un participante para ver
+        sus mediciones, sin participante activo, sin consentimiento y sin
+        guardar nada (ver SessionWizard.start(trial=True))."""
+        if self._judge_running:
+            messagebox.showinfo(
+                "Evaluación de prompts en curso",
+                "El juez está evaluando prompts. Espera a que termine (o detenlo) "
+                "antes de comenzar una sesión.",
+            )
+            return
+        if not ai_provider_available():
+            continue_anyway = messagebox.askyesno(
+                "Backend de IA no disponible",
+                f"{ai_backend.provider_unavailable_reason()}\n\n"
+                "Las Etapas 3, 4 y 5 dependen de él; sin esto configurado van a "
+                "mostrar un error. ¿Continuar la sesión de prueba de todas formas?",
+            )
+            if not continue_anyway:
+                return
+        self._ask_session_devices(lambda choice: self._begin_session_wizard(choice, trial=True), trial=True)
+
+    def _begin_session_wizard(self, choice, trial: bool = False):
         if choice is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
         enabled_devices, start_index = choice
@@ -434,9 +456,9 @@ class App(ctk.CTk, *_DND_MIXIN):
         # su botón queda deshabilitado mientras dure esta.
         self._session_active = True
         self._refresh_judge_button()
-        self.session_wizard.start(enabled_devices, start_index)
+        self.session_wizard.start(enabled_devices, start_index, trial=trial)
 
-    def _ask_session_devices(self, on_done):
+    def _ask_session_devices(self, on_done, trial: bool = False):
         """Modal previo a entrar a la sesión guiada: que dispositivos se
         van a usar esta vez -- todos tildados por defecto. Si se destilda
         alguno, la sesión guiada sigue funcionando igual, solo sin pedir
@@ -446,10 +468,11 @@ class App(ctk.CTk, *_DND_MIXIN):
         tienen que arrancar en uno específico (por defecto, el del
         progreso guardado). `on_done` recibe (set de dispositivos, índice
         del desafío inicial en GUIDED_SESSION_GAME_ORDER), o None si se
-        canceló."""
+        canceló. Con `trial` (sesión de prueba) no hay progreso guardado:
+        se puede empezar en cualquier desafío."""
         modal = ctk.CTkToplevel(self)
-        modal.title("Dispositivos de esta sesión")
-        modal.geometry(f"{wrap(440)}x{wrap(520)}")
+        modal.title("Sesión de prueba" if trial else "Dispositivos de esta sesión")
+        modal.geometry(f"{wrap(440)}x{wrap(560 if trial else 520)}")
         modal.configure(fg_color=BG_CARD)
         modal.transient(self)
         modal.resizable(False, False)
@@ -469,6 +492,11 @@ class App(ctk.CTk, *_DND_MIXIN):
         modal.protocol("WM_DELETE_WINDOW", lambda: finish(None))
         modal.grab_set()
 
+        if trial:
+            ctk.CTkLabel(
+                modal, text="🧪  Sesión de prueba · no se guarda nada",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"), text_color=WARNING,
+            ).pack(pady=(20, 0), padx=24, anchor="w")
         ctk.CTkLabel(
             modal, text="⚙️  ¿Qué dispositivos vas a usar en esta sesión?",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(15), weight="bold"),
@@ -503,7 +531,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # Desafío inicial: por defecto el del progreso guardado; el
         # evaluador puede elegir otro si el flujo de este participante se
         # alteró (ver SessionWizard.start / next_pending_index).
-        active = self.store.get_active()
+        active = None if trial else self.store.get_active()
         saved_index = saved_game_index(active)
         played = played_challenges(active)
         challenge_options = []
@@ -512,7 +540,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             label = f"Desafío {index + 1} · {challenge.title if challenge else game_name}"
             if index + 1 in played:
                 label += "  ✓ ya jugado"
-            elif index == saved_index:
+            elif index == saved_index and not trial:
                 label += "  (progreso guardado)"
             challenge_options.append(label)
 
@@ -528,6 +556,11 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         def on_challenge_selected(label):
             index = challenge_options.index(label)
+            if trial:
+                replay_warning.configure(
+                    text="Después se sigue con los desafíos siguientes, en orden. Al salir se borra todo.",
+                )
+                return
             replay_warning.configure(
                 text="⚠️  Este desafío ya tiene datos guardados -- se van a sobrescribir."
                 if index + 1 in played else
@@ -1408,6 +1441,28 @@ class App(ctk.CTk, *_DND_MIXIN):
             corner_radius=8, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
             fg_color=BG_CARD_ALT, hover_color=BORDER,
             command=self._view_consent,
+        ).pack(anchor="w", padx=18, pady=(0, 18))
+
+        # ---------------- Sesión de prueba (ver SessionWizard.start(trial=True)) ----------------
+        trial_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        trial_card.pack(fill="x", pady=(0, 14))
+        ctk.CTkLabel(
+            trial_card, text="🧪  Sesión de prueba",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            trial_card,
+            text="Simula la sesión guiada de un participante para ver sus mediciones en vivo, sin "
+                 "elegir un participante activo y empezando en el desafío que quieras. No se guarda "
+                 "nada: ni datos de sensores, ni respuestas, ni progreso; todo se borra al salir.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+        ctk.CTkButton(
+            trial_card, text="🧪  Iniciar sesión de prueba", height=scaled(36), width=scaled(280),
+            corner_radius=8, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self.enter_trial_session,
         ).pack(anchor="w", padx=18, pady=(0, 18))
 
         # ---------------- Probar dispositivos (ver ui/device_test.py) ----------------

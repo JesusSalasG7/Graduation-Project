@@ -1,6 +1,6 @@
-"""Pestaña "Análisis": features EEG de carga cognitiva (EEG1, EEG2) por
-etapa, leídas del dataset consolidado. Solo muestra lo que calcula
-analisis/ (ver analisis/README.md); no hace cálculos propios.
+"""Pestaña "Análisis": EEG1 (Alfa/Theta) y EEG2 (Theta) normalizados por
+participante, por etapa, y su relación con la comprensión. Solo muestra lo
+que calcula analisis/ (ver analisis/README.md); no hace cálculos propios.
 
 Recibe la paleta y la tipografía desde ui/app.py (igual que SessionWizard
 recibe sus colores) para no duplicar las constantes del panel.
@@ -15,54 +15,74 @@ import customtkinter as ctk
 import numpy as np
 import pandas as pd
 
-from analisis.config import BASELINE_STAGE, DATASET_FILE, AnalysisConfig
-from analisis.loader import compute_features, export_features
-from analisis.report import STAGE_NAMES, filter_participant, quality_summary, stage_summary
+from analisis.config import RUTA_DATASET, RUTA_SALIDA, ConfigAnalisis
+from analisis.estadistica import NOTA_MUESTRA_PEQUENA
+from analisis.loader import ResultadoAnalisis, ejecutar_analisis, exportar
+from analisis.pipeline import interpretar_carga
+from analisis.por_desafio import desafios_disponibles, vista_desafio
 
-# matplotlib se usa solo para el gráfico de barras; si faltara, la pestaña
-# sigue funcionando sin él (con un aviso en su lugar).
+# matplotlib se usa para embeber los gráficos; si faltara, la pestaña
+# sigue funcionando con las tablas (con un aviso en lugar del gráfico).
 try:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-    from matplotlib.figure import Figure
 except ImportError:  # pragma: no cover
     FigureCanvasTkAgg = None
-    Figure = None
 
 ALL_PARTICIPANTS = "Todos"
+ALL_CHALLENGES = "Todos juntos"
 
-EFFORT_NOTE = (
-    "EEG1 = θ/(α+β) y EEG2 = θ/α miden esfuerzo mental y carga de memoria de "
-    "trabajo, NO comprensión. Sus valores solo son comparables dentro del mismo "
-    "participante, o entre participantes después de normalizar (cambio % contra "
-    f"la Etapa {BASELINE_STAGE} del mismo desafío, z-score o Min-Max)."
+INTERPRETACION = (
+    "• Los valores son z dentro de cada participante: z = 0 es su nivel habitual. Son relativos a "
+    "cada persona, nunca absolutos.\n"
+    "• EEG1 = Alfa/Theta. EEG1_z bajo (negativo) = mayor carga cognitiva; alto = menor carga o más relajación.\n"
+    "• EEG2 = Theta. EEG2_z alto (positivo) = mayor carga de memoria de trabajo o esfuerzo; bajo = menor demanda.\n"
+    "• Patrón de alta carga: EEG1_z bajo y EEG2_z alto a la vez. Si se contradicen, el resultado es "
+    "no concluyente.\n"
+    "• Attention y Meditation (eSense, propietarios de NeuroSky) son solo complementarios: NO sustituyen "
+    "a EEG1 ni EEG2. Gamma y Delta no se usan como indicadores de carga (Delta solo como control de artefactos).\n"
+    "• Etapa 3 (escribir el prompt): al teclear puede haber ruido muscular; interpretarla con cautela."
 )
+NOTA_ETAPA3 = "Teclado: posible ruido muscular"
 
-# (columna de la tabla de features, encabezado, ancho, formato)
-TABLE_COLUMNS = [
-    ("Participante_ID", "Part.", 60, "{:.0f}"),
-    ("Desafio", "Desafío", 70, "{:.0f}"),
-    ("Etapa", "Etapa", 60, "{:.0f}"),
-    ("Intento", "Intento", 70, "{:.0f}"),
-    ("Muestras_Validas", "Válidas", 75, "{:.0f}"),
-    ("Pct_Descartado", "% desc.", 75, "{:.1f}"),
-    ("EEG1_Media", "EEG1", 75, "{:.4f}"),
-    ("EEG1_Media_Cambio_Pct", "EEG1 Δ%", 80, "{:+.2f}"),
-    ("EEG2_Media", "EEG2", 75, "{:.4f}"),
-    ("EEG2_Media_Cambio_Pct", "EEG2 Δ%", 80, "{:+.2f}"),
-    ("AlphaTheta_Media", "α/θ", 75, "{:.4f}"),
-    ("Theta_Mediana", "θ med.", 75, "{:.3f}"),
-    ("Delta_Media", "δ media", 75, "{:.3f}"),
-    ("eSense_Attention_Media", "Atención*", 85, "{:.1f}"),
-    ("eSense_Meditation_Media", "Meditación*", 95, "{:.1f}"),
+# (columna, encabezado, ancho, formato)
+COLUMNAS_RESULTADOS = [
+    ("participante", "Part.", 55, "P{:.0f}"),
+    ("etapa", "Etapa", 70, None),
+    ("EEG1_z", "EEG1_z", 70, "{:+.3f}"),
+    ("EEG2_z", "EEG2_z", 70, "{:+.3f}"),
+    ("lectura", "Lectura", 120, None),
+    ("theta_beta_z", "θ/β z", 65, "{:+.3f}"),
+    ("engagement_z", "Engag. z", 70, "{:+.3f}"),
+    ("duracion_s", "Duración (s)", 90, "{:.0f}"),
+    ("attention_prom", "Attention*", 80, "{:.1f}"),
+    ("meditation_prom", "Meditation*", 85, "{:.1f}"),
+    ("puntaje", "% aciertos", 80, "{:.1f}"),
+    ("pct_muestras_validas", "% válido", 70, "{:.1f}"),
+    ("nota", "Nota", 200, None),
+]
+COLUMNAS_ESTADISTICA = [
+    ("analisis", "Análisis", 180, None),
+    ("indicador", "Indicador", 110, None),
+    ("etapa", "Etapa / comparación", 220, None),
+    ("n", "n", 40, "{:.0f}"),
+    ("estadistico", "Est.", 40, None),
+    ("valor", "Valor", 70, "{:.3f}"),
+    ("p", "p", 65, "{:.3f}"),
+    ("p_holm", "p Holm", 65, "{:.3f}"),
+    ("efecto", "Efecto", 100, None),
+    ("valor_efecto", "Tamaño", 70, "{:+.3f}"),
+    ("significativo", "Sig.", 45, None),
+    ("nota", "Nota", 360, None),
 ]
 
-EEG1_COLOR = "#5865f2"
-EEG2_COLOR = "#3fb8af"
 
-
-def _fmt(value, pattern: str) -> str:
-    if value is None or (isinstance(value, float) and np.isnan(value)) or pd.isna(value):
+def _fmt(value, pattern: Optional[str]) -> str:
+    if value is None or (isinstance(value, float) and np.isnan(value)) or (not isinstance(value, str) and pd.isna(value)):
         return "—"
+    if isinstance(value, (bool, np.bool_)):
+        return "Sí" if value else "No"
+    if pattern is None:
+        return str(value)
     try:
         return pattern.format(float(value))
     except (TypeError, ValueError):
@@ -75,11 +95,13 @@ class AnalysisView:
         self.c = colors
         self.font_family = font_family
         self.scaled = scaled
-        self.cfg = AnalysisConfig()
-        self.features: Optional[pd.DataFrame] = None
-        self.warnings: list[str] = []
+        self.cfg = ConfigAnalisis()
+        self.analisis: Optional[ResultadoAnalisis] = None
         self._loading = False
-        self._canvas = None
+        self._canvases = []
+        # (desafío, participante) -> figuras de esa vista (se generan al
+        # elegirla y se reutilizan hasta el próximo "Recalcular").
+        self._figuras_vista: dict = {}
         self._build()
 
     # ---------------- Construcción ----------------
@@ -92,6 +114,32 @@ class AnalysisView:
         ctk.CTkLabel(card, text=title, font=self._font(13, bold=True)).pack(anchor="w", padx=18, pady=(16, 6))
         return card
 
+    def _muted(self, parent, text: str = "") -> ctk.CTkLabel:
+        label = ctk.CTkLabel(
+            parent, text=text, font=self._font(11), text_color=self.c["TEXT_MUTED"],
+            wraplength=self.scaled(760), justify="left", anchor="w",
+        )
+        label.pack(fill="x", padx=18, pady=(0, 10))
+        return label
+
+    def _tree(self, parent, columns, height: int) -> ttk.Treeview:
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(fill="x", padx=18, pady=(0, 16))
+        frame.grid_columnconfigure(0, weight=1)
+        tree = ttk.Treeview(frame, columns=[c for c, *_ in columns], show="headings", height=height)
+        for col, label, width, _ in columns:
+            tree.heading(col, text=label, anchor="center")
+            tree.column(col, width=self.scaled(width), anchor="center", stretch=False)
+        tree.tag_configure("baja", foreground=self.c["WARNING"])
+        tree.tag_configure("sig", foreground=self.c["ACCENT"])
+        tree.grid(row=0, column=0, sticky="ew")
+        y_scroll = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        x_scroll = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
+        y_scroll.grid(row=0, column=1, sticky="ns")
+        x_scroll.grid(row=1, column=0, sticky="ew")
+        return tree
+
     def _build(self):
         wrapper = ctk.CTkScrollableFrame(self.parent, fg_color="transparent")
         wrapper.pack(fill="both", expand=True, padx=26, pady=(24, 20))
@@ -99,7 +147,8 @@ class AnalysisView:
         ctk.CTkLabel(wrapper, text="Análisis EEG", font=self._font(22, bold=True)).pack(anchor="w")
         ctk.CTkLabel(
             wrapper,
-            text="Features de carga cognitiva (EEG1, EEG2) por etapa, calculadas desde el dataset consolidado.",
+            text="EEG1 (Alfa/Theta) y EEG2 (Theta) por etapa, normalizados por participante, "
+                 "y su relación con la comprensión.",
             font=self._font(12), text_color=self.c["TEXT_MUTED"],
         ).pack(anchor="w", pady=(2, 14))
 
@@ -113,231 +162,280 @@ class AnalysisView:
         self.participant_menu = ctk.CTkOptionMenu(
             row, variable=self.participant_var, values=[ALL_PARTICIPANTS], width=self.scaled(150),
             font=self._font(12), fg_color=self.c["BG_CARD_ALT"], button_color=self.c["ACCENT"],
-            button_hover_color=self.c["ACCENT_HOVER"], command=lambda _: self._render(),
+            button_hover_color=self.c["ACCENT_HOVER"], command=lambda _: self._on_selection_change(),
         )
         self.participant_menu.pack(side="left", padx=(0, 14))
+        ctk.CTkLabel(row, text="Desafío", font=self._font(12)).pack(side="left", padx=(0, 8))
+        self.challenge_var = ctk.StringVar(value=ALL_CHALLENGES)
+        self.challenge_menu = ctk.CTkOptionMenu(
+            row, variable=self.challenge_var, values=[ALL_CHALLENGES], width=self.scaled(190),
+            font=self._font(12), fg_color=self.c["BG_CARD_ALT"], button_color=self.c["ACCENT"],
+            button_hover_color=self.c["ACCENT_HOVER"], command=lambda _: self._on_challenge_change(),
+        )
+        self.challenge_menu.pack(side="left", padx=(0, 14))
         ctk.CTkButton(
             row, text="🔄  Recalcular", height=self.scaled(32), corner_radius=8, font=self._font(12, bold=True),
             fg_color=self.c["ACCENT"], hover_color=self.c["ACCENT_HOVER"], command=self.refresh,
         ).pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            row, text="💾  Exportar CSV", height=self.scaled(32), corner_radius=8, font=self._font(12),
+            row, text="💾  Exportar CSV y PNG", height=self.scaled(32), corner_radius=8, font=self._font(12),
             fg_color=self.c["BG_CARD_ALT"], hover_color=self.c["BORDER"], command=self._export,
         ).pack(side="left")
         self.status_label = ctk.CTkLabel(
-            controls, text=f"Fuente: {DATASET_FILE}", font=self._font(11), text_color=self.c["TEXT_MUTED"],
+            controls, text=f"Fuente: {RUTA_DATASET}", font=self._font(11), text_color=self.c["TEXT_MUTED"],
             anchor="w", justify="left",
         )
         self.status_label.pack(fill="x", padx=18, pady=(0, 14))
 
-        # Nota de interpretación
-        note = self._card(wrapper, "ℹ️  Cómo leer estos valores")
-        ctk.CTkLabel(
-            note, text=EFFORT_NOTE, font=self._font(11), text_color=self.c["TEXT_MUTED"],
-            wraplength=self.scaled(700), justify="left", anchor="w",
-        ).pack(fill="x", padx=18, pady=(0, 16))
+        self._muted(self._card(wrapper, "ℹ️  Cómo leer estos valores"), INTERPRETACION)
+        self.quality_label = self._muted(self._card(wrapper, "🩺  Calidad de la señal"))
 
-        # Calidad
-        quality = self._card(wrapper, "🩺  Calidad de la señal")
-        self.quality_label = ctk.CTkLabel(
-            quality, text="", font=self._font(11), wraplength=self.scaled(700), justify="left", anchor="w",
-        )
-        self.quality_label.pack(fill="x", padx=18, pady=(0, 16))
+        # Gráficos (uno por tarjeta, se llenan en _render_charts)
+        self.chart_holders = {}
+        from analisis.graficos import FIGURAS
+        for clave, (titulo, _) in FIGURAS.items():
+            card = self._card(wrapper, f"📊  {titulo}")
+            holder = ctk.CTkFrame(card, fg_color=self.c["BG_CARD"])
+            holder.pack(fill="x", padx=18, pady=(0, 16))
+            self.chart_holders[clave] = holder
 
-        # Gráfico
-        chart = self._card(wrapper, "📊  EEG1 y EEG2 por etapa")
-        self.chart_caption = ctk.CTkLabel(
-            chart, text="", font=self._font(11), text_color=self.c["TEXT_MUTED"],
-            wraplength=self.scaled(700), justify="left", anchor="w",
+        stats_card = self._card(wrapper, "🧮  Resultados estadísticos")
+        self.stats_caption = self._muted(
+            stats_card,
+            "Friedman (con W de Kendall) entre etapas; si es significativo, Wilcoxon por pares con Holm y r. "
+            "Spearman EEG–% de aciertos y Mann-Whitney (alta vs baja comprensión, con r). α = 0,05. "
+            "En azul, los resultados significativos. Calculados con todos los desafíos juntos: no cambian "
+            "con el selector de desafío.",
         )
-        self.chart_caption.pack(fill="x", padx=18, pady=(0, 6))
-        self.chart_holder = ctk.CTkFrame(chart, fg_color=self.c["BG_CARD"])
-        self.chart_holder.pack(fill="x", padx=18, pady=(0, 16))
+        self.stats_tree = self._tree(stats_card, COLUMNAS_ESTADISTICA, height=10)
 
-        # Tabla
-        table = self._card(wrapper, "🧾  Features por etapa")
-        ctk.CTkLabel(
-            table,
-            text="Δ% = cambio contra la línea base. * eSense: métricas propietarias de NeuroSky. "
-                 "Las filas en naranja tienen datos insuficientes y las rojas, δ atípicamente alta. "
-                 "El CSV exportado trae todas las columnas (DE, mín., máx., z-score, Min-Max…).",
-            font=self._font(11), text_color=self.c["TEXT_MUTED"], wraplength=self.scaled(700),
-            justify="left", anchor="w",
-        ).pack(fill="x", padx=18, pady=(0, 8))
-        table_frame = ctk.CTkFrame(table, fg_color="transparent")
-        table_frame.pack(fill="x", padx=18, pady=(0, 16))
-        table_frame.grid_columnconfigure(0, weight=1)
-        self.tree = ttk.Treeview(
-            table_frame, columns=[col for col, *_ in TABLE_COLUMNS], show="headings", height=12,
+        table_card = self._card(wrapper, "🧾  Resultados por etapa")
+        self._muted(
+            table_card,
+            "Mediana de los z de cada participante en cada etapa: todos sus desafíos e intentos juntos o, con el "
+            "selector, solo el desafío elegido (ahí el % de muestras válidas queda en —: la calidad es por etapa). "
+            "* Attention/Meditation: eSense propietario, solo complementario. Etapa 3 sin cuestionario.",
         )
-        for col, label, width, _ in TABLE_COLUMNS:
-            self.tree.heading(col, text=label, anchor="center")
-            self.tree.column(col, width=self.scaled(width), anchor="center", stretch=False)
-        self.tree.tag_configure("insuficiente", foreground=self.c["WARNING"])
-        self.tree.tag_configure("delta", foreground=self.c["DANGER"])
-        self.tree.grid(row=0, column=0, sticky="ew")
-        y_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
-        x_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
-        y_scroll.grid(row=0, column=1, sticky="ns")
-        x_scroll.grid(row=1, column=0, sticky="ew")
+        self.tree = self._tree(table_card, COLUMNAS_RESULTADOS, height=12)
 
     # ---------------- Datos ----------------
     def refresh(self):
-        """Recalcula desde el CSV en un hilo aparte (lee y procesa todas las
-        listas crudas, puede tardar unos segundos)."""
+        """Recalcula y exporta en un hilo aparte (lee y procesa todas las
+        listas crudas y genera los PNG a 300 dpi; tarda unos segundos)."""
         if self._loading:
             return
         self._loading = True
-        self.status_label.configure(text="Calculando features…")
+        self.status_label.configure(text="Calculando…")
 
         def work():
             try:
-                features, warnings = compute_features(DATASET_FILE, self.cfg)
+                analisis = ejecutar_analisis(RUTA_DATASET, self.cfg)
+                carpeta = exportar(analisis)
                 error = None
             except Exception as exc:  # se muestra en la pestaña, la app sigue
-                features, warnings, error = None, [], exc
-            self.parent.after(0, lambda: self._on_loaded(features, warnings, error))
+                analisis, carpeta, error = None, None, exc
+            self.parent.after(0, lambda: self._on_loaded(analisis, carpeta, error))
 
         threading.Thread(target=work, daemon=True).start()
 
     def refresh_if_needed(self):
-        if self.features is None:
+        if self.analisis is None:
             self.refresh()
 
-    def _on_loaded(self, features, warnings, error):
+    def _on_loaded(self, analisis: Optional[ResultadoAnalisis], carpeta, error):
         self._loading = False
         if error is not None:
             self.status_label.configure(text=f"⚠️  {error}")
             return
-        self.features, self.warnings = features, warnings
-        participants = sorted(int(p) for p in features["Participante_ID"].dropna().unique()) if not features.empty else []
-        options = [ALL_PARTICIPANTS] + [f"Participante {p}" for p in participants]
-        self.participant_menu.configure(values=options)
-        if self.participant_var.get() not in options:
-            self.participant_var.set(ALL_PARTICIPANTS)
+        self.analisis = analisis
+        self._figuras_vista = {}
+        res = analisis.pipeline.resultados
+        participants = sorted(int(p) for p in res["participante"].dropna().unique()) if not res.empty else []
+        self._challenge_labels = dict(desafios_disponibles(analisis.por_desafio))
+        challenges = [ALL_CHALLENGES] + list(self._challenge_labels.values())
+        self.challenge_menu.configure(values=challenges)
+        if self.challenge_var.get() not in challenges:
+            self.challenge_var.set(ALL_CHALLENGES)
+        self._update_participant_options()
         self.status_label.configure(
-            text=f"Fuente: {DATASET_FILE} · {len(features)} filas · {len(participants)} participantes"
+            text=f"Fuente: {RUTA_DATASET} · {len(participants)} participantes · {len(res)} filas · "
+                 f"resultados exportados en {carpeta}"
         )
-        self._render()
+        self._render_quality()
+        self._on_selection_change()
 
+    # ---------------- Selección (participante × desafío) ----------------
     def _selected_participant(self) -> Optional[int]:
         value = self.participant_var.get()
         return None if value == ALL_PARTICIPANTS else int(value.split()[-1])
 
-    def _export(self):
-        if self.features is None or self.features.empty:
-            messagebox.showinfo("Exportar CSV", "Todavía no hay features calculadas.")
+    def _selected_challenge(self) -> Optional[int]:
+        value = self.challenge_var.get()
+        return None if value == ALL_CHALLENGES else int(value.split()[1])
+
+    def _vista(self) -> pd.DataFrame:
+        """Resultados de la vista actual: todos los desafíos juntos
+        (resultados_por_etapa) o solo el desafío elegido."""
+        desafio = self._selected_challenge()
+        if desafio is None:
+            return self.analisis.pipeline.resultados
+        return vista_desafio(self.analisis.por_desafio, desafio)
+
+    def _update_participant_options(self):
+        """Solo los participantes con datos en el desafío elegido."""
+        res = self._vista()
+        participants = sorted(int(p) for p in res["participante"].dropna().unique()) if not res.empty else []
+        options = [ALL_PARTICIPANTS] + [f"Participante {p}" for p in participants]
+        self.participant_menu.configure(values=options)
+        if self.participant_var.get() not in options:
+            self.participant_var.set(ALL_PARTICIPANTS)
+
+    def _on_challenge_change(self):
+        if self.analisis is None:
             return
-        path = export_features(self.features)
-        messagebox.showinfo("Exportar CSV", f"Tabla de features guardada en:\n{path}")
+        self._update_participant_options()
+        self._on_selection_change()
+
+    def _on_selection_change(self):
+        """Tablas y gráficos de la vista elegida. Desafío: solo ese desafío
+        (o todos juntos). Participante: gráficos con sus propios resultados
+        (o el grupo). Todos + todos juntos = las figuras ya exportadas."""
+        if self.analisis is None:
+            return
+        self._render_tables()
+        participante, desafio = self._selected_participant(), self._selected_challenge()
+        res = self._vista()
+        if res.empty:
+            self._render_charts({}, "Sin datos para esta combinación.")
+            return
+        if participante is None and desafio is None:
+            self._render_charts(self.analisis.figuras)
+            return
+        clave = (desafio, participante)
+        if clave in self._figuras_vista:
+            self._render_charts(self._figuras_vista[clave])
+            return
+        contexto = self._challenge_labels.get(desafio, "") if desafio is not None else ""
+
+        def work():
+            from analisis.graficos import generar_figuras
+            try:
+                figuras, mensaje = generar_figuras(res, self.cfg, participante=participante, contexto=contexto), None
+            except Exception as exc:  # la pestaña sigue; se avisa en la tarjeta
+                figuras, mensaje = {}, f"No se pudo generar el gráfico: {exc}"
+            self.parent.after(0, lambda: self._on_view_figures(clave, figuras, mensaje))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_view_figures(self, clave: tuple, figuras: dict, mensaje: Optional[str]):
+        if mensaje is None:
+            self._figuras_vista[clave] = figuras
+        if (self._selected_challenge(), self._selected_participant()) == clave:  # puede haber cambiado
+            self._render_charts(figuras, mensaje)
+
+    def _export(self):
+        if self.analisis is None or self.analisis.pipeline.resultados.empty:
+            messagebox.showinfo("Exportar", "Todavía no hay resultados calculados.")
+            return
+        carpeta = exportar(self.analisis, RUTA_SALIDA)
+        messagebox.showinfo(
+            "Exportar",
+            f"Guardado en:\n{carpeta}\n\nresultados_por_etapa.csv, resultados_estadisticos.csv, "
+            "reporte_calidad.csv, resultados_por_desafio.csv y los gráficos del grupo en PNG (300 dpi).",
+        )
 
     # ---------------- Render ----------------
-    def _render(self):
-        if self.features is None:
-            return
-        selected = filter_participant(self.features, self._selected_participant())
-        self._render_quality(selected)
-        self._render_chart(selected)
-        self._render_table(selected)
-
-    def _render_quality(self, df: pd.DataFrame):
-        q = quality_summary(df)
+    def _render_quality(self):
+        p = self.analisis.pipeline
+        cal = p.calidad
         lines = []
-        if q["pct_descartado_por_etapa"]:
-            pct = " · ".join(f"Etapa {stage}: {value}%" for stage, value in q["pct_descartado_por_etapa"].items())
-            lines.append(f"Muestras descartadas (PoorSignal > {self.cfg.poor_signal_threshold}), promedio por etapa: {pct}")
+        if not cal.empty:
+            por_etapa = cal.groupby("etapa")["pct_valido"].mean()
+            lines.append(
+                f"Muestras válidas (PoorSignal ≤ {self.cfg.umbral_poor_signal}, Theta y Alfa > 0), "
+                "promedio por etapa: " + " · ".join(f"{e}: {v:.1f} %" for e, v in por_etapa.items())
+            )
+            bajas = cal[cal["baja_calidad"]]
+            accion = "excluidas del análisis" if self.cfg.excluir_baja_calidad else "incluidas"
+            lines.append(
+                f"Baja calidad (< {self.cfg.min_pct_valido:.0f} % o < {self.cfg.min_muestras_validas} muestras "
+                f"válidas, {accion}): "
+                + (", ".join(f"P{r.participante} · {r.etapa}" for r in bajas.itertuples()) or "ninguna")
+            )
+            lines.append(
+                f"Control de artefactos (Delta): {cal['pct_delta_alta'].mean():.1f} % de muestras válidas con "
+                f"log Delta > media + {self.cfg.delta_z_artefacto:g} DE del participante (máx. "
+                f"{cal['pct_delta_alta'].max():.1f} %)."
+            )
         lines.append(
-            f"Datos insuficientes (< {self.cfg.min_valid_samples} muestras o < "
-            f"{self.cfg.min_valid_fraction:.0%} válidas): "
-            + (", ".join(q["insuficientes"]) if q["insuficientes"] else "ninguna etapa")
+            "Otras etapas en el dataset (fuera del análisis): "
+            + (", ".join(p.etapas_ignoradas) if p.etapas_ignoradas else "ninguna")
         )
         lines.append(
-            f"⚠️ δ atípicamente alta (z > {self.cfg.delta_alert_z}; posibles parpadeos o artefactos, Fp1): "
-            + (", ".join(q["delta_alta"]) if q["delta_alta"] else "ninguna")
+            "Línea base: " + (self.cfg.etapa_linea_base or "todas las muestras válidas de las Etapas 2–5 del participante")
         )
-        if q["filas"] and q["con_linea_base"] == 0:
-            lines.append(f"⚠️ Sin línea base (Etapa {self.cfg.baseline_stage}): no se calculó el cambio %.")
-        elif q["filas"] - q["con_linea_base"] > 0:
-            lines.append(f"Filas sin línea base válida: {q['filas'] - q['con_linea_base']} de {q['filas']}.")
+        otros = [a for a in p.avisos if "baja calidad" not in a]
+        if otros:
+            lines.append("Avisos: " + " ".join(otros[:6]) + (f" (+{len(otros) - 6} más)" if len(otros) > 6 else ""))
+        por_desafio = self.analisis.avisos_por_desafio
+        if por_desafio:
+            lines.append("Vista por desafío: " + " ".join(por_desafio[:4])
+                         + (f" (+{len(por_desafio) - 4} más)" if len(por_desafio) > 4 else ""))
         self.quality_label.configure(text="\n".join(lines))
 
-    def _render_chart(self, df: pd.DataFrame):
-        for child in self.chart_holder.winfo_children():
-            child.destroy()
-        self._canvas = None
-        if Figure is None:
-            self.chart_caption.configure(text="matplotlib no está instalado: el gráfico no está disponible.")
+    def _render_charts(self, figuras: Optional[dict] = None, mensaje: Optional[str] = None):
+        figuras = self.analisis.figuras if figuras is None else figuras
+        for canvas in self._canvases:
+            canvas.get_tk_widget().destroy()
+        self._canvases = []
+        for clave, holder in self.chart_holders.items():
+            for child in holder.winfo_children():
+                child.destroy()
+            fig = figuras.get(clave)
+            if FigureCanvasTkAgg is None or fig is None:
+                ctk.CTkLabel(
+                    holder, text=mensaje or "Gráfico no disponible (sin datos o sin matplotlib).", font=self._font(11),
+                    text_color=self.c["TEXT_MUTED"],
+                ).pack(anchor="w")
+                continue
+            canvas = FigureCanvasTkAgg(fig, master=holder)
+            canvas.draw()
+            canvas.get_tk_widget().pack(anchor="w")
+            self._canvases.append(canvas)
+
+    def _render_tables(self):
+        if self.analisis is None:
             return
-        summary = stage_summary(df)
-        if summary.empty:
-            self.chart_caption.configure(text="No hay etapas con datos suficientes para graficar.")
-            return
-
-        use_change = summary[["EEG1_Media_Cambio_Pct", "EEG2_Media_Cambio_Pct"]].notna().any().any()
-        if use_change:
-            cols = ("EEG1_Media_Cambio_Pct", "EEG2_Media_Cambio_Pct")
-            ylabel = f"Cambio % vs. Etapa {self.cfg.baseline_stage}"
-            self.chart_caption.configure(
-                text=f"Barras: cambio % medio contra la línea base (Etapa {self.cfg.baseline_stage} del mismo "
-                     "desafío, por eso vale 0). Encima: el valor medio de EEG1 / EEG2. n = filas promediadas."
-            )
-        else:
-            cols = ("EEG1_Media", "EEG2_Media")
-            ylabel = "Valor medio (log)"
-            self.chart_caption.configure(
-                text="⚠️ Sin línea base: se grafican los valores medios sin normalizar, comparables solo "
-                     "dentro del mismo participante."
-            )
-
-        bg, fg, muted = self.c["BG_CARD"], "#e6e8f0", self.c["TEXT_MUTED"]
-        fig = Figure(figsize=(8, 3.4), dpi=100, facecolor=bg)
-        ax = fig.add_subplot(111)
-        ax.set_facecolor(bg)
-        x = np.arange(len(summary))
-        width = 0.36
-        for offset, col, raw_col, color, label in (
-            (-width / 2, cols[0], "EEG1_Media", EEG1_COLOR, "EEG1 = θ/(α+β)"),
-            (width / 2, cols[1], "EEG2_Media", EEG2_COLOR, "EEG2 = θ/α"),
-        ):
-            values = summary[col].fillna(0).to_numpy()
-            bars = ax.bar(x + offset, values, width, color=color, label=label)
-            if use_change:
-                for bar, raw in zip(bars, summary[raw_col]):
-                    height = bar.get_height()
-                    ax.annotate(
-                        f"{raw:.3f}", (bar.get_x() + bar.get_width() / 2, height),
-                        xytext=(0, 3 if height >= 0 else -11), textcoords="offset points",
-                        ha="center", fontsize=8, color=muted,
-                    )
-        ax.axhline(0, color=muted, linewidth=0.8)
-        ax.set_xticks(x)
-        ax.set_xticklabels(
-            [f"Etapa {int(s)}\n{STAGE_NAMES.get(int(s), '')}\nn={int(n)}" for s, n in zip(summary["Etapa"], summary["Filas"])],
-            color=fg, fontsize=9,
-        )
-        ax.set_ylabel(ylabel, color=fg, fontsize=9)
-        ax.tick_params(axis="y", colors=muted, labelsize=8)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        for spine in ("left", "bottom"):
-            ax.spines[spine].set_color(self.c["BORDER"])
-        ax.margins(y=0.2)
-        ax.legend(frameon=False, labelcolor=fg, fontsize=9, loc="upper right")
-        fig.tight_layout()
-
-        self._canvas = FigureCanvasTkAgg(fig, master=self.chart_holder)
-        self._canvas.draw()
-        self._canvas.get_tk_widget().pack(fill="x")
-
-    def _render_table(self, df: pd.DataFrame):
+        participante = self._selected_participant()
+        res = self._vista().copy()
+        if participante is not None:
+            res = res[res["participante"] == participante]
+        res["lectura"] = [interpretar_carga(a, b) for a, b in zip(res["EEG1_z"], res["EEG2_z"])]
+        res["nota"] = np.where(res["etapa"] == self.cfg.etapa_sin_cuestionario, NOTA_ETAPA3, "")
         self.tree.delete(*self.tree.get_children())
-        for _, row in df.iterrows():
-            tags = ()
-            if bool(row.get("Datos_Insuficientes")):
-                tags = ("insuficiente",)
-            elif bool(row.get("Delta_Atipica")):
-                tags = ("delta",)
+        for _, row in res.iterrows():
             self.tree.insert(
-                "", "end", values=[_fmt(row.get(col), pattern) for col, _, _, pattern in TABLE_COLUMNS], tags=tags,
+                "", "end", values=[_fmt(row.get(c), f) for c, _, _, f in COLUMNAS_RESULTADOS],
+            )
+
+        est = self.analisis.estadistica
+        self.stats_tree.delete(*self.stats_tree.get_children())
+        for _, row in est.iterrows():
+            values = []
+            for c, _, _, f in COLUMNAS_ESTADISTICA:
+                v = row.get(c)
+                if c == "nota" and isinstance(v, str):
+                    v = v.replace(f"; {NOTA_MUESTRA_PEQUENA}", "").replace(NOTA_MUESTRA_PEQUENA, "") or "—"
+                values.append(_fmt(v, f))
+            sig = row.get("significativo")
+            tags = ("sig",) if isinstance(sig, (bool, np.bool_)) and sig else ()
+            self.stats_tree.insert("", "end", values=values, tags=tags)
+        if not est.empty and est["nota"].astype(str).str.contains(NOTA_MUESTRA_PEQUENA).any():
+            self.stats_caption.configure(
+                text=f"⚠️ {NOTA_MUESTRA_PEQUENA.capitalize()} "
+                     f"(n = {self.analisis.pipeline.resultados['participante'].nunique()}; el modelo lineal mixto "
+                     f"requiere ≥ {self.cfg.min_participantes_modelo_mixto} participantes). "
+                     "Friedman (W de Kendall) entre etapas → Wilcoxon por pares con Holm y r si es significativo; "
+                     "Spearman EEG–% de aciertos; Mann-Whitney alta vs baja (r). α = 0,05. "
+                     "En azul, los resultados significativos."
             )
