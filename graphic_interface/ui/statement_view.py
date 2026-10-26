@@ -7,6 +7,8 @@ investigador pueda ver exactamente lo mismo que va a ver el participante,
 sin duplicar el layout en los dos lugares.
 """
 
+import tkinter
+
 import customtkinter as ctk
 
 FONT_FAMILY = "Segoe UI"
@@ -59,13 +61,67 @@ def _section(parent, title: str, font_scale: float = 1.0):
     ).pack(anchor="w", pady=(0, 6))
 
 
-def _code_block(parent, text: str, colors: dict, font_scale: float = 1.0):
+def code_block(parent, text: str, colors: dict, font_size: int = 12):
+    """Bloque de código de solo lectura que respeta las líneas tal cual
+    (sin re-envolverlas, para no romper la indentación). Antes era un
+    label: si una línea no cabía en la columna, se cortaba y el resto no
+    se podía ver. Ahora, si alguna línea es más ancha que el bloque,
+    aparece debajo una barra para desplazarse a los lados (también con
+    Shift + rueda del mouse); si todo cabe, la barra no se muestra.
+
+    Muestra siempre todas las líneas (el alto se ajusta al texto), así el
+    desplazamiento vertical lo sigue haciendo la columna que lo contiene.
+    El texto se puede seleccionar y copiar. `font_size` va en las mismas
+    unidades que CTkFont (sin el escalado de pantalla de CTk)."""
     card = ctk.CTkFrame(parent, fg_color=colors["BG_CARD_ALT"], corner_radius=8)
     card.pack(anchor="w", fill="x", pady=(0, 18))
-    ctk.CTkLabel(
-        card, text=text, font=ctk.CTkFont(family="monospace", size=round(12 * font_scale)),
-        justify="left", anchor="w",
-    ).pack(anchor="w", fill="x", padx=14, pady=10)
+
+    # tkinter.Text en vez de CTkTextbox: permite fijar el alto en líneas
+    # exactas. Como es un widget de tk puro, el escalado de CTk se aplica
+    # a mano (tamaño negativo = píxeles, igual que hace CTk).
+    scaling = ctk.ScalingTracker.get_widget_scaling(card)
+    background = card._apply_appearance_mode(colors["BG_CARD_ALT"])
+    foreground = card._apply_appearance_mode(ctk.ThemeManager.theme["CTkLabel"]["text_color"])
+    text = text.rstrip("\n") or " "
+    box = tkinter.Text(
+        card, wrap="none", width=1, height=text.count("\n") + 1,
+        font=("monospace", -round(font_size * scaling)),
+        bg=background, fg=foreground, insertbackground=foreground,
+        selectbackground=card._apply_appearance_mode(colors.get("BORDER", "#3a3f4b")),
+        relief="flat", borderwidth=0, highlightthickness=0,
+        padx=round(14 * scaling), pady=round(10 * scaling), cursor="xterm",
+    )
+    box.insert("1.0", text)
+    box.configure(state="disabled")  # solo lectura, pero se puede seleccionar
+    box.pack(fill="x", padx=4, pady=4)
+
+    scrollbar = ctk.CTkScrollbar(card, orientation="horizontal", command=box.xview, height=14)
+
+    def on_xscroll(first, last):
+        scrollbar.set(first, last)
+        needed = float(first) > 0.0 or float(last) < 1.0
+        if needed and not scrollbar.winfo_ismapped():
+            scrollbar.pack(fill="x", padx=8, pady=(0, 6))
+        elif not needed and scrollbar.winfo_ismapped():
+            scrollbar.pack_forget()
+
+    box.configure(xscrollcommand=on_xscroll)
+
+    # En Linux, Shift + rueda llega como Shift-Button-4/5; en Windows y
+    # macOS como Shift-MouseWheel. tk.Text no siempre lo traduce a scroll
+    # horizontal, así que se hace explícito.
+    def scroll_x(units):
+        box.xview_scroll(units, "units")
+        return "break"
+
+    box.bind("<Shift-MouseWheel>", lambda e: scroll_x(-1 if e.delta > 0 else 1))
+    box.bind("<Shift-Button-4>", lambda e: scroll_x(-3))
+    box.bind("<Shift-Button-5>", lambda e: scroll_x(3))
+    return card
+
+
+def _code_block(parent, text: str, colors: dict, font_scale: float = 1.0):
+    code_block(parent, text, colors, round(12 * font_scale))
 
 
 def render_statement(parent, game, challenge, colors: dict, wraplength: int = 420, font_scale: float = 1.0):

@@ -119,7 +119,7 @@ from ui.monitors import (
     usable_area,
 )
 from ui.session_monitor import STAGE_NAMES, SessionMonitorWindow
-from ui.statement_view import fit_wraplength, render_statement
+from ui.statement_view import code_block, fit_wraplength, render_statement
 
 FONT_FAMILY = "Segoe UI"
 PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
@@ -528,12 +528,7 @@ class SessionWizard:
         ).pack(anchor="w", pady=(0, 6))
 
     def _code_block(self, parent, text: str):
-        card = ctk.CTkFrame(parent, fg_color=self.c["BG_CARD_ALT"], corner_radius=8)
-        card.pack(anchor="w", fill="x", pady=(0, 18))
-        ctk.CTkLabel(
-            card, text=text, font=ctk.CTkFont(family="monospace", size=scaled(12)),
-            justify="left", anchor="w",
-        ).pack(anchor="w", fill="x", padx=14, pady=10)
+        code_block(parent, text, self.c, scaled(12))
 
     def _play_button(self, parent, label: str, launch_fn):
         """Botón que corre `launch_fn()` (sin argumentos, ver game_patch.py)
@@ -1730,11 +1725,13 @@ class SessionWizard:
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
             text_color=self.c["ACCENT"],
         ).pack(anchor="w", padx=16, pady=(12, 4))
-        ctk.CTkLabel(
+        symptom_label = ctk.CTkLabel(
             symptom_card, text=challenge.broken_symptom,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13)),
             wraplength=wrap(860), justify="left",
-        ).pack(anchor="w", padx=16, pady=(0, 14))
+        )
+        symptom_label.pack(anchor="w", padx=16, pady=(0, 14))
+        fit_wraplength(symptom_card, [(symptom_label, 32, None)])
 
         self._play_button(
             body, "🎮  Jugar",
@@ -2044,20 +2041,26 @@ class SessionWizard:
             fg_color=pill_bg, text_color=pill_fg, corner_radius=10, padx=12, pady=4,
         ).pack(anchor="w", pady=(0, 10))
 
+        fitted_labels = []
         if result.error:
-            ctk.CTkLabel(
+            error_label = ctk.CTkLabel(
                 left, text=result.error, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
                 text_color="#f87171", wraplength=wrap(420), justify="left",
-            ).pack(anchor="w", pady=(0, 10))
+            )
+            error_label.pack(anchor="w", pady=(0, 10))
+            fitted_labels.append((error_label, 0, None))
 
         self._section(left, "💻  Código generado (sin ningún contexto)")
-        ctk.CTkLabel(
+        reminder_label = ctk.CTkLabel(
             left,
             text="Recuerda: esta IA solo vio el prompt exacto que escribiste en la Etapa 3, "
             "nada más.",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=self.c["TEXT_MUTED"],
             wraplength=wrap(420), justify="left",
-        ).pack(anchor="w", pady=(0, 8))
+        )
+        reminder_label.pack(anchor="w", pady=(0, 8))
+        fitted_labels.append((reminder_label, 0, None))
+        fit_wraplength(left, fitted_labels)
         self._code_block(left, result.response_text or "(sin respuesta para mostrar)")
 
         self._build_quiz(
@@ -2113,11 +2116,13 @@ class SessionWizard:
             f"No se generó una explicación para este caso. ({quiz_error})" if quiz_error
             else "No se generó una explicación para este caso."
         )
-        ctk.CTkLabel(
+        explanation_label = ctk.CTkLabel(
             left, text=explanation_text,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(14)),
             wraplength=wrap(420), justify="left", anchor="w",
-        ).pack(anchor="w", fill="x", pady=(0, 18))
+        )
+        explanation_label.pack(anchor="w", fill="x", pady=(0, 18))
+        fit_wraplength(left, [(explanation_label, 0, None)])
 
         self._build_quiz(
             right, result.reasoning_questions if result else [], self.stage4_answers,
