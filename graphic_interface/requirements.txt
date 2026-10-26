@@ -47,3 +47,8 @@ anthropic==1.13.0
 # ponderado (scikit-learn), Kruskal-Wallis y Spearman (scipy).
 scipy==1.17.1
 scikit-learn==1.9.0
+# Pestaña Análisis (ver analisis/ y ui/analysis_view.py): gráficos de
+# EEG1/EEG2 por etapa embebidos con el backend TkAgg y exportados en PNG;
+# statsmodels ajusta el modelo lineal mixto (solo con >= 15 participantes).
+matplotlib==3.11.1
+statsmodels==0.15.0

@@ -73,6 +73,7 @@ Graduation-Project/
 │   ├── sensors/           # Integración con cada sensor: NeuroSky, cámara, eye tracker, reloj (heart_rate_import.py)
 │   ├── games/             # Lanzar juegos y parchearlos con la solución de la IA
 │   ├── judge/             # Juez de prompts (LLM-as-a-judge): judge_config.py, judge_inputs.py, judge_prompt.py, judge_client.py, judge_runner.py
+│   ├── analisis/          # Pestaña Análisis: EEG1 (Alfa/Theta) y EEG2 (Theta) en z por etapa vs comprensión -- ver analisis/README.md
 │   ├── storage/           # Persistencia: participantes, consentimientos (consent_store.py), respuestas de cuestionarios, stage_capture.py, tiempos de la sesión guiada (session_timing.py)
 │   ├── scripts/           # Utilidades sueltas: reimport_heart_rate.py, test_gemini_connection.py, test_email_config.py, evaluate_prompts.py (juez)
 │   ├── assets/            # Icono de la app, consentimiento/consentimiento_v1.0.pdf (carta original) y juez/ (rubrica.md, especificaciones.md)

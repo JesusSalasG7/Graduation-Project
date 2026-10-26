@@ -28,7 +28,9 @@ from storage.stage_capture import GUIDED_SESSION_STAGE_ORDER, challenge_dir_read
 from ui.consent_view import (
     EMAIL_RE, RESULT_ACCEPTED, RESULT_DECLINED, ConsentView, normalize_ci, open_consent_viewer,
 )
-from ui.session_wizard import SessionWizard
+from ui.analysis_view import AnalysisView
+from ui.device_test import DeviceTester
+from ui.session_wizard import SessionWizard, played_challenges, saved_game_index
 from ui.statement_view import render_statement
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
@@ -215,14 +217,25 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tab_games = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_participants = ctk.CTkFrame(self.content, fg_color=BG_APP)
         self.tab_session = ctk.CTkFrame(self.content, fg_color=BG_APP)
+        self.tab_analysis = ctk.CTkFrame(self.content, fg_color=BG_APP)
         for frame in (
-            self.tab_games, self.tab_participants, self.tab_session,
+            self.tab_games, self.tab_participants, self.tab_session, self.tab_analysis,
         ):
             frame.grid(row=0, column=0, sticky="nsew")
 
         self._build_games_tab()
         self._build_participants_tab()
         self._build_session_tab()
+        # Pestaña Análisis (ver ui/analysis_view.py y analisis/README.md).
+        self.analysis_view = AnalysisView(
+            self.tab_analysis,
+            {
+                "ACCENT": ACCENT, "ACCENT_HOVER": ACCENT_HOVER,
+                "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT, "BORDER": BORDER,
+                "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING, "DANGER": DANGER,
+            },
+            FONT_FAMILY, scaled,
+        )
         self._select_nav("games")
 
         # Sesión guiada: un frame que ocupa TODA la ventana (sidebar +
@@ -238,6 +251,18 @@ class App(ctk.CTk, *_DND_MIXIN):
                 "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT,
                 "BORDER": BORDER, "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING,
             },
+        )
+
+        # "Probar dispositivos" (pestaña Sesión): reusa el modal de sudo
+        # del wizard para vincular el NeuroSky.
+        self.device_tester = DeviceTester(
+            self,
+            {
+                "ACCENT": ACCENT, "ACCENT_HOVER": ACCENT_HOVER,
+                "BG_CARD": BG_CARD, "BG_CARD_ALT": BG_CARD_ALT,
+                "BORDER": BORDER, "TEXT_MUTED": TEXT_MUTED, "WARNING": WARNING,
+            },
+            FONT_FAMILY, scaled, self.session_wizard._ask_sudo_password_blocking,
         )
 
         # Consentimiento informado: igual que la sesión guiada, un frame a
@@ -389,9 +414,35 @@ class App(ctk.CTk, *_DND_MIXIN):
                 return
         self._ask_session_devices(self._begin_session_wizard)
 
-    def _begin_session_wizard(self, enabled_devices):
-        if enabled_devices is None:
+    def enter_trial_session(self):
+        """Sesión de prueba: simula la sesión de un participante para ver
+        sus mediciones, sin participante activo, sin consentimiento y sin
+        guardar nada (ver SessionWizard.start(trial=True))."""
+        if self._judge_running:
+            messagebox.showinfo(
+                "Evaluación de prompts en curso",
+                "El juez está evaluando prompts. Espera a que termine (o detenlo) "
+                "antes de comenzar una sesión.",
+            )
+            return
+        if not ai_provider_available():
+            continue_anyway = messagebox.askyesno(
+                "Backend de IA no disponible",
+                f"{ai_backend.provider_unavailable_reason()}\n\n"
+                "Las Etapas 3, 4 y 5 dependen de él; sin esto configurado van a "
+                "mostrar un error. ¿Continuar la sesión de prueba de todas formas?",
+            )
+            if not continue_anyway:
+                return
+        self._ask_session_devices(lambda choice: self._begin_session_wizard(choice, trial=True), trial=True)
+
+    def _begin_session_wizard(self, choice, trial: bool = False):
+        if choice is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
+        enabled_devices, start_index = choice
+        # La sesión necesita la cámara y el NeuroSky libres: se corta
+        # cualquier prueba de "Probar dispositivos" que siga abierta.
+        self.device_tester.stop_all(wait=True)
         # La app entera arranca maximizada (ver __init__); esto solo
         # cubre el caso de que el usuario la haya desmaximizado a mano.
         self._maximize()
@@ -405,18 +456,23 @@ class App(ctk.CTk, *_DND_MIXIN):
         # su botón queda deshabilitado mientras dure esta.
         self._session_active = True
         self._refresh_judge_button()
-        self.session_wizard.start(enabled_devices)
+        self.session_wizard.start(enabled_devices, start_index, trial=trial)
 
-    def _ask_session_devices(self, on_done):
+    def _ask_session_devices(self, on_done, trial: bool = False):
         """Modal previo a entrar a la sesión guiada: que dispositivos se
         van a usar esta vez -- todos tildados por defecto. Si se destilda
         alguno, la sesión guiada sigue funcionando igual, solo sin pedir
         ni procesar los datos de ese dispositivo (ver SessionWizard.
-        _enabled_devices / _show_next_setup_screen). `on_done` recibe el
-        set de dispositivos elegidos, o None si se canceló."""
+        _enabled_devices / _show_next_setup_screen). Además permite elegir
+        el desafío inicial, para participantes cuyo flujo se alteró y
+        tienen que arrancar en uno específico (por defecto, el del
+        progreso guardado). `on_done` recibe (set de dispositivos, índice
+        del desafío inicial en GUIDED_SESSION_GAME_ORDER), o None si se
+        canceló. Con `trial` (sesión de prueba) no hay progreso guardado:
+        se puede empezar en cualquier desafío."""
         modal = ctk.CTkToplevel(self)
-        modal.title("Dispositivos de esta sesión")
-        modal.geometry(f"{wrap(440)}x{wrap(360)}")
+        modal.title("Sesión de prueba" if trial else "Dispositivos de esta sesión")
+        modal.geometry(f"{wrap(440)}x{wrap(560 if trial else 520)}")
         modal.configure(fg_color=BG_CARD)
         modal.transient(self)
         modal.resizable(False, False)
@@ -425,17 +481,22 @@ class App(ctk.CTk, *_DND_MIXIN):
         modal.lift()
         modal.focus_force()
 
-        def finish(devices):
+        def finish(choice):
             try:
                 modal.grab_release()
             except Exception:
                 pass
             modal.destroy()
-            on_done(devices)
+            on_done(choice)
 
         modal.protocol("WM_DELETE_WINDOW", lambda: finish(None))
         modal.grab_set()
 
+        if trial:
+            ctk.CTkLabel(
+                modal, text="🧪  Sesión de prueba · no se guarda nada",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"), text_color=WARNING,
+            ).pack(pady=(20, 0), padx=24, anchor="w")
         ctk.CTkLabel(
             modal, text="⚙️  ¿Qué dispositivos vas a usar en esta sesión?",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(15), weight="bold"),
@@ -467,6 +528,55 @@ class App(ctk.CTk, *_DND_MIXIN):
                 fg_color=ACCENT, hover_color=ACCENT_HOVER,
             ).pack(anchor="w", padx=44, pady=7)
 
+        # Desafío inicial: por defecto el del progreso guardado; el
+        # evaluador puede elegir otro si el flujo de este participante se
+        # alteró (ver SessionWizard.start / next_pending_index).
+        active = None if trial else self.store.get_active()
+        saved_index = saved_game_index(active)
+        played = played_challenges(active)
+        challenge_options = []
+        for index, game_name in enumerate(GUIDED_SESSION_GAME_ORDER):
+            challenge = get_challenge(game_name)
+            label = f"Desafío {index + 1} · {challenge.title if challenge else game_name}"
+            if index + 1 in played:
+                label += "  ✓ ya jugado"
+            elif index == saved_index and not trial:
+                label += "  (progreso guardado)"
+            challenge_options.append(label)
+
+        ctk.CTkLabel(
+            modal, text="🎯  Desafío inicial",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=24, pady=(18, 4))
+        challenge_var = ctk.StringVar(value=challenge_options[saved_index])
+        replay_warning = ctk.CTkLabel(
+            modal, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=WARNING,
+            wraplength=wrap(380), justify="left",
+        )
+
+        def on_challenge_selected(label):
+            index = challenge_options.index(label)
+            if trial:
+                replay_warning.configure(
+                    text="Después se sigue con los desafíos siguientes, en orden. Al salir se borra todo.",
+                )
+                return
+            replay_warning.configure(
+                text="⚠️  Este desafío ya tiene datos guardados -- se van a sobrescribir."
+                if index + 1 in played else
+                "Después se sigue con los desafíos pendientes, en orden."
+                if index != saved_index else "",
+            )
+
+        ctk.CTkOptionMenu(
+            modal, values=challenge_options, variable=challenge_var, width=wrap(380),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+            command=on_challenge_selected,
+        ).pack(anchor="w", padx=24)
+        replay_warning.pack(anchor="w", padx=24, pady=(6, 0))
+        on_challenge_selected(challenge_var.get())
+
         buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
         buttons_row.pack(pady=(22, 0))
         ctk.CTkButton(
@@ -479,7 +589,10 @@ class App(ctk.CTk, *_DND_MIXIN):
             buttons_row, text="Continuar  ▶", width=scaled(150), height=scaled(34), corner_radius=8,
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
-            command=lambda: finish({device for device, var in device_vars.items() if var.get()}),
+            command=lambda: finish((
+                {device for device, var in device_vars.items() if var.get()},
+                challenge_options.index(challenge_var.get()),
+            )),
         ).pack(side="left")
 
     def exit_session_wizard(self):
@@ -539,6 +652,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._profile_dropdown = ctk.CTkFrame(nav, fg_color=BG_CARD, corner_radius=8)
         self._profile_dropdown_open = False
         self._nav_buttons["session"] = self._nav_button(nav, "⏱️  Sesión", "session")
+        self._nav_buttons["analysis"] = self._nav_button(nav, "📈  Análisis", "analysis")
 
         footer = ctk.CTkFrame(sidebar, fg_color="transparent")
         footer.pack(side="bottom", fill="x", padx=20, pady=18)
@@ -634,6 +748,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             "games": self.tab_games,
             "participants": self.tab_participants,
             "session": self.tab_session,
+            "analysis": self.tab_analysis,
         }
         for name, btn in self._nav_buttons.items():
             active = name == key
@@ -648,6 +763,10 @@ class App(ctk.CTk, *_DND_MIXIN):
             # pestaña -- lee de disco, así que refleja lo que se haya
             # exportado desde la última vez que se miró esta vista.
             self._refresh_session_data_matrix()
+        if key == "analysis":
+            # Calcula las features la primera vez que se entra; después,
+            # solo con el botón "Recalcular" de la pestaña.
+            self.analysis_view.refresh_if_needed()
 
     # ---------------- Juegos ----------------
     def _build_games_tab(self):
@@ -871,6 +990,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # datos capturados y trata de desvincular el dispositivo antes de
         # que la ventana desaparezca (ver SessionWizard.cleanup_incomplete_session).
         self.session_wizard.cleanup_incomplete_session()
+        self.device_tester.stop_all(wait=True)
         self.destroy()
 
     def _repair_environment(self):
@@ -1322,6 +1442,58 @@ class App(ctk.CTk, *_DND_MIXIN):
             fg_color=BG_CARD_ALT, hover_color=BORDER,
             command=self._view_consent,
         ).pack(anchor="w", padx=18, pady=(0, 18))
+
+        # ---------------- Sesión de prueba (ver SessionWizard.start(trial=True)) ----------------
+        trial_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        trial_card.pack(fill="x", pady=(0, 14))
+        ctk.CTkLabel(
+            trial_card, text="🧪  Sesión de prueba",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            trial_card,
+            text="Simula la sesión guiada de un participante para ver sus mediciones en vivo, sin "
+                 "elegir un participante activo y empezando en el desafío que quieras. No se guarda "
+                 "nada: ni datos de sensores, ni respuestas, ni progreso; todo se borra al salir.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+        ctk.CTkButton(
+            trial_card, text="🧪  Iniciar sesión de prueba", height=scaled(36), width=scaled(280),
+            corner_radius=8, font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12), weight="bold"),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=self.enter_trial_session,
+        ).pack(anchor="w", padx=18, pady=(0, 18))
+
+        # ---------------- Probar dispositivos (ver ui/device_test.py) ----------------
+        devices_card = ctk.CTkFrame(wrapper, fg_color=BG_CARD, corner_radius=12)
+        devices_card.pack(fill="x", pady=(0, 14))
+        ctk.CTkLabel(
+            devices_card, text="🔌  Probar dispositivos",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            devices_card,
+            text="Revisa que el NeuroSky y la cámara (Emotion + Eye Tracker) funcionen sin entrar a "
+                 "una sesión. No se guarda nada a nombre de ningún participante; al iniciar una "
+                 "sesión guiada las pruebas abiertas se cierran solas.",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(820), justify="left",
+        ).pack(anchor="w", padx=18, pady=(0, 10))
+        devices_row = ctk.CTkFrame(devices_card, fg_color="transparent")
+        devices_row.pack(fill="x", padx=18, pady=(0, 18))
+        ctk.CTkButton(
+            devices_row, text="🧠  Probar NeuroSky", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=lambda: self.device_tester.open_neurosky(),
+        ).pack(side="left")
+        ctk.CTkButton(
+            devices_row, text="📷  Probar cámara (Emotion + Eye)", height=scaled(34), corner_radius=8,
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, hover_color=BORDER,
+            command=lambda: self.device_tester.open_camera(),
+        ).pack(side="left", padx=(8, 0))
 
         # ---------------- Datos guardados (leidos de disco, no de memoria) ----------------
         # Matriz de lo que ya se exportó para el participante activo, leyendo

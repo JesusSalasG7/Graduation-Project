@@ -260,3 +260,7 @@ data/juez/sesiones/
 # Lecturas de NeuroSky grabadas con tools/NeuroSky/test_neurosky.py
 # (datos de sesiones/pruebas, no deben ir al repo)
 tools/NeuroSky/*.csv
+
+# Tabla de features EEG exportada desde la pestaña Análisis
+# (graphic_interface/analisis/): datos de participantes, no van al repo.
+data/analisis/

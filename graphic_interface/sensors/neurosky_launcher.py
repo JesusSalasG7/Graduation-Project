@@ -119,10 +119,14 @@ def delete_neurosky_data() -> None:
         pass
 
 
-def start_neurosky_test() -> subprocess.Popen:
+def start_neurosky_test(output_file: Optional[Path] = None) -> subprocess.Popen:
     """Lanza tools/NeuroSky/test_neurosky.py en segundo plano con el .venv
     unificado (pyserial ya está instalado ahí), con su salida como pipe de
     texto línea a línea para poder mostrarla en vivo.
+
+    `output_file` cambia el CSV donde se graban las lecturas (por defecto
+    NEUROSKY_DATA_FILE, el de la sesión guiada) -- la prueba suelta de
+    ui/device_test.py usa uno propio para no pisar el de una sesión.
 
     El flag `-u` es necesario: al no estar conectado a una terminal, el
     stdout del proceso hijo queda bufferizado por bloques (no por línea),
@@ -133,8 +137,11 @@ def start_neurosky_test() -> subprocess.Popen:
     if not NEUROSKY_TEST_SCRIPT.exists():
         raise FileNotFoundError("No se encontró tools/NeuroSky/test_neurosky.py")
 
+    args = [str(venv_python()), "-u", str(NEUROSKY_TEST_SCRIPT)]
+    if output_file is not None:
+        args += ["--output", str(output_file)]
     return subprocess.Popen(
-        [str(venv_python()), "-u", str(NEUROSKY_TEST_SCRIPT)],
+        args,
         cwd=str(NEUROSKY_DIR),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
