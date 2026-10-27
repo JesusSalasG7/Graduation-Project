@@ -26,7 +26,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 from urllib.parse import unquote, urlparse
 
 import customtkinter as ctk
@@ -182,6 +182,7 @@ def import_heart_rate_for_challenge(
 
 def reimport_heart_rate_for_challenge(
     participant_number: int, challenge_number: int, export_folder: Path,
+    stages: Optional[Iterable[int]] = None,
 ) -> dict[int, list[str]]:
     """Reprocesa la frecuencia cardíaca de un desafío YA CERRADO (Etapas
     2/3/4/5 ya exportadas), a partir de la carpeta completa del export de
@@ -201,10 +202,21 @@ def reimport_heart_rate_for_challenge(
     Uso desde línea de comandos, para cualquier participante/desafío: ver
     scripts/reimport_heart_rate.py.
 
+    `stages` limita el recorte a esas etapas (p.ej. solo la 2, si las
+    demás todavía no se jugaron o ya están bien) -- None = 2, 3, 4 y 5.
+    Las etapas que no se piden no se tocan.
+
     Devuelve {etapa: [advertencias]} como import_heart_rate_for_challenge,
     y además reescribe resumen_desafio.json con esas advertencias (el
-    resto del manifiesto se conserva).
+    resto del manifiesto, y las advertencias de las etapas no pedidas, se
+    conservan).
     """
+    selected_stages = sorted(set(stages)) if stages is not None else [2, 3, 4, 5]
+    invalid = [stage for stage in selected_stages if stage not in (2, 3, 4, 5)]
+    if invalid or not selected_stages:
+        raise HeartRateValidationError(
+            f"Etapas inválidas: {invalid or 'ninguna'} -- la frecuencia cardíaca solo se recorta en las etapas 2, 3, 4 y 5.",
+        )
     csv_path = validate_heart_rate_export_folder(export_folder)
     jsons_dir = heart_rate_json_dir(export_folder)
 
@@ -219,7 +231,7 @@ def reimport_heart_rate_for_challenge(
     _copy_heart_rate_traceability(export_folder, csv_path, challenge_folder)
 
     warnings_by_stage: dict[int, list[str]] = {}
-    for stage in (2, 3, 4, 5):
+    for stage in selected_stages:
         folder = resolve_stage_folder(challenge_folder, stage)
         if folder is None:
             warnings_by_stage[stage] = [
@@ -260,9 +272,14 @@ def _update_challenge_manifest_heart_rate(
             stage_status = {}
 
     stage_status.pop("heart_rate", None)  # ya no aplica "omitido por el evaluador" si se reimportó
-    stage_status["heart_rate_warnings"] = {
-        str(stage): warnings for stage, warnings in warnings_by_stage.items() if warnings
+    # Se conservan las advertencias de las etapas que no se reprocesaron.
+    previous = stage_status.get("heart_rate_warnings")
+    merged = {
+        key: value for key, value in (previous if isinstance(previous, dict) else {}).items()
+        if key not in {str(stage) for stage in warnings_by_stage}
     }
+    merged.update({str(stage): warnings for stage, warnings in warnings_by_stage.items() if warnings})
+    stage_status["heart_rate_warnings"] = merged
     write_challenge_manifest(challenge_folder, participant, challenge_number, stage_status)
 
 
