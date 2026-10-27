@@ -30,7 +30,7 @@ from ui.consent_view import (
 )
 from ui.analysis_view import AnalysisView
 from ui.device_test import DeviceTester
-from ui.session_wizard import SessionWizard, played_challenges, saved_game_index
+from ui.session_wizard import STARTABLE_STAGES, SessionWizard, played_challenges, saved_game_index
 from ui.statement_view import render_statement
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
@@ -439,7 +439,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _begin_session_wizard(self, choice, trial: bool = False):
         if choice is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
-        enabled_devices, start_index = choice
+        enabled_devices, start_index, start_stage = choice
         # La sesión necesita la cámara y el NeuroSky libres: se corta
         # cualquier prueba de "Probar dispositivos" que siga abierta.
         self.device_tester.stop_all(wait=True)
@@ -456,7 +456,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # su botón queda deshabilitado mientras dure esta.
         self._session_active = True
         self._refresh_judge_button()
-        self.session_wizard.start(enabled_devices, start_index, trial=trial)
+        self.session_wizard.start(enabled_devices, start_index, trial=trial, start_stage=start_stage)
 
     def _ask_session_devices(self, on_done, trial: bool = False):
         """Modal previo a entrar a la sesión guiada: que dispositivos se
@@ -466,13 +466,15 @@ class App(ctk.CTk, *_DND_MIXIN):
         _enabled_devices / _show_next_setup_screen). Además permite elegir
         el desafío inicial, para participantes cuyo flujo se alteró y
         tienen que arrancar en uno específico (por defecto, el del
-        progreso guardado). `on_done` recibe (set de dispositivos, índice
-        del desafío inicial en GUIDED_SESSION_GAME_ORDER), o None si se
+        progreso guardado), y la etapa en la que arranca ese desafío (ver
+        STARTABLE_STAGES), para retomar uno que se cortó a la mitad.
+        `on_done` recibe (set de dispositivos, índice del desafío inicial
+        en GUIDED_SESSION_GAME_ORDER, etapa inicial), o None si se
         canceló. Con `trial` (sesión de prueba) no hay progreso guardado:
         se puede empezar en cualquier desafío."""
         modal = ctk.CTkToplevel(self)
         modal.title("Sesión de prueba" if trial else "Dispositivos de esta sesión")
-        modal.geometry(f"{wrap(440)}x{wrap(560 if trial else 520)}")
+        modal.geometry(f"{wrap(440)}x{wrap(680 if trial else 640)}")
         modal.configure(fg_color=BG_CARD)
         modal.transient(self)
         modal.resizable(False, False)
@@ -577,6 +579,36 @@ class App(ctk.CTk, *_DND_MIXIN):
         replay_warning.pack(anchor="w", padx=24, pady=(6, 0))
         on_challenge_selected(challenge_var.get())
 
+        # Etapa inicial de ese desafío: por defecto la 1; para retomar un
+        # desafío que se cortó a la mitad (ver SessionWizard._start_current_game).
+        stage_options = list(STARTABLE_STAGES.values())
+        ctk.CTkLabel(
+            modal, text="🧩  Etapa inicial",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=24, pady=(14, 4))
+        stage_var = ctk.StringVar(value=stage_options[0])
+        stage_hint = ctk.CTkLabel(
+            modal, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(380), justify="left",
+        )
+
+        def on_stage_selected(label):
+            stage = stage_options.index(label) + 1
+            stage_hint.configure(
+                text="" if stage == 1 else
+                f"Se saltan las etapas anteriores a la {stage} solo en este desafío; "
+                "los siguientes empiezan en la Etapa 1."
+                + (" La Etapa 3 se guarda como un intento nuevo." if stage == 3 else ""),
+            )
+
+        ctk.CTkOptionMenu(
+            modal, values=stage_options, variable=stage_var, width=wrap(380),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+            command=on_stage_selected,
+        ).pack(anchor="w", padx=24)
+        stage_hint.pack(anchor="w", padx=24, pady=(6, 0))
+
         buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
         buttons_row.pack(pady=(22, 0))
         ctk.CTkButton(
@@ -592,6 +624,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             command=lambda: finish((
                 {device for device, var in device_vars.items() if var.get()},
                 challenge_options.index(challenge_var.get()),
+                stage_options.index(stage_var.get()) + 1,
             )),
         ).pack(side="left")
 
