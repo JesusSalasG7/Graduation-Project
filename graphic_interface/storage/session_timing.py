@@ -103,14 +103,14 @@ class SessionTimingLog:
 
     # ---------------- registro ----------------
     def start_stage(self, challenge: int, game: str, stage: int, attempt: Optional[int]) -> None:
-        """Cierra la etapa anterior y abre esta. La Etapa 1 abre la sesión
-        si todavía no está abierta (el cronómetro arranca con el juego)."""
+        """Cierra la etapa anterior y abre esta. La primera etapa que se
+        muestra abre la sesión si todavía no está abierta (el cronómetro
+        arranca con el juego) -- la 1, o la etapa inicial que eligió el
+        evaluador (ver session_wizard.STARTABLE_STAGES)."""
         if self._paused_at is not None:
             return
         now = _now()
         if self._session is None:
-            if stage != 1:
-                return
             self._session = {
                 "numero": self.next_session_number(), "inicio": now, "fin": None,
                 "duracion_s": 0, "cierre": _OPEN, "desafios": [],

@@ -30,7 +30,7 @@ from ui.consent_view import (
 )
 from ui.analysis_view import AnalysisView
 from ui.device_test import DeviceTester
-from ui.session_wizard import SessionWizard, played_challenges, saved_game_index
+from ui.session_wizard import STARTABLE_STAGES, SessionWizard, played_challenges, saved_game_index
 from ui.statement_view import render_statement
 
 # data/build_dataset.py vive fuera de graphic_interface (es parte del
@@ -69,6 +69,14 @@ EXPERIENCE_PROFILES = [
     ("Perfil 2", "Análisis y diseño de algoritmos"),
     ("Perfil 3", "Ingeniería del Software y Base de Datos"),
 ]
+
+
+def challenge_progress(participant: dict) -> tuple[int, int]:
+    """(desafíos jugados, porcentaje) de la sesión guiada: cada uno de los
+    7 desafíos vale 100/7 %, así que con los 7 jugados lleva el 100 %."""
+    total = len(GUIDED_SESSION_GAME_ORDER)
+    done = len({c for c in played_challenges(participant) if 1 <= c <= total})
+    return done, round(done * 100 / total)
 
 
 def experience_text(level: str) -> str:
@@ -439,7 +447,7 @@ class App(ctk.CTk, *_DND_MIXIN):
     def _begin_session_wizard(self, choice, trial: bool = False):
         if choice is None:
             return  # se canceló el modal de dispositivos -- no se entra a la sesión
-        enabled_devices, start_index = choice
+        enabled_devices, start_index, start_stage = choice
         # La sesión necesita la cámara y el NeuroSky libres: se corta
         # cualquier prueba de "Probar dispositivos" que siga abierta.
         self.device_tester.stop_all(wait=True)
@@ -456,7 +464,7 @@ class App(ctk.CTk, *_DND_MIXIN):
         # su botón queda deshabilitado mientras dure esta.
         self._session_active = True
         self._refresh_judge_button()
-        self.session_wizard.start(enabled_devices, start_index, trial=trial)
+        self.session_wizard.start(enabled_devices, start_index, trial=trial, start_stage=start_stage)
 
     def _ask_session_devices(self, on_done, trial: bool = False):
         """Modal previo a entrar a la sesión guiada: que dispositivos se
@@ -466,13 +474,15 @@ class App(ctk.CTk, *_DND_MIXIN):
         _enabled_devices / _show_next_setup_screen). Además permite elegir
         el desafío inicial, para participantes cuyo flujo se alteró y
         tienen que arrancar en uno específico (por defecto, el del
-        progreso guardado). `on_done` recibe (set de dispositivos, índice
-        del desafío inicial en GUIDED_SESSION_GAME_ORDER), o None si se
+        progreso guardado), y la etapa en la que arranca ese desafío (ver
+        STARTABLE_STAGES), para retomar uno que se cortó a la mitad.
+        `on_done` recibe (set de dispositivos, índice del desafío inicial
+        en GUIDED_SESSION_GAME_ORDER, etapa inicial), o None si se
         canceló. Con `trial` (sesión de prueba) no hay progreso guardado:
         se puede empezar en cualquier desafío."""
         modal = ctk.CTkToplevel(self)
         modal.title("Sesión de prueba" if trial else "Dispositivos de esta sesión")
-        modal.geometry(f"{wrap(440)}x{wrap(560 if trial else 520)}")
+        modal.geometry(f"{wrap(440)}x{wrap(680 if trial else 640)}")
         modal.configure(fg_color=BG_CARD)
         modal.transient(self)
         modal.resizable(False, False)
@@ -577,6 +587,36 @@ class App(ctk.CTk, *_DND_MIXIN):
         replay_warning.pack(anchor="w", padx=24, pady=(6, 0))
         on_challenge_selected(challenge_var.get())
 
+        # Etapa inicial de ese desafío: por defecto la 1; para retomar un
+        # desafío que se cortó a la mitad (ver SessionWizard._start_current_game).
+        stage_options = list(STARTABLE_STAGES.values())
+        ctk.CTkLabel(
+            modal, text="🧩  Etapa inicial",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(13), weight="bold"),
+        ).pack(anchor="w", padx=24, pady=(14, 4))
+        stage_var = ctk.StringVar(value=stage_options[0])
+        stage_hint = ctk.CTkLabel(
+            modal, text="", font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
+            wraplength=wrap(380), justify="left",
+        )
+
+        def on_stage_selected(label):
+            stage = stage_options.index(label) + 1
+            stage_hint.configure(
+                text="" if stage == 1 else
+                f"Se saltan las etapas anteriores a la {stage} solo en este desafío; "
+                "los siguientes empiezan en la Etapa 1."
+                + (" La Etapa 3 se guarda como un intento nuevo." if stage == 3 else ""),
+            )
+
+        ctk.CTkOptionMenu(
+            modal, values=stage_options, variable=stage_var, width=wrap(380),
+            font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)),
+            fg_color=BG_CARD_ALT, button_color=ACCENT, button_hover_color=ACCENT_HOVER,
+            command=on_stage_selected,
+        ).pack(anchor="w", padx=24)
+        stage_hint.pack(anchor="w", padx=24, pady=(6, 0))
+
         buttons_row = ctk.CTkFrame(modal, fg_color="transparent")
         buttons_row.pack(pady=(22, 0))
         ctk.CTkButton(
@@ -592,6 +632,7 @@ class App(ctk.CTk, *_DND_MIXIN):
             command=lambda: finish((
                 {device for device, var in device_vars.items() if var.get()},
                 challenge_options.index(challenge_var.get()),
+                stage_options.index(stage_var.get()) + 1,
             )),
         ).pack(side="left")
 
@@ -600,6 +641,10 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._refresh_judge_button()
         self._set_fullscreen(False)
         self.session_wizard_frame.lower()
+        # Al salir de la sesión guiada pudo cambiar el progreso del
+        # participante (y quizá llegó al 100 %): se recalcula la tabla y el
+        # contador verde de cada perfil.
+        self._refresh_participants()
         self._select_nav("session")
         # No se restaura ningún tamaño "chico": la ventana siempre vive
         # maximizada, así que simplemente se deja como esta (evita el bug
@@ -702,17 +747,21 @@ class App(ctk.CTk, *_DND_MIXIN):
         else:
             self._profile_dropdown.pack_forget()
 
-    def _profile_counts(self) -> list[tuple[str, int]]:
-        """(perfil, cantidad) de los perfiles que tienen al menos un
-        participante, en el orden de EXPERIENCE_PROFILES. Los niveles
-        anteriores a los perfiles (ej. "Avanzado") van al final."""
+    def _profile_counts(self) -> list[tuple[str, int, int]]:
+        """(perfil, cantidad, cuántos llevan el 100 % de los desafíos) de
+        los perfiles que tienen al menos un participante, en el orden de
+        EXPERIENCE_PROFILES. Los niveles anteriores a los perfiles (ej.
+        "Avanzado") van al final."""
         counts: dict[str, int] = {}
+        finished: dict[str, int] = {}
         for p in self.store.list_participants():
             level = p.get("attributes", {}).get("nivel_experiencia") or "Sin perfil"
             counts[level] = counts.get(level, 0) + 1
+            if challenge_progress(p)[1] == 100:
+                finished[level] = finished.get(level, 0) + 1
         ordered = [profile for profile, _ in EXPERIENCE_PROFILES if profile in counts]
         ordered += sorted(level for level in counts if level not in ordered)
-        return [(level, counts[level]) for level in ordered]
+        return [(level, counts[level], finished.get(level, 0)) for level in ordered]
 
     def _refresh_profile_dropdown(self):
         for child in self._profile_dropdown.winfo_children():
@@ -724,7 +773,7 @@ class App(ctk.CTk, *_DND_MIXIN):
                 font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
             ).pack(anchor="w", padx=12, pady=8)
             return
-        for i, (level, count) in enumerate(rows):
+        for i, (level, count, finished) in enumerate(rows):
             row = ctk.CTkFrame(self._profile_dropdown, fg_color="transparent")
             row.pack(fill="x", padx=12, pady=(8 if i == 0 else 2, 8 if i == len(rows) - 1 else 2))
             ctk.CTkLabel(
@@ -735,6 +784,14 @@ class App(ctk.CTk, *_DND_MIXIN):
                 row, text=str(count), font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
                 fg_color=BG_CARD_ALT, corner_radius=8, text_color="white", width=scaled(28),
             ).pack(side="right")
+            # En verde, cuántos de ese perfil ya completaron los 7 desafíos
+            # (100 %). Solo aparece cuando al menos uno llegó al 100 %.
+            if finished:
+                ctk.CTkLabel(
+                    row, text=f"✓ {finished}",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
+                    fg_color=SUCCESS, corner_radius=8, text_color="white", width=scaled(34),
+                ).pack(side="right", padx=(0, 4))
 
     def _select_nav(self, key):
         # "Participantes" abre su desplegable al entrar a la pestaña y lo
@@ -1159,11 +1216,12 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         self._style_treeview()
 
-        columns = ("participante", "nivel", "consentimiento", "fecha")
+        columns = ("participante", "nivel", "progreso", "consentimiento", "fecha")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for col, label, width in (
             ("participante", "Participante", scaled(160)),
             ("nivel", "Perfil (materias aprobadas)", scaled(330)),
+            ("progreso", "Desafíos", scaled(130)),
             ("consentimiento", "Consentimiento", scaled(160)),
             ("fecha", "Registrado", scaled(180)),
         ):
@@ -1207,9 +1265,12 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tree.delete(*self.tree.get_children())
         for p in self.store.list_participants():
             nivel = experience_text(p.get("attributes", {}).get("nivel_experiencia", "—"))
-            self.tree.insert("", "end", iid=p["id"], values=(
-                participant_label(p), nivel, consent_store.consent_status_text(p["number"]), p["created_at"],
+            done, percent = challenge_progress(p)
+            progreso = f"{percent} % ({done}/{len(GUIDED_SESSION_GAME_ORDER)})"
+            self.tree.insert("", "end", iid=p["id"], tags=("completo",) if percent == 100 else (), values=(
+                participant_label(p), nivel, progreso, consent_store.consent_status_text(p["number"]), p["created_at"],
             ))
+        self.tree.tag_configure("completo", foreground=SUCCESS)
         active = self.store.get_active()
         if active is not None:
             self.tree.selection_set(active["id"])

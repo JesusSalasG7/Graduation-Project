@@ -14,6 +14,10 @@ Uso:
     python graphic_interface/scripts/reimport_heart_rate.py --participante 1 --desafio 1 \\
         --carpeta "/ruta/a/samsunghealth_usuario_20260920151062"
 
+    # Solo algunas etapas (las demás no se tocan):
+    python graphic_interface/scripts/reimport_heart_rate.py --participante 12 --desafio 3 --etapa 2 \\
+        --carpeta "/ruta/a/samsunghealth_usuario_20261026151317"
+
 `--carpeta` tiene que ser la carpeta COMPLETA que exporta Samsung Health
 ("Descargar mis datos personales"), no el CSV suelto -- el detalle minuto
 a minuto de la medición continua vive en JSON aparte dentro de ella (ver
@@ -44,10 +48,16 @@ def main() -> None:
         "--carpeta", type=Path, required=True,
         help='Carpeta completa del export de Samsung Health (ej. "samsunghealth_usuario_<fecha>").',
     )
+    parser.add_argument(
+        "--etapa", type=int, action="append", choices=(2, 3, 4, 5),
+        help="Etapa a procesar (se puede repetir). Sin esta opción se procesan la 2, 3, 4 y 5.",
+    )
     args = parser.parse_args()
 
     try:
-        warnings_by_stage = reimport_heart_rate_for_challenge(args.participante, args.desafio, args.carpeta)
+        warnings_by_stage = reimport_heart_rate_for_challenge(
+            args.participante, args.desafio, args.carpeta, stages=args.etapa,
+        )
     except (HeartRateValidationError, FileNotFoundError) as exc:
         print(f"Error: {exc}")
         raise SystemExit(1)

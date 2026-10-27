@@ -93,6 +93,7 @@ from storage.stage_capture import (
     StageTimer,
     available_challenges,
     challenge_dir,
+    list_stage_attempts,
     participant_session_dir,
     set_sessions_root_override,
     slice_emotion,
@@ -130,6 +131,18 @@ PROGRESS_ATTRIBUTE = "sesion_guiada_siguiente_juego"
 # selección. El orden importa: es el orden en que aparecen sus pantallas
 # de configuración (ver _show_next_setup_screen).
 ALL_DEVICES = ("heart_rate", "neurosky", "camera")
+
+# Etapas en las que se puede arrancar el desafío inicial (ver
+# App._ask_session_devices / SessionWizard._start_current_game), para
+# participantes cuya sesión se cortó a mitad de un desafío. Solo hasta la
+# 3: las etapas 4, 5 y 6 usan la respuesta de la IA y las preguntas que se
+# generan al enviar el prompt de la Etapa 3, y esas preguntas viven en
+# memoria (no quedan en disco para retomarlas).
+STARTABLE_STAGES = {
+    1: "Etapa 1 · Ver el juego",
+    2: "Etapa 2 · El problema",
+    3: "Etapa 3 · Tu prompt",
+}
 
 # Sesión de prueba (botón "Sesión de prueba" de la pestaña Sesión): simula
 # la sesión de un participante sin elegir uno ni guardar nada. Usa este
@@ -217,6 +230,12 @@ class SessionWizard:
         # progreso guardado (ver start()) -- solo cambia el texto de la
         # Bienvenida.
         self._start_overridden = False
+        # Etapa elegida en el modal para el PRIMER desafío de esta sesión
+        # (ver STARTABLE_STAGES / start()) -- se consume en
+        # _start_current_game y vuelve a 1 para los desafíos siguientes.
+        # `_first_stage` es la etapa en la que arrancó el desafío actual.
+        self._start_stage = 1
+        self._first_stage = 1
         self.current_game = None
         self.current_challenge = None
         self.current_result: ChallengeSolveResult | None = None
@@ -347,11 +366,12 @@ class SessionWizard:
         text = f"Etapa {stage} de 6 · {STAGE_NAMES[stage]}"
         if attempt is not None and attempt > 1:
             text += f" (intento {attempt})"
-        # El cronómetro arranca con el juego: la Etapa 1 del primer
-        # desafío que se juega en esta sesión (si se retoma una sesión
-        # guardada, es el desafío donde se retoma, y el total sigue desde
-        # lo acumulado).
-        self._update_session_monitor(text, starts_session=stage == 1, stage=stage)
+        # El cronómetro arranca con el juego: la primera etapa que se
+        # muestra en esta sesión -- normalmente la 1, pero puede ser otra si
+        # el evaluador eligió una etapa inicial (ver STARTABLE_STAGES). Solo
+        # arranca la primera vez; si se retoma una sesión guardada, el total
+        # sigue desde lo acumulado.
+        self._update_session_monitor(text, starts_session=True, stage=stage)
         if self._timing is not None:
             game = self.current_game.name if self.current_game is not None else ""
             self._timing.start_stage(self.game_index + 1, game, stage, attempt)
@@ -816,15 +836,17 @@ class SessionWizard:
     # ---------------- flujo ----------------
     def start(
         self, enabled_devices: Optional[set[str]] = None, start_index: Optional[int] = None,
-        trial: bool = False,
+        trial: bool = False, start_stage: Optional[int] = None,
     ):
         """`enabled_devices` es el subconjunto de ALL_DEVICES elegido por
         el evaluador en el modal previo (ver App._ask_session_devices) --
         None (todos habilitados) es solo un respaldo, por si algo llama a
         start() sin pasarlo. `start_index` es el desafío inicial elegido en
         ese mismo modal, para participantes que no siguen el orden normal
-        -- None retoma desde el progreso guardado. `trial` = sesión de
-        prueba: participante ficticio, nada se guarda (ver _start_trial)."""
+        -- None retoma desde el progreso guardado. `start_stage` es la
+        etapa en la que arranca ese primer desafío (ver STARTABLE_STAGES)
+        -- None o inválida = Etapa 1. `trial` = sesión de prueba:
+        participante ficticio, nada se guarda (ver _start_trial)."""
         if trial:
             self._start_trial()
         else:
@@ -835,7 +857,8 @@ class SessionWizard:
             self.game_index = start_index
         else:
             self.game_index = saved_index
-        self._start_overridden = self.game_index != saved_index
+        self._start_stage = start_stage if start_stage in STARTABLE_STAGES else 1
+        self._start_overridden = self.game_index != saved_index or self._start_stage != 1
         self._session_completed = False
         self._enabled_devices = set(enabled_devices) if enabled_devices is not None else set(ALL_DEVICES)
         if self._session_monitor is not None:
@@ -1636,8 +1659,10 @@ class SessionWizard:
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(24), weight="bold"),
         ).pack()
         if self._start_overridden or self.game_index > 0:
+            stage_text = f", desde la etapa {self._start_stage}" if self._start_stage != 1 else ""
             first_line = (
-                f"Hoy comenzás en el desafío {self.game_index + 1} de {len(GUIDED_SESSION_GAME_ORDER)}."
+                f"Hoy comenzás en el desafío {self.game_index + 1} de "
+                f"{len(GUIDED_SESSION_GAME_ORDER)}{stage_text}."
                 if self._start_overridden else
                 f"Retomás donde dejaste, en el desafío {self.game_index + 1} de "
                 f"{len(GUIDED_SESSION_GAME_ORDER)}."
@@ -1689,10 +1714,24 @@ class SessionWizard:
         self.current_result = None
         self._attempt_number = 1
         self._stage_warnings.clear()
+        # La etapa elegida en el modal vale solo para el primer desafío.
+        first_stage, self._start_stage = self._start_stage, 1
+        self._first_stage = first_stage
         if self.current_game is None or self.current_challenge is None:
             self._advance_or_finish()
             return
-        self._show_stage1()
+        if first_stage == 3:
+            # Intento nuevo: no se pisa lo que ya hubiera de la Etapa 3
+            # (p.ej. un intento que quedó a medias cuando se cortó la sesión).
+            participant = self._participant()
+            if participant is not None:
+                challenge_folder = challenge_dir(participant, self.game_index + 1)
+                self._attempt_number = max(list_stage_attempts(challenge_folder, 3), default=0) + 1
+            self._show_stage3()
+        elif first_stage == 2:
+            self._show_stage2()
+        else:
+            self._show_stage1()
 
     # ---------------- Etapa 1 ----------------
     def _show_stage1(self):
@@ -2370,22 +2409,19 @@ class SessionWizard:
         )
         if already_queued:
             return
+        # Si el desafío arrancó en una etapa posterior (ver STARTABLE_STAGES),
+        # las anteriores son de otra sesión: no se les recorta nada acá
+        # (para eso está scripts/reimport_heart_rate.py --etapa).
+        stages = [stage for stage in (2, 3, 4, 5) if stage >= self._first_stage]
         self._pending_heart_rate_challenges.append({
             "challenge_number": challenge_number,
             "attempt": self._attempt_number,
             "challenge_folder": challenge_dir(participant, challenge_number),
             "stage_folders": {
-                2: stage_dir(participant, challenge_number, 2),
-                3: stage_dir(participant, challenge_number, 3, attempt=self._attempt_number),
-                4: stage_dir(participant, challenge_number, 4, attempt=self._attempt_number),
-                5: stage_dir(participant, challenge_number, 5, attempt=self._attempt_number),
+                stage: stage_dir(participant, challenge_number, stage, attempt=None if stage == 2 else self._attempt_number)
+                for stage in stages
             },
-            "stage_windows": {
-                2: self._stage_timer.window(2),
-                3: self._stage_timer.window(3),
-                4: self._stage_timer.window(4),
-                5: self._stage_timer.window(5),
-            },
+            "stage_windows": {stage: self._stage_timer.window(stage) for stage in stages},
         })
 
     def _finish_challenge(self, heart_rate_export_folder: Optional[Path], on_done):
