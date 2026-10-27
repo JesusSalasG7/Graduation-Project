@@ -71,6 +71,14 @@ EXPERIENCE_PROFILES = [
 ]
 
 
+def challenge_progress(participant: dict) -> tuple[int, int]:
+    """(desafíos jugados, porcentaje) de la sesión guiada: cada uno de los
+    7 desafíos vale 100/7 %, así que con los 7 jugados lleva el 100 %."""
+    total = len(GUIDED_SESSION_GAME_ORDER)
+    done = len({c for c in played_challenges(participant) if 1 <= c <= total})
+    return done, round(done * 100 / total)
+
+
 def experience_text(level: str) -> str:
     """Texto del perfil para la tabla de participantes, con sus materias.
     Los participantes registrados antes de que existieran los perfiles
@@ -633,6 +641,10 @@ class App(ctk.CTk, *_DND_MIXIN):
         self._refresh_judge_button()
         self._set_fullscreen(False)
         self.session_wizard_frame.lower()
+        # Al salir de la sesión guiada pudo cambiar el progreso del
+        # participante (y quizá llegó al 100 %): se recalcula la tabla y el
+        # contador verde de cada perfil.
+        self._refresh_participants()
         self._select_nav("session")
         # No se restaura ningún tamaño "chico": la ventana siempre vive
         # maximizada, así que simplemente se deja como esta (evita el bug
@@ -735,17 +747,21 @@ class App(ctk.CTk, *_DND_MIXIN):
         else:
             self._profile_dropdown.pack_forget()
 
-    def _profile_counts(self) -> list[tuple[str, int]]:
-        """(perfil, cantidad) de los perfiles que tienen al menos un
-        participante, en el orden de EXPERIENCE_PROFILES. Los niveles
-        anteriores a los perfiles (ej. "Avanzado") van al final."""
+    def _profile_counts(self) -> list[tuple[str, int, int]]:
+        """(perfil, cantidad, cuántos llevan el 100 % de los desafíos) de
+        los perfiles que tienen al menos un participante, en el orden de
+        EXPERIENCE_PROFILES. Los niveles anteriores a los perfiles (ej.
+        "Avanzado") van al final."""
         counts: dict[str, int] = {}
+        finished: dict[str, int] = {}
         for p in self.store.list_participants():
             level = p.get("attributes", {}).get("nivel_experiencia") or "Sin perfil"
             counts[level] = counts.get(level, 0) + 1
+            if challenge_progress(p)[1] == 100:
+                finished[level] = finished.get(level, 0) + 1
         ordered = [profile for profile, _ in EXPERIENCE_PROFILES if profile in counts]
         ordered += sorted(level for level in counts if level not in ordered)
-        return [(level, counts[level]) for level in ordered]
+        return [(level, counts[level], finished.get(level, 0)) for level in ordered]
 
     def _refresh_profile_dropdown(self):
         for child in self._profile_dropdown.winfo_children():
@@ -757,7 +773,7 @@ class App(ctk.CTk, *_DND_MIXIN):
                 font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=TEXT_MUTED,
             ).pack(anchor="w", padx=12, pady=8)
             return
-        for i, (level, count) in enumerate(rows):
+        for i, (level, count, finished) in enumerate(rows):
             row = ctk.CTkFrame(self._profile_dropdown, fg_color="transparent")
             row.pack(fill="x", padx=12, pady=(8 if i == 0 else 2, 8 if i == len(rows) - 1 else 2))
             ctk.CTkLabel(
@@ -768,6 +784,14 @@ class App(ctk.CTk, *_DND_MIXIN):
                 row, text=str(count), font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
                 fg_color=BG_CARD_ALT, corner_radius=8, text_color="white", width=scaled(28),
             ).pack(side="right")
+            # En verde, cuántos de ese perfil ya completaron los 7 desafíos
+            # (100 %). Solo aparece cuando al menos uno llegó al 100 %.
+            if finished:
+                ctk.CTkLabel(
+                    row, text=f"✓ {finished}",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11), weight="bold"),
+                    fg_color=SUCCESS, corner_radius=8, text_color="white", width=scaled(34),
+                ).pack(side="right", padx=(0, 4))
 
     def _select_nav(self, key):
         # "Participantes" abre su desplegable al entrar a la pestaña y lo
@@ -1192,11 +1216,12 @@ class App(ctk.CTk, *_DND_MIXIN):
 
         self._style_treeview()
 
-        columns = ("participante", "nivel", "consentimiento", "fecha")
+        columns = ("participante", "nivel", "progreso", "consentimiento", "fecha")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
         for col, label, width in (
             ("participante", "Participante", scaled(160)),
             ("nivel", "Perfil (materias aprobadas)", scaled(330)),
+            ("progreso", "Desafíos", scaled(130)),
             ("consentimiento", "Consentimiento", scaled(160)),
             ("fecha", "Registrado", scaled(180)),
         ):
@@ -1240,9 +1265,12 @@ class App(ctk.CTk, *_DND_MIXIN):
         self.tree.delete(*self.tree.get_children())
         for p in self.store.list_participants():
             nivel = experience_text(p.get("attributes", {}).get("nivel_experiencia", "—"))
-            self.tree.insert("", "end", iid=p["id"], values=(
-                participant_label(p), nivel, consent_store.consent_status_text(p["number"]), p["created_at"],
+            done, percent = challenge_progress(p)
+            progreso = f"{percent} % ({done}/{len(GUIDED_SESSION_GAME_ORDER)})"
+            self.tree.insert("", "end", iid=p["id"], tags=("completo",) if percent == 100 else (), values=(
+                participant_label(p), nivel, progreso, consent_store.consent_status_text(p["number"]), p["created_at"],
             ))
+        self.tree.tag_configure("completo", foreground=SUCCESS)
         active = self.store.get_active()
         if active is not None:
             self.tree.selection_set(active["id"])
