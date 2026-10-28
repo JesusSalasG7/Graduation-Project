@@ -1,9 +1,9 @@
 """Genera la respuesta de la Etapa 2/3 de la sesión guiada a partir del
 prompt que escribe el participante.
 
-La llamada a la IA en si (aislada, sin contexto del ejercicio ni del juego,
-system prompt restrictivo -- ver ahí mismo por qué NO tiene temperature
-baja) vive en isolated_prompt.py. Este archivo solo orquesta: le pasa el
+La llamada a la IA en si (sin el enunciado, pero con el código del juego
+-- ver challenge_context.py --, system prompt restrictivo -- ver ahí mismo
+por qué NO tiene temperature baja) vive en isolated_prompt.py. Este archivo solo orquesta: le pasa el
 prompt del participante a esa llamada aislada y, con la respuesta que
 vuelva, genera los dos bancos de preguntas de opción multiple (comprension
 para la Etapa 3, razonamiento para la Etapa 4) y el texto de explicación
@@ -19,6 +19,7 @@ from typing import Callable, Optional
 
 from ai import ai_backend
 from content.challenges import Challenge
+from ai.challenge_context import CodeContext, build_code_context
 from ai.isolated_prompt import ISOLATED_MODEL, ask_isolated_prompt
 from content.quiz import QuizQuestion
 
@@ -77,6 +78,10 @@ class ChallengeSolveResult:
     provider: str = ""  # "claude" o "gemini"
     model: str = ""
     called_at: Optional[datetime] = None  # momento en que se envió el prompt
+    # Código del juego que recibió la IA junto con el prompt (ver
+    # challenge_context.py): archivos incluidos y huella del texto enviado.
+    context_files: list[str] = field(default_factory=list)
+    context_sha256: str = ""
 
 
 def _question_from_payload(payload: dict) -> QuizQuestion:
@@ -164,10 +169,11 @@ def generate_isolated_response(
     challenge: Challenge, participant_prompt: str,
     on_isolated_response: Optional[Callable[[ChallengeSolveResult], None]] = None,
 ) -> ChallengeSolveResult:
-    """Envía el prompt del participante a la llamada 100% aislada (ver
-    isolated_prompt.ask_isolated_prompt) y, si responde, arma los bancos de
-    preguntas y la explicación de razonamiento de las Etapas 3 y 4 a partir
-    de esa respuesta.
+    """Envía el prompt del participante, junto con el código del juego del
+    desafío (sin el enunciado, ver challenge_context.py), a la llamada
+    aislada (ver isolated_prompt.ask_isolated_prompt) y, si responde, arma
+    los bancos de preguntas y la explicación de razonamiento de las Etapas
+    4 y 5 a partir de esa respuesta.
 
     `on_isolated_response` se llama apenas vuelve la llamada aislada (haya
     respondido o fallado), ANTES de generar los cuestionarios -- que pueden
@@ -175,15 +181,30 @@ def generate_isolated_response(
     sesión se cierre en el medio. Lo que lance se ignora: es solo registro.
     """
     provider = ai_backend.active_provider()
+    try:
+        code_context: Optional[CodeContext] = build_code_context(challenge)
+    except Exception as exc:  # noqa: BLE001 -- sin el código no se debe llamar a la IA a ciegas
+        solve_result = ChallengeSolveResult(
+            ok=False, error=f"No se pudo leer el código del juego para la IA: {exc}",
+            provider=provider, model=ai_backend.requested_model(ISOLATED_MODEL), called_at=datetime.now(),
+        )
+        if on_isolated_response is not None:
+            try:
+                on_isolated_response(solve_result)
+            except Exception:  # noqa: BLE001
+                pass
+        return solve_result
+
     called_at = datetime.now()
     started = time.monotonic()
-    result = ask_isolated_prompt(participant_prompt)
+    result = ask_isolated_prompt(participant_prompt, code_context)
     elapsed = time.monotonic() - started
 
     solve_result = ChallengeSolveResult(
         ok=result.ok, response_text=result.text, error=result.error, elapsed_seconds=elapsed,
         raw_response_text=result.raw_text, provider=provider,
         model=result.model or ai_backend.requested_model(ISOLATED_MODEL), called_at=called_at,
+        context_files=code_context.files, context_sha256=code_context.sha256,
     )
     if on_isolated_response is not None:
         try:

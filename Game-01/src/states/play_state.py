@@ -179,12 +179,6 @@ class PlayState(BaseState):
             settings.SOUNDS["eat"].play()
             self.ambient.duck()
 
-        range_bonus = self.world.consume_range_bonus_event()
-
-        if range_bonus is not None and range_bonus[1] > 0:
-            settings.SOUNDS["eat"].play()
-            self.ambient.duck()
-
         self.ambient.sync_with_world(self.world)
         self.ambient.update(dt)
 

@@ -56,7 +56,7 @@ Cada uno de los 7 juegos (`Game-01` a `Game-07`) es un microvideojuego
 independiente (Pygame + el framework `gale`) con una función
 específica **deliberadamente rota o sin implementar**: ese es el
 "desafío" que el participante debe resolver escribiéndole un prompt a
-una IA aislada (sin contexto del juego ni del enunciado), para
+una IA aislada (que ve el código del juego, pero no el enunciado), para
 después responder cuestionarios sobre la respuesta que le llegó.
 
 ## Estructura del proyecto
@@ -498,8 +498,14 @@ pestaña Sesión). El flujo es:
      raro por su cuenta.
    - **Etapa 2 — El problema**: lee el enunciado real del desafío y
      responde un cuestionario de comprensión.
-   - **Etapa 3 — Tu prompt**: escribe, a ciegas (sin ver el enunciado
-     ni el juego), el prompt que le daría a una IA para resolverlo.
+   - **Etapa 3 — Tu prompt**: escribe el prompt que le daría a una IA
+     para resolverlo. La IA recibe ese prompt junto con todo el código
+     `.py` del juego, pero no el enunciado: qué hay que lograr lo sabe
+     solo por el prompt. Ese código llega sin pistas: sin `tests/` ni
+     guías `.md`, sin comentarios ni docstrings, con la función del
+     desafío reducida a `raise NotImplementedError` y sin las funciones
+     que ya la resuelven casi igual (ver
+     `graphic_interface/ai/challenge_context.py`).
    - **Etapa 4 — Resultado**: ve la respuesta de esa IA aislada y
      responde un cuestionario sobre qué dice/hace esa respuesta.
    - **Etapa 5 — Razonamiento**: lee una explicación de por qué la IA

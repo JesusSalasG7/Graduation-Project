@@ -1,47 +1,50 @@
 """Llamada aislada a la IA (backend configurable -- ver ai_backend.py):
 el mecanismo real detrás del prompt que escribe el participante en la
-Etapa 2 de la sesión guiada (ver challenge_solver.generate_isolated_
-response), "hoja en blanco", sin nada más que el texto exacto que escribió.
+Etapa 3 de la sesión guiada (ver challenge_solver.generate_isolated_
+response).
+
+Qué ve la IA: el código Python completo del juego del desafío actual (ver
+challenge_context.build_code_context: sin tests, sin guías .md y con la
+función del desafío sin su TODO) y, después, el texto exacto que escribió
+el participante. Lo único que NO ve es el enunciado: lo que hay que lograr
+lo sabe solo por las instrucciones del participante.
 
 Por defecto usa el CLI `claude` (headless, `-p`) en vez de la API directa
 de Anthropic, para no depender de una ANTHROPIC_API_KEY: el CLI ya
 funciona con el login / suscripción que este equipo ya tiene configurado.
 Alternativamente, con AI_PROVIDER=gemini + GEMINI_API_KEY (ver
-ai_backend.py), la misma llamada aislada se hace contra la API de Gemini.
-La contrapartida del CLI (backend por defecto) es que el aislamiento no es
-tan estricto como con una API directa (ver el punto 2):
+ai_backend.py), la misma llamada se hace contra la API de Gemini.
 
-  1. Aislamiento: se invoca `claude -p` pasándole ÚNICAMENTE el texto que
-     escribió el participante -- sin enunciado, sin el juego, sin historial
-     de la sesión -- y corriendo con el directorio de trabajo apuntando a
-     una carpeta temporal vacía (no la de este proyecto), para que no se
-     autodescubra ningún CLAUDE.md ni configuración de este repositorio.
-     `--tools ""` deshabilita toda herramienta (no puede leer/escribir
-     archivos ni ejecutar nada). Con el backend Gemini esto no aplica: es
-     una llamada de API pura, sin acceso a filesystem en ningún caso.
-  2. Determinismo: el CLI `claude` NO EXPONE un flag de temperature
-     (verificado contra `claude -p --help`: no existe). Este requisito no
-     se puede cumplir de forma estricta por esta vía -- es la contrapartida
-     de evitar la API directa (que si permite fijarla) y no manejar una
-     ANTHROPIC_API_KEY.
+  1. Aislamiento: el código del juego va DENTRO del mensaje (no se le da
+     acceso a archivos). Con el CLI, `--tools ""` deshabilita toda
+     herramienta y el proceso corre en una carpeta temporal vacía, para
+     que no se autodescubra ningún CLAUDE.md ni configuración de este
+     repositorio. El mensaje va por stdin: el código de algunos juegos
+     supera el límite de largo de un argumento de línea de comandos.
+  2. Determinismo: el CLI `claude` NO EXPONE un flag de temperature. Este
+     requisito no se puede cumplir de forma estricta por esta vía -- es la
+     contrapartida de evitar la API directa y no manejar una API key.
   3. System prompt: `--system-prompt` REEMPLAZA por completo el system
-     prompt por defecto del agente (a diferencia de `--append-system-
-     prompt`, que solo le agrega texto encima), con el texto pedido para
-     el estudio (ver ISOLATED_SYSTEM_PROMPT) más dos cláusulas agregadas:
-     que la respuesta sea código puro (sin explicaciones ni comentarios), y
-     que SIEMPRE devuelva código, aunque el prompt sea incompleto o ambiguo
-     -- si al prompt le falta contexto, eso se ve en el código que genera
-     (y lo evaluan las Etapas 4/5 contra el enunciado), en vez de cortar
-     la sesión en la Etapa 3. Con Gemini, ese mismo texto se manda como
+     prompt por defecto del agente (ver ISOLATED_SYSTEM_PROMPT): seguir
+     solo las instrucciones del participante, usar el código para conocer
+     los nombres reales, devolver solo código, y SIEMPRE devolver código
+     aunque las instrucciones sean incompletas -- si les falta algo, eso se
+     ve en el código que genera (y lo evalúan las Etapas 4/5 contra el
+     enunciado). Con Gemini, ese mismo texto se manda como
      systemInstruction (ver ai_backend._gemini_request).
 """
 
 import tempfile
 from dataclasses import dataclass
+from typing import Optional
 
 from ai import ai_backend
+from ai.challenge_context import CodeContext
+
 ISOLATED_MODEL = "sonnet"
-ISOLATED_TIMEOUT_SECONDS = 120
+# Más alto que antes de mandar el código del juego: el mensaje ahora pesa
+# entre 25 y 95 KB según el juego.
+ISOLATED_TIMEOUT_SECONDS = 180
 
 
 def ai_provider_available() -> bool:
@@ -59,19 +62,38 @@ def ai_provider_available() -> bool:
 
 
 ISOLATED_SYSTEM_PROMPT = (
-    "Eres un asistente de IA que inicia como una hoja en blanco. No tienes "
-    "conocimiento de ningún contexto previo, sistema o problema subyacente. "
-    "Debes responder única y exclusivamente basándote en la información y "
-    "las instrucciones explícitas proporcionadas en el prompt del usuario. "
-    "No agregues requisitos que el prompt no pida y sé completamente "
-    "literal con la solicitud. "
-    "Tu respuesta debe ser ÚNICAMENTE código: sin explicaciones antes o "
-    "después, sin comentarios dentro del código, y sin bloques de markdown "
-    "(```) -- solo el código en sí, listo para copiar y pegar. "
-    "Responde SIEMPRE con código, aunque el prompt sea incompleto o "
-    "ambiguo: en ese caso escribe la mejor implementación que puedas a "
-    "partir de lo que el prompt dice literalmente."
+    "Eres un asistente de programación. Vas a recibir el código fuente "
+    "completo de un proyecto en Python y, después, las instrucciones de un "
+    "usuario. No tienes ningún otro contexto: lo que el usuario quiere "
+    "lograr lo sabes única y exclusivamente por sus instrucciones. Usa el "
+    "código para conocer los nombres, clases, métodos y estructuras que "
+    "existen, pero haz solo lo que las instrucciones piden, de forma "
+    "literal, sin agregar requisitos que no pidan ni suponer objetivos que "
+    "no estén escritos en ellas. "
+    "Tu respuesta debe ser ÚNICAMENTE código Python: solo la función o el "
+    "método que escribas o modifiques (no el archivo completo ni el resto "
+    "del proyecto), sin explicaciones antes o después, sin comentarios "
+    "dentro del código, y sin bloques de markdown (```) -- solo el código "
+    "en sí, listo para copiar y pegar. "
+    "Responde SIEMPRE con código, aunque las instrucciones sean incompletas "
+    "o ambiguas: en ese caso escribe la mejor implementación que puedas a "
+    "partir de lo que las instrucciones dicen literalmente."
 )
+
+
+def build_isolated_message(participant_prompt: str, code_context: Optional[CodeContext]) -> str:
+    """Mensaje que recibe la IA: el código del juego (si hay) y, al final,
+    las instrucciones del participante tal cual las escribió."""
+    prompt = participant_prompt.strip()
+    if code_context is None or not code_context.text:
+        return prompt
+    return (
+        "Este es el código fuente completo del proyecto:\n\n"
+        f"{code_context.text}\n\n"
+        "---\n\n"
+        "Instrucciones del usuario:\n\n"
+        f"{prompt}"
+    )
 
 
 @dataclass
@@ -98,11 +120,14 @@ def _strip_code_fences(text: str) -> str:
     return text
 
 
-def ask_isolated_prompt(participant_prompt: str) -> IsolatedPromptResult:
-    """Envía `participant_prompt` -- y solo eso -- al backend de IA
+def ask_isolated_prompt(
+    participant_prompt: str, code_context: Optional[CodeContext] = None,
+) -> IsolatedPromptResult:
+    """Envía `participant_prompt`, junto con el código del juego
+    (`code_context`, ver challenge_context.py), al backend de IA
     seleccionado (ver ai_backend.py), con el system prompt de arriba, sin
     herramientas, y (para el backend 'claude') corriendo en una carpeta
-    vacía para minimizar que se cuele contexto de este proyecto.
+    vacía para que no se cuele otro contexto de este proyecto.
     """
     prompt = participant_prompt.strip()
     if not prompt:
@@ -110,7 +135,8 @@ def ask_isolated_prompt(participant_prompt: str) -> IsolatedPromptResult:
 
     with tempfile.TemporaryDirectory(prefix="isolated_prompt_") as empty_dir:
         result = ai_backend.run_isolated_prompt(
-            prompt, ISOLATED_SYSTEM_PROMPT, ISOLATED_MODEL, ISOLATED_TIMEOUT_SECONDS, cwd=empty_dir,
+            build_isolated_message(prompt, code_context), ISOLATED_SYSTEM_PROMPT,
+            ISOLATED_MODEL, ISOLATED_TIMEOUT_SECONDS, cwd=empty_dir,
         )
 
     if not result.ok:

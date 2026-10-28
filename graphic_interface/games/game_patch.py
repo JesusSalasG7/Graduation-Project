@@ -77,10 +77,11 @@ def _solution_function(func_name: str, solution_code: str) -> ast.FunctionDef:
     except SyntaxError as exc:
         raise PatchError(f"El código generado no es Python válido: {exc}") from exc
 
-    func_node = next(
-        (n for n in parsed.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))),
-        None,
-    )
+    functions = [n for n in parsed.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    # Con el código del juego a la vista, la IA puede devolver también
+    # alguna función auxiliar: se prefiere la que se llama como la del
+    # desafío y, si ninguna se llama así, la primera.
+    func_node = next((n for n in functions if n.name == func_name), functions[0] if functions else None)
     if func_node is None:
         raise PatchError("El código generado no contiene ninguna función/método.")
     func_node.name = func_name
@@ -116,9 +117,9 @@ def _apply_replacement(game_dir: Path, relative_file: str, class_name: Optional[
 # Desafío. El desafío A01 (World.count_apples_in_range) SOLO se ejercita
 # en Modo Desafío -- ver `self.mode == "challenge"` en src/world.py --
 # así que si la sesión guiada dejara el juego en el splash/menu (o el
-# participante terminara en Modo Clásico), nunca se vería el conteo ni
-# el bono periódico roto/incompleto que la Etapa 1 necesita mostrar, ni
-# la solución aplicada en la Etapa 6. Por eso, solo en esta copia
+# participante terminara en Modo Clásico), nunca se vería el conteo
+# "En rango: N/Total" roto que la Etapa 1 necesita mostrar, ni la
+# solución aplicada en la Etapa 6. Por eso, solo en esta copia
 # temporal, se salta directo a PlayState en Modo Desafío.
 _SNAKE_COVER_CALL = 'self.state_machine.change("cover")'
 _SNAKE_CHALLENGE_CALL = 'self.state_machine.change("play", mode="challenge")'

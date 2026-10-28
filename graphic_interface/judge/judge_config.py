@@ -60,7 +60,7 @@ JUDGE_SEED = 20261013
 # que subirla a mano cada vez que cambie la plantilla, la rúbrica, las reglas
 # o una ficha. Como respaldo, cada llamada guarda además un hash del texto
 # realmente enviado (ver judge_prompt.context_hash).
-JUDGE_TEMPLATE_VERSION = "1.0"
+JUDGE_TEMPLATE_VERSION = "1.1"  # 1.1: Game-01 sin el bono de puntos
 
 # Respuesta que no cumple el formato: se repite la llamada una vez.
 JUDGE_INVALID_RETRIES = 1

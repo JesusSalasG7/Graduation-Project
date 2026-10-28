@@ -403,13 +403,6 @@ CHALLENGE_APPLE_COUNT = 6
 # World._spawn_apple / World._update_apple_timers.
 CHALLENGE_OUT_OF_RANGE_LIFETIME_RANGE = (3.0, 6.0)
 
-# Every CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS, World scores
-# count_apples_in_range(): each apple currently sitting inside the active
-# filter window is worth this many bonus points, on top of whatever eating
-# it directly is worth -- see World._update_range_bonus.
-CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS = 5.0
-CHALLENGE_RANGE_BONUS_PER_APPLE = 2
-
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_ESCAPE, "quit")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_UP, "move_up")
 input_handler.InputHandler.set_keyboard_action(input_handler.KEY_DOWN, "move_down")

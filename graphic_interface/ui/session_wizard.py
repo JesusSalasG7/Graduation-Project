@@ -12,11 +12,13 @@ Etapa 2 -- pantalla dividida: enunciado completo del desafío a la izquierda,
            7 preguntas de opción multiple sobre ESE enunciado a la derecha
            (banco estático, ver statement_quiz.py).
 Etapa 3 -- el participante escribe su propio prompt para resolverlo; al
-           enviarlo, ese prompt -- y SOLO ese prompt, sin el enunciado ni
-           ningún otro contexto -- se envía a una IA completamente aislada
-           (ver isolated_prompt.py y challenge_solver.generate_isolated_
-           response): si el prompt no alcanza a describir el problema, la
-           respuesta lo va a reflejar.
+           enviarlo, ese prompt se envía a una IA aislada junto con el
+           código completo del juego del desafío, pero SIN el enunciado
+           (ver isolated_prompt.py, challenge_context.py y
+           challenge_solver.generate_isolated_response): la IA conoce el
+           código, pero qué hay que lograr lo sabe solo por el prompt; si
+           el prompt no alcanza a describir el problema, la respuesta lo
+           va a reflejar.
 Etapa 4 -- pantalla dividida: la respuesta cruda que devolvió esa IA
            aislada a la izquierda, 7 preguntas de opción multiple sobre esa
            respuesta concreta a la derecha (generadas dinámicamente).
@@ -1943,9 +1945,10 @@ class SessionWizard:
                 "para que resuelva este ejercicio. Abajo tienes, como referencia, la "
                 "función exacta que hay que implementar (no hace falta que la "
                 "memorices, ni es lo que se evalúa). Importante: la IA que va a "
-                "responder NO va a ver el enunciado ni nada de lo que leíste antes -- "
-                "solo el texto exacto que escribas acá. Si tu prompt no incluye el "
-                "contexto necesario, la respuesta lo va a reflejar."
+                "responder tiene acceso a todo el código del juego, pero NO va a ver "
+                "el enunciado ni nada de lo que leíste antes -- lo que hay que lograr "
+                "lo sabrá solo por el texto exacto que escribas acá. Si tu prompt no "
+                "explica bien el problema, la respuesta lo va a reflejar."
             ),
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(12)), text_color=self.c["TEXT_MUTED"],
             wraplength=wrap(900), justify="left",
@@ -2035,6 +2038,7 @@ class SessionWizard:
                 raw_response=result.raw_response_text,
                 code=result.response_text if result.ok else "",
                 error="" if result.ok else (result.error or "Error desconocido"),
+                context_files=result.context_files, context_sha256=result.context_sha256,
             )
         except Exception:  # noqa: BLE001
             pass
@@ -2089,11 +2093,11 @@ class SessionWizard:
             error_label.pack(anchor="w", pady=(0, 10))
             fitted_labels.append((error_label, 0, None))
 
-        self._section(left, "💻  Código generado (sin ningún contexto)")
+        self._section(left, "💻  Código generado (sin el enunciado)")
         reminder_label = ctk.CTkLabel(
             left,
-            text="Recuerda: esta IA solo vio el prompt exacto que escribiste en la Etapa 3, "
-            "nada más.",
+            text="Recuerda: esta IA vio el código del juego y el prompt exacto que "
+            "escribiste en la Etapa 3, pero no el enunciado.",
             font=ctk.CTkFont(family=FONT_FAMILY, size=scaled(11)), text_color=self.c["TEXT_MUTED"],
             wraplength=wrap(420), justify="left",
         )

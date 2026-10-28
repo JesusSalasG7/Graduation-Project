@@ -45,9 +45,6 @@ class World:
         for _ in range(apple_count):
             self._spawn_apple()
 
-        self._range_bonus_timer = 0.0
-        self._range_bonus_event = None
-
         self.score = 0
         self.game_over = False
         self._move_timer = 0.0
@@ -109,16 +106,6 @@ class World:
         self._eat_event = False
         return happened
 
-    def consume_range_bonus_event(self):
-        """
-        (count, bonus_points) from the last count_apples_in_range() payout,
-        or None if none happened since the last read -- challenge mode only,
-        see _update_range_bonus.
-        """
-        event = self._range_bonus_event
-        self._range_bonus_event = None
-        return event
-
     def set_direction(self, direction: Direction) -> None:
         if not self.finished:
             self.snake.set_direction(direction)
@@ -134,7 +121,6 @@ class World:
 
         if self.mode == "challenge":
             self._update_filter_window(dt)
-            self._update_range_bonus(dt)
 
         self._move_timer += dt
 
@@ -270,31 +256,6 @@ class World:
                 apple.expires_in = None
             elif apple.expires_in is None:
                 apple.expires_in = random.uniform(*settings.CHALLENGE_OUT_OF_RANGE_LIFETIME_RANGE)
-
-    def _update_range_bonus(self, dt: float) -> None:
-        """
-        Every CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS, scores
-        count_apples_in_range() -- challenge mode only (see update()).
-        Sets _range_bonus_event so PlayState can react (a sound) exactly
-        once per payout; see consume_range_bonus_event.
-        """
-        self._range_bonus_timer += dt
-
-        if self._range_bonus_timer < settings.CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS:
-            return
-
-        self._range_bonus_timer -= settings.CHALLENGE_RANGE_BONUS_INTERVAL_SECONDS
-
-        # count_apples_in_range() is a TODO (raises NotImplementedError)
-        # until the A01 challenge is solved -- the bonus is simply 0 in
-        # that case, instead of crashing every 5 seconds.
-        try:
-            count = self.count_apples_in_range() or 0
-        except Exception:
-            count = 0
-        bonus = count * settings.CHALLENGE_RANGE_BONUS_PER_APPLE
-        self.score += bonus
-        self._range_bonus_event = (count, bonus)
 
     def _apple_passes_filter(self, value: int) -> bool:
         return self.filter_min <= value <= self.filter_max
