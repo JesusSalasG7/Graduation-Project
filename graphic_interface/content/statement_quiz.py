@@ -35,7 +35,7 @@ STATEMENT_QUESTIONS: dict[str, list[QuizQuestion]] = {
         ),
         QuizQuestion(
             "¿Qué método ya existente debe reutilizarse para decidir si una manzana individual pasa el filtro?",
-            ["count_apples_in_range()", "_apple_passes_filter(value)", "food_field.apples()", "_update_range_bonus()"],
+            ["count_apples_in_range()", "_apple_passes_filter(value)", "food_field.apples()", "_update_filter_window()"],
             1,
         ),
         QuizQuestion(
@@ -59,12 +59,12 @@ STATEMENT_QUESTIONS: dict[str, list[QuizQuestion]] = {
             2,
         ),
         QuizQuestion(
-            "¿Qué partes del juego consumen el resultado de count_apples_in_range(), según el enunciado?",
+            "¿Dónde se muestra el resultado de count_apples_in_range(), según el enunciado?",
             [
-                "Solo el sistema de puntuación final",
-                "El HUD \"En rango: N/Total\" y el bono periódico de puntos del modo Desafío",
-                "La generación aleatoria de nuevas manzanas",
-                "El sistema de colisiones de la serpiente",
+                "En el puntaje: suma puntos por cada manzana en rango",
+                "En el indicador \"En rango: N/Total\" del modo Desafío",
+                "En el valor de las manzanas nuevas que aparecen",
+                "En la velocidad de la serpiente",
             ],
             1,
         ),

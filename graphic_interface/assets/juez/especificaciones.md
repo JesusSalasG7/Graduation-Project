@@ -25,7 +25,7 @@ Las fichas están contrastadas con `graphic_interface/content/challenges.py` (el
 
 - Cuenta cuántas manzanas del tablero tienen un valor dentro del filtro activo `[filter_min, filter_max]`, con ambos límites incluidos.
 - Cada manzana tiene un valor entero: -5, 5 o 15.
-- El resultado alimenta el indicador "En rango: N/Total" y suma 2 puntos por manzana en rango cada 5 segundos.
+- El resultado es lo que muestra el indicador "En rango: N/Total"; no suma puntos ni cambia nada del juego.
 
 **Restricciones de implementación**
 

@@ -39,21 +39,17 @@ CHALLENGES: dict[str, Challenge] = {
             "para que devuelva cuántas manzanas del tablero tienen su valor dentro "
             "del rango activo (límites inclusive), reutilizando el método ya "
             "existente World._apple_passes_filter(value) para decidir si cada "
-            "manzana individual pasa el filtro. Este conteo alimenta dos cosas: el "
-            "indicador en pantalla \"En rango: N/Total\", y un BONO DE PUNTOS "
-            "AUTOMÁTICO -- cada 5 segundos, sin que el jugador tenga que comer "
-            "nada, el juego debe sumar 2 puntos por cada manzana que en ESE "
-            "momento esté dentro del filtro activo (N manzanas en rango -> "
-            "+2*N puntos, cada 5 segundos, solo, sin comer)."
+            "manzana individual pasa el filtro. Este conteo es lo que muestra el "
+            "indicador en pantalla \"En rango: N/Total\": N es el resultado de "
+            "count_apples_in_range() y Total, la cantidad de manzanas en el tablero."
         ),
         broken_symptom=(
-            "Juega un rato en Modo Desafío sin comer ninguna manzana y mira tu "
-            "puntaje: cada 5 segundos, el juego debería sumarte puntos solo por "
-            "tener manzanas dentro del \"Filtro activo: [X, Y]\" que se ve arriba "
-            "(2 puntos por cada manzana en rango, aunque no la comas) -- es un "
-            "bono automático, aparte de los puntos de comer. Fíjate si el "
-            "indicador \"En rango: N/Total\" y ese aumento de puntaje cada 5 "
-            "segundos realmente pasan, o si tu puntaje se queda quieto."
+            "Juega un rato en Modo Desafío y mira el indicador \"En rango: N/Total\" "
+            "que aparece arriba, debajo del \"Filtro activo: [X, Y]\". Compáralo con "
+            "las manzanas del tablero: N debería ser cuántas tienen su valor dentro "
+            "del filtro activo, y cambiar cuando cambia el filtro o aparecen "
+            "manzanas nuevas. Fíjate si ese número realmente corresponde, o si se "
+            "queda siempre igual."
         ),
         signature="def count_apples_in_range(self) -> int:",
         requirements=[

@@ -22,10 +22,9 @@ Ya existe un método que responde esa pregunta para **una sola** manzana:
 falta reimplementar esa comparación -- solo usarla una vez por manzana y
 llevar la cuenta de cuántas veces da `True`.
 
-Este número alimenta dos cosas del juego (no hace falta tocarlas, solo saber
-que dependen de esto):
-- El HUD `En rango: N/Total` (`src/rendering/world_renderer.py`).
-- El bono periódico de puntos (`World._update_range_bonus`).
+Este número es lo que muestra el HUD `En rango: N/Total`
+(`src/rendering/world_renderer.py`); no hace falta tocar el HUD, solo saber
+que depende de esto.
 
 ### Ejemplo para verificar a mano
 

@@ -117,9 +117,9 @@ def _apply_replacement(game_dir: Path, relative_file: str, class_name: Optional[
 # Desafío. El desafío A01 (World.count_apples_in_range) SOLO se ejercita
 # en Modo Desafío -- ver `self.mode == "challenge"` en src/world.py --
 # así que si la sesión guiada dejara el juego en el splash/menu (o el
-# participante terminara en Modo Clásico), nunca se vería el conteo ni
-# el bono periódico roto/incompleto que la Etapa 1 necesita mostrar, ni
-# la solución aplicada en la Etapa 6. Por eso, solo en esta copia
+# participante terminara en Modo Clásico), nunca se vería el conteo
+# "En rango: N/Total" roto que la Etapa 1 necesita mostrar, ni la
+# solución aplicada en la Etapa 6. Por eso, solo en esta copia
 # temporal, se salta directo a PlayState en Modo Desafío.
 _SNAKE_COVER_CALL = 'self.state_machine.change("cover")'
 _SNAKE_CHALLENGE_CALL = 'self.state_machine.change("play", mode="challenge")'
