@@ -88,6 +88,95 @@ def _solution_function(func_name: str, solution_code: str) -> ast.FunctionDef:
     return func_node
 
 
+def _defined_name(node: ast.stmt) -> Optional[str]:
+    """Nombre que define una función/clase o una asignación simple
+    (`X = ...` / `X: T = ...`); None para el resto."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return node.name
+    if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+        return node.targets[0].id
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.target.id
+    return None
+
+
+def _solution_parts(
+    func_name: str, class_name: Optional[str], solution_code: str,
+) -> tuple[ast.FunctionDef, list[ast.stmt], list[ast.stmt]]:
+    """Separa el código de la IA en (función del desafío, auxiliares,
+    imports). Con el código del juego a la vista, la IA suele devolver,
+    además de la función del desafío, funciones auxiliares o constantes
+    que esa función usa (p.ej. `_merge_sort`, `_count_live_neighbors`):
+    si solo se insertara la función del desafío, el juego fallaría con
+    NameError al llamarla. Si la IA envuelve el método en su clase
+    (`class World: ...`), se toma lo de adentro de esa clase."""
+    try:
+        parsed = ast.parse(textwrap.dedent(solution_code))
+    except SyntaxError as exc:
+        raise PatchError(f"El código generado no es Python válido: {exc}") from exc
+
+    body = parsed.body
+    is_function = lambda n: isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))  # noqa: E731
+    if class_name is not None and not any(is_function(n) for n in body):
+        wrapper = next(
+            (n for n in body if isinstance(n, ast.ClassDef) and any(
+                is_function(m) and m.name == func_name for m in n.body)),
+            None,
+        )
+        if wrapper is not None:
+            body = [n for n in body if n is not wrapper] + wrapper.body
+
+    functions = [n for n in body if is_function(n)]
+    # La que se llama como la del desafío y, si ninguna, la primera (igual que _solution_function).
+    main = next((n for n in functions if n.name == func_name), functions[0] if functions else None)
+    if main is None:
+        raise PatchError("El código generado no contiene ninguna función/método.")
+    main.name = func_name
+    imports = [n for n in body if isinstance(n, (ast.Import, ast.ImportFrom))]
+    helpers = [n for n in body if n is not main and _defined_name(n) not in (None, func_name)]
+    return main, helpers, imports
+
+
+def _apply_solution(game_dir: Path, relative_file: str, class_name: Optional[str],
+                    func_name: str, solution_code: str) -> None:
+    """Reemplaza la función/método del desafío por la de la IA e inserta
+    sus auxiliares en el mismo lugar (módulo o clase): si ya existe algo
+    con ese nombre, se reemplaza; si no, se agrega justo antes de la
+    función del desafío. Los imports de la IA van al principio del
+    módulo."""
+    source_path = game_dir / relative_file
+    if not source_path.exists():
+        raise PatchError(f"No se encontró {relative_file} en la copia del juego.")
+
+    main, helpers, imports = _solution_parts(func_name, class_name, solution_code)
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    body, index = _find_function_slot(tree, class_name, func_name)
+    body[index] = ast.copy_location(main, body[index])
+
+    for helper in helpers:
+        name = _defined_name(helper)
+        existing = next((i for i, n in enumerate(body) if _defined_name(n) == name), None)
+        if existing is not None:
+            body[existing] = helper
+        else:
+            slot = next(i for i, n in enumerate(body) if n is main)
+            body.insert(slot, helper)
+
+    if imports:
+        # Después del docstring y de los `from __future__`, que deben ir primero.
+        position = 0
+        while position < len(tree.body) and (
+            (position == 0 and isinstance(tree.body[0], ast.Expr)
+             and isinstance(getattr(tree.body[0], "value", None), ast.Constant))
+            or (isinstance(tree.body[position], ast.ImportFrom) and tree.body[position].module == "__future__")
+        ):
+            position += 1
+        tree.body[position:position] = imports
+
+    ast.fix_missing_locations(tree)
+    source_path.write_text(ast.unparse(tree), encoding="utf-8")
+
+
 def _copy_game_to_tempdir(game: GameInfo) -> Path:
     tmp_root = Path(tempfile.mkdtemp(prefix=f"sesion_guiada_{game.name}_"))
     dest = tmp_root / game.name
@@ -96,20 +185,6 @@ def _copy_game_to_tempdir(game: GameInfo) -> Path:
         ignore=shutil.ignore_patterns(".venv", "__pycache__", "*.pyc", ".git"),
     )
     return dest
-
-
-def _apply_replacement(game_dir: Path, relative_file: str, class_name: Optional[str],
-                        func_name: str, replacement_factory) -> None:
-    source_path = game_dir / relative_file
-    if not source_path.exists():
-        raise PatchError(f"No se encontró {relative_file} en la copia del juego.")
-
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
-    body, index = _find_function_slot(tree, class_name, func_name)
-    replacement = replacement_factory(body[index])
-    body[index] = ast.copy_location(replacement, body[index])
-    ast.fix_missing_locations(tree)
-    source_path.write_text(ast.unparse(tree), encoding="utf-8")
 
 
 # Game-01 (Snake) arranca por defecto en el estado "cover" (splash) y de
@@ -182,10 +257,7 @@ def launch_game_with_solution(game: GameInfo, challenge: Challenge, solution_cod
     relative_file, class_name, func_name = _parse_location(challenge.location)
     game_dir = _copy_game_to_tempdir(game)
     try:
-        _apply_replacement(
-            game_dir, relative_file, class_name, func_name,
-            lambda _original: _solution_function(func_name, solution_code),
-        )
+        _apply_solution(game_dir, relative_file, class_name, func_name, solution_code)
         if game.name == "Game-01":
             _force_snake_challenge_mode(game_dir)
     except Exception:
