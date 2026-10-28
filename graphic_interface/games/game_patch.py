@@ -77,10 +77,11 @@ def _solution_function(func_name: str, solution_code: str) -> ast.FunctionDef:
     except SyntaxError as exc:
         raise PatchError(f"El código generado no es Python válido: {exc}") from exc
 
-    func_node = next(
-        (n for n in parsed.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))),
-        None,
-    )
+    functions = [n for n in parsed.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    # Con el código del juego a la vista, la IA puede devolver también
+    # alguna función auxiliar: se prefiere la que se llama como la del
+    # desafío y, si ninguna se llama así, la primera.
+    func_node = next((n for n in functions if n.name == func_name), functions[0] if functions else None)
     if func_node is None:
         raise PatchError("El código generado no contiene ninguna función/método.")
     func_node.name = func_name

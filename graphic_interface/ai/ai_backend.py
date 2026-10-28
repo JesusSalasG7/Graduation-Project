@@ -156,14 +156,17 @@ def _claude_cli_request(
     prompt: str, system_prompt: str, model: str, timeout: int,
     json_schema: Optional[dict], cwd: Optional[str],
 ) -> AIResult:
-    cmd = [CLAUDE_BIN, "-p", prompt, "--tools", "", "--model", model, "--output-format", "json"]
+    # El prompt va por stdin, no como argumento: en la Etapa 3 incluye el
+    # código completo del juego (hasta ~95 KB, y crece con el juego), y Linux no acepta un
+    # argumento de más de 128 KB.
+    cmd = [CLAUDE_BIN, "-p", "--tools", "", "--model", model, "--output-format", "json"]
     if system_prompt:
         cmd += ["--system-prompt", system_prompt]
     if json_schema is not None:
         cmd += ["--json-schema", json.dumps(json_schema)]
 
     try:
-        proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, cwd=cwd, input=prompt, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError:
         return AIResult(ok=False, error="No se encontró el comando 'claude' en el PATH.")
     except subprocess.TimeoutExpired:
@@ -199,7 +202,7 @@ def _claude_cli_request(
 def run_isolated_prompt(
     prompt: str, system_prompt: str, model: str, timeout: int, cwd: Optional[str] = None,
 ) -> AIResult:
-    """Llamada aislada de texto libre (Etapa 2 -- ver isolated_prompt.py
+    """Llamada aislada de texto libre (Etapa 3 -- ver isolated_prompt.py
     para el aislamiento real: system prompt
     restrictivo, sin tools, carpeta de trabajo vacía). `cwd` solo aplica al
     backend 'claude' (aislamiento de filesystem); Gemini es una llamada de

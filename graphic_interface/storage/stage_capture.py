@@ -539,6 +539,7 @@ def write_stage3_ai_files(
     stage_folder: Path, *, challenge_id: str, provider: str, model: str,
     called_at: Optional[datetime], elapsed_seconds: float,
     raw_response: str = "", code: str = "", error: str = "",
+    context_files: Optional[list[str]] = None, context_sha256: str = "",
 ) -> None:
     """Etapa 3: lo que devolvió la IA aislada al prompt de este intento
     (antes solo vivía en memoria).
@@ -550,7 +551,10 @@ def write_stage3_ai_files(
     - `metadatos_ia.json`: proveedor, modelo, fecha y hora de la llamada,
       duración y desafío; `error` trae el motivo si la llamada falló o no
       se pudo extraer código (en ese caso no se escribe `codigo_generado.py`,
-      ni `respuesta_ia.txt` si no llegó ninguna respuesta).
+      ni `respuesta_ia.txt` si no llegó ninguna respuesta);
+      `contexto_codigo` lista los archivos del juego que recibió la IA junto
+      con el prompt y la huella SHA-256 de ese texto (ver
+      ai/challenge_context.py).
 
     Las sesiones grabadas antes de este registro no tienen estos archivos.
     """
@@ -565,6 +569,10 @@ def write_stage3_ai_files(
         "fecha_hora_llamada": called_at.isoformat(timespec="seconds") if called_at else None,
         "duracion_segundos": round(elapsed_seconds, 2),
         "error": error or None,
+        "contexto_codigo": {
+            "archivos": context_files or [],
+            "sha256": context_sha256 or None,
+        },
     }
     (stage_folder / "metadatos_ia.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8",
